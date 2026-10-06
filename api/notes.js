@@ -45,16 +45,18 @@ export default async function handler(request, response) {
     return response.status(401).json({ error: 'UNAUTHORIZED' });
   }
 
+  const currentUserId = verifiedUser.userId;
   const supabase = createClient(supabaseUrl, supabaseSecretKey);
   const method = request.method;
   const id = request.query?.id;
 
-  // 1. 목록 조회: GET /api/notes
+  // 1. 목록 조회: GET /api/notes (본인 소유 메모만 조회)
   if (method === 'GET' && !id) {
     try {
       const { data: notes, error } = await supabase
         .from('notes')
         .select('id, title, content, owner_id')
+        .eq('owner_id', currentUserId)
         .order('id', { ascending: true });
 
       if (error) {
@@ -65,7 +67,6 @@ export default async function handler(request, response) {
         id: String(note.id),
         title: note.title,
         body: note.content,
-        owner_id: note.owner_id,
       }));
 
       return response.status(200).json(formatted);
@@ -74,7 +75,7 @@ export default async function handler(request, response) {
     }
   }
 
-  // 2. 단건 조회: GET /api/notes/:id
+  // 2. 단건 조회: GET /api/notes/:id (본인 소유 확인, 타인 메모는 403 거부)
   if (method === 'GET' && id) {
     try {
       const { data: note, error } = await supabase
@@ -89,6 +90,9 @@ export default async function handler(request, response) {
       if (!note) {
         return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       }
+      if (note.owner_id !== currentUserId) {
+        return response.status(403).json({ error: 'FORBIDDEN' });
+      }
 
       return response.status(200).json({
         id: String(note.id),
@@ -100,7 +104,7 @@ export default async function handler(request, response) {
     }
   }
 
-  // 3. 메모 추가: POST /api/notes -> {id, title, body}
+  // 3. 메모 추가: POST /api/notes -> {id, title, body} (본인 ID로만 저장)
   if (method === 'POST') {
     let bodyData = request.body;
     if (typeof bodyData === 'string') {
@@ -120,7 +124,7 @@ export default async function handler(request, response) {
           id: noteId,
           title: title,
           content: body || '',
-          owner_id: verifiedUser.userId,
+          owner_id: currentUserId,
         })
         .select('id, title, content')
         .single();
@@ -139,7 +143,7 @@ export default async function handler(request, response) {
     }
   }
 
-  // 4. 메모 수정: PUT /api/notes/:id
+  // 4. 메모 수정: PUT /api/notes/:id (기존 행과 새 행 소유자 모두 본인이어야 함, 소유자 변경 거부)
   if (method === 'PUT') {
     if (!id) return response.status(400).json({ error: 'NOTE_ID_REQUIRED' });
 
@@ -149,8 +153,33 @@ export default async function handler(request, response) {
     }
     const { title, body } = bodyData || {};
 
+    // 본문에서 owner_id를 조작하려 하거나 본인이 아닌 다른 ID로 바꾸려는 경우 거부
+    if (bodyData?.owner_id !== undefined && bodyData.owner_id !== currentUserId) {
+      return response.status(403).json({ error: 'FORBIDDEN' });
+    }
+
     try {
-      const updatePayload = {};
+      // 1) 기존 행 조회하여 소유자 확인
+      const { data: existing, error: fetchErr } = await supabase
+        .from('notes')
+        .select('id, owner_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (fetchErr) {
+        return response.status(500).json({ error: 'DATABASE_QUERY_FAILED' });
+      }
+      if (!existing) {
+        return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+      }
+      if (existing.owner_id !== currentUserId) {
+        return response.status(403).json({ error: 'FORBIDDEN' });
+      }
+
+      // 2) 수정 payload 구성 (owner_id는 항상 본인 ID 유지)
+      const updatePayload = {
+        owner_id: currentUserId,
+      };
       if (title !== undefined) updatePayload.title = title;
       if (body !== undefined) updatePayload.content = body;
 
@@ -158,6 +187,7 @@ export default async function handler(request, response) {
         .from('notes')
         .update(updatePayload)
         .eq('id', id)
+        .eq('owner_id', currentUserId)
         .select('id, title, content')
         .maybeSingle();
 
@@ -178,15 +208,34 @@ export default async function handler(request, response) {
     }
   }
 
-  // 5. 메모 삭제: DELETE /api/notes/:id
+  // 5. 메모 삭제: DELETE /api/notes/:id (본인 소유 행만 삭제 허용)
   if (method === 'DELETE') {
     if (!id) return response.status(400).json({ error: 'NOTE_ID_REQUIRED' });
 
     try {
-      const { error, count } = await supabase
+      // 1) 기존 행 소유자 확인
+      const { data: existing, error: fetchErr } = await supabase
         .from('notes')
-        .delete({ count: 'exact' })
-        .eq('id', id);
+        .select('id, owner_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (fetchErr) {
+        return response.status(500).json({ error: 'DATABASE_QUERY_FAILED' });
+      }
+      if (!existing) {
+        return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+      }
+      if (existing.owner_id !== currentUserId) {
+        return response.status(403).json({ error: 'FORBIDDEN' });
+      }
+
+      // 2) 본인 소유 메모 삭제
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', id)
+        .eq('owner_id', currentUserId);
 
       if (error) {
         return response.status(500).json({ error: 'DATABASE_DELETE_FAILED' });
