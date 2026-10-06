@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
@@ -20,10 +21,6 @@ async function getVerifier(supabaseSecretKey) {
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
-  if (request.method !== 'GET') {
-    return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
-  }
-
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
@@ -36,26 +33,170 @@ export default async function handler(request, response) {
     return response.status(401).json({ error: 'UNAUTHORIZED' });
   }
 
+  let verifiedUser = null;
   try {
     const verifyLogin = await getVerifier(supabaseSecretKey);
-    const verified = await verifyLogin(authorization);
-
-    if (!verified || !verified.userId) {
-      return response.status(401).json({ error: 'UNAUTHORIZED' });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseSecretKey);
-    const { data: notes, error } = await supabase
-      .from('notes')
-      .select('title, content')
-      .order('id', { ascending: true });
-
-    if (error) {
-      return response.status(500).json({ error: 'DATABASE_QUERY_FAILED' });
-    }
-
-    return response.status(200).json({ notes: notes || [] });
+    verifiedUser = await verifyLogin(authorization);
   } catch (_err) {
-    return response.status(500).json({ error: 'SERVER_ERROR' });
+    return response.status(401).json({ error: 'UNAUTHORIZED' });
   }
+
+  if (!verifiedUser || !verifiedUser.userId) {
+    return response.status(401).json({ error: 'UNAUTHORIZED' });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseSecretKey);
+  const method = request.method;
+  const id = request.query?.id;
+
+  // 1. 목록 조회: GET /api/notes
+  if (method === 'GET' && !id) {
+    try {
+      const { data: notes, error } = await supabase
+        .from('notes')
+        .select('id, title, content, owner_id')
+        .order('id', { ascending: true });
+
+      if (error) {
+        return response.status(500).json({ error: 'DATABASE_QUERY_FAILED' });
+      }
+
+      const formatted = (notes || []).map(note => ({
+        id: String(note.id),
+        title: note.title,
+        body: note.content,
+        owner_id: note.owner_id,
+      }));
+
+      return response.status(200).json(formatted);
+    } catch (_err) {
+      return response.status(500).json({ error: 'SERVER_ERROR' });
+    }
+  }
+
+  // 2. 단건 조회: GET /api/notes/:id
+  if (method === 'GET' && id) {
+    try {
+      const { data: note, error } = await supabase
+        .from('notes')
+        .select('id, title, content, owner_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        return response.status(500).json({ error: 'DATABASE_QUERY_FAILED' });
+      }
+      if (!note) {
+        return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+      }
+
+      return response.status(200).json({
+        id: String(note.id),
+        title: note.title,
+        body: note.content,
+      });
+    } catch (_err) {
+      return response.status(500).json({ error: 'SERVER_ERROR' });
+    }
+  }
+
+  // 3. 메모 추가: POST /api/notes -> {id, title, body}
+  if (method === 'POST') {
+    let bodyData = request.body;
+    if (typeof bodyData === 'string') {
+      try { bodyData = JSON.parse(bodyData); } catch { bodyData = {}; }
+    }
+    const { title, body } = bodyData || {};
+    const noteId = bodyData?.id || randomUUID();
+
+    if (!title || typeof title !== 'string') {
+      return response.status(400).json({ error: 'INVALID_TITLE' });
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({
+          id: noteId,
+          title: title,
+          content: body || '',
+          owner_id: verifiedUser.userId,
+        })
+        .select('id, title, content')
+        .single();
+
+      if (error) {
+        return response.status(500).json({ error: 'DATABASE_INSERT_FAILED', details: error.message });
+      }
+
+      return response.status(201).json({
+        id: String(data.id),
+        title: data.title,
+        body: data.content,
+      });
+    } catch (_err) {
+      return response.status(500).json({ error: 'SERVER_ERROR' });
+    }
+  }
+
+  // 4. 메모 수정: PUT /api/notes/:id
+  if (method === 'PUT') {
+    if (!id) return response.status(400).json({ error: 'NOTE_ID_REQUIRED' });
+
+    let bodyData = request.body;
+    if (typeof bodyData === 'string') {
+      try { bodyData = JSON.parse(bodyData); } catch { bodyData = {}; }
+    }
+    const { title, body } = bodyData || {};
+
+    try {
+      const updatePayload = {};
+      if (title !== undefined) updatePayload.title = title;
+      if (body !== undefined) updatePayload.content = body;
+
+      const { data, error } = await supabase
+        .from('notes')
+        .update(updatePayload)
+        .eq('id', id)
+        .select('id, title, content')
+        .maybeSingle();
+
+      if (error) {
+        return response.status(500).json({ error: 'DATABASE_UPDATE_FAILED' });
+      }
+      if (!data) {
+        return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
+      }
+
+      return response.status(200).json({
+        id: String(data.id),
+        title: data.title,
+        body: data.content,
+      });
+    } catch (_err) {
+      return response.status(500).json({ error: 'SERVER_ERROR' });
+    }
+  }
+
+  // 5. 메모 삭제: DELETE /api/notes/:id
+  if (method === 'DELETE') {
+    if (!id) return response.status(400).json({ error: 'NOTE_ID_REQUIRED' });
+
+    try {
+      const { error, count } = await supabase
+        .from('notes')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+
+      if (error) {
+        return response.status(500).json({ error: 'DATABASE_DELETE_FAILED' });
+      }
+
+      return response.status(200).json({ success: true, deletedId: id });
+    } catch (_err) {
+      return response.status(500).json({ error: 'SERVER_ERROR' });
+    }
+  }
+
+  return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
 }
