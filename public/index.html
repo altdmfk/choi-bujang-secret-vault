@@ -16,18 +16,108 @@
     li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
     strong { display: block; font-size: 18px; margin-bottom: 5px; }
     li span { color: #bfd0e5; }
+    .auth-box { margin: 24px 0; padding: 20px; border: 1px solid #3d5675; border-radius: 14px; background: #132235; }
+    .auth-box h2 { margin: 0 0 14px; font-size: 18px; }
+    .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .form-group input { padding: 10px 14px; border-radius: 8px; border: 1px solid #51667c; background: #1a2a3d; color: #ecf4ff; font-size: 15px; }
+    .btn-row { display: flex; gap: 10px; }
+    .btn { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: #3ecf8e; color: #101a28; }
+    .btn-secondary { background: #51667c; color: #ecf4ff; }
+    .auth-error { margin-top: 10px; color: #ff8b9e; font-size: 14px; display: none; }
+    .user-info { display: flex; align-items: center; justify-content: space-between; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 1단계 피해 확인</div>
-    <h1>점령된 자료실</h1>
-    <p>지금은 보호 장치가 없는 상태입니다. 아래 기록은 모두 실습을 위해 만든 가상 자료입니다.</p>
-    <div class="notice">로그인하지 않은 방문자도 자료를 볼 수 있습니다. 공개 범위를 확인하고, 다음 제작 단계에서 접근을 차례로 막아 주세요.</div>
+    <div class="eyebrow">BYTE BACK · 3단계 신원 확인</div>
+    <h1>자료실</h1>
+    <p>지금은 Supabase Auth 기반 사용자 로그인이 연동된 상태입니다.</p>
+    
+    <div class="auth-box" id="authSection">
+      <div id="loggedOutView">
+        <h2>로그인</h2>
+        <form id="loginForm">
+          <div class="form-group">
+            <input type="email" id="emailInput" placeholder="이메일" required />
+            <input type="password" id="passwordInput" placeholder="비밀번호" required />
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="loginBtn">로그인</button>
+          </div>
+          <div class="auth-error" id="authError"></div>
+        </form>
+      </div>
+
+      <div id="loggedInView" style="display: none;">
+        <div class="user-info">
+          <span>접속 계정: <strong id="userEmail" style="display: inline; color: #8ad8df;"></strong></span>
+          <button type="button" class="btn btn-secondary" id="logoutBtn">로그아웃</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="notice">로그인 상태에 따라 화면 표시가 달라집니다.</div>
     <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
   <script type="module">
+    const SUPABASE_URL = 'https://lklooocegqcqbhayaofm.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_5Gch3Is0iMgMBQaKtWq0ww_hI60Rz5J';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const loggedOutView = document.querySelector('#loggedOutView');
+    const loggedInView = document.querySelector('#loggedInView');
+    const userEmailSpan = document.querySelector('#userEmail');
+    const loginForm = document.querySelector('#loginForm');
+    const emailInput = document.querySelector('#emailInput');
+    const passwordInput = document.querySelector('#passwordInput');
+    const authError = document.querySelector('#authError');
+    const logoutBtn = document.querySelector('#logoutBtn');
     const list = document.querySelector('#notes');
+
+    function updateAuthUI(user) {
+      if (user) {
+        loggedOutView.style.display = 'none';
+        loggedInView.style.display = 'block';
+        userEmailSpan.textContent = user.email;
+        authError.style.display = 'none';
+      } else {
+        loggedOutView.style.display = 'block';
+        loggedInView.style.display = 'none';
+        userEmailSpan.textContent = '';
+      }
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      authError.style.display = 'none';
+      authError.textContent = '';
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.value,
+        password: passwordInput.value,
+      });
+
+      if (error) {
+        authError.textContent = `로그인 실패: ${error.message}`;
+        authError.style.display = 'block';
+        return;
+      }
+
+      updateAuthUI(data.user);
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      updateAuthUI(null);
+    });
+
+    // 초기 세션 확인
+    const { data: { session } } = await supabase.auth.getSession();
+    updateAuthUI(session?.user || null);
+
+    // 메모 목록 로드 (앞 단계 기능 보존)
     try {
       const response = await fetch('/api/notes', { cache: 'no-store' });
       if (!response.ok) throw new Error('자료 API를 읽을 수 없습니다.');
