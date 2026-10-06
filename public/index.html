@@ -32,8 +32,6 @@
     .action-row { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
     .editor-section { margin: 20px 0; padding: 18px; border: 1px solid #3ecf8e55; border-radius: 12px; background: #15293d; }
     .editor-section h3 { margin: 0 0 12px; font-size: 16px; color: #8ad8df; }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <main>
@@ -83,10 +81,6 @@
     <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
   <script type="module">
-    const SUPABASE_URL = 'https://lklooocegqcqbhayaofm.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_5Gch3Is0iMgMBQaKtWq0ww_hI60Rz5J';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
     const loggedOutView = document.querySelector('#loggedOutView');
     const loggedInView = document.querySelector('#loggedInView');
     const userEmailSpan = document.querySelector('#userEmail');
@@ -253,31 +247,49 @@
       authError.style.display = 'none';
       authError.textContent = '';
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailInput.value,
-        password: passwordInput.value,
-      });
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailInput.value,
+            password: passwordInput.value,
+          }),
+        });
 
-      if (error) {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || '로그인에 실패했습니다.');
+        }
+
+        const session = {
+          access_token: data.access_token,
+          user: data.user,
+        };
+        sessionStorage.setItem('auth_session', JSON.stringify(session));
+
+        updateAuthUI(session.user);
+        await loadNotes(session);
+      } catch (error) {
         authError.textContent = `로그인 실패: ${error.message}`;
         authError.style.display = 'block';
-        return;
       }
-
-      updateAuthUI(data.user);
-      await loadNotes(data.session);
     });
 
     logoutBtn.addEventListener('click', async () => {
-      await supabase.auth.signOut();
+      sessionStorage.removeItem('auth_session');
       updateAuthUI(null);
       await loadNotes(null);
     });
 
-    // 초기 세션 확인
-    const { data: { session } } = await supabase.auth.getSession();
-    updateAuthUI(session?.user || null);
-    await loadNotes(session || null);
+    // 초기 세션 확인 (sessionStorage 사용)
+    let savedSession = null;
+    try {
+      savedSession = JSON.parse(sessionStorage.getItem('auth_session'));
+    } catch {}
+
+    updateAuthUI(savedSession?.user || null);
+    await loadNotes(savedSession || null);
   </script>
 </body>
 </html>

@@ -10,6 +10,7 @@
     "jwksUrl": "https://lklooocegqcqbhayaofm.supabase.co/auth/v1/.well-known/jwks.json"
   },
   "allowedRoutes": [
+    "POST /api/login",
     "GET /api/notes",
     "POST /api/notes",
     "GET /api/notes/:id",
