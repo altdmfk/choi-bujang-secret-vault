@@ -18,16 +18,18 @@
 
 로컬에서 화면만 확인할 때는 `npm run build -- --local`을 사용합니다. 로컬 실행은 Vercel 배포나 심판 접수를 증명하지 않습니다.
 
-## 5단계 현재 작동하는 기능 및 다시 실행하는 방법
+## 보너스 xdr-01 저장점 현재 작동하는 기능 및 다시 실행하는 방법
 
 - **작동하는 기능**:
-  - Supabase Auth를 통한 사용자 로그인(A, B 계정) 및 로그아웃이 지원됩니다.
-  - Vercel 서버 함수(`/api/notes`)는 요청 토큰을 검증하고, 검증된 사용자 ID와 DB의 `owner_id`를 대조하여 본인 소유의 메모만 조회, 수정, 삭제를 허용합니다.
-  - 원본 자료 저장소의 직접 접근 권한(`PUBLIC`, `anon`, `authenticated`)을 회수하여 외부 우회 직접 조회를 차단하고 서버 함수 한곳으로 자료 요청을 집약했습니다.
-  - `aleph.config.json`의 `originalApiUrl`에 원본 자료 엔드포인트를 지정하여 직접 접근 차단 여부를 점검할 수 있도록 구성했습니다.
+  - (5단계) Supabase Auth를 통한 사용자 로그인(A, B 계정) 및 로그아웃이 지원됩니다.
+  - (5단계) Vercel 서버 함수(`/api/notes`)는 요청 토큰을 검증하고, 검증된 사용자 ID와 DB의 `owner_id`를 대조하여 본인 소유의 메모만 조회/수정/삭제를 허용합니다.
+  - (5단계) 원본 자료 저장소 직접 접근을 차단하고 `aleph.config.json`의 `originalApiUrl`에 엔드포인트를 지정했습니다.
+  - (보너스 XDR) MITRE ATT&CK T1110 기반의 무차별 로그인 공격(Brute Force) 패턴을 적용하여 악성 IP를 가려냅니다.
+  - (보너스 XDR) 애매한 공격은 Jev를 통해 확신도를 조정하며, 명확한 차단 후보만 ZTNA 판정기(`src/decider.mjs`)에 거부 규칙(`xdr.alert.[id]`)으로 등록되어 작동합니다.
 - **다시 실행하는 방법**:
   - 로컬 환경: `.env.local`에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 작성한 뒤 `npx vercel dev`로 실행합니다.
   - 배포 환경: GitHub 푸시 시 Vercel에서 자동 배포되며 `https://choi-bujang-secret-vault-neon.vercel.app`에서 확인할 수 있습니다.
+  - XDR 실행: `npm run xdr:run -- brute-force` 명령으로 경보를 판정하고, `node xdr/brute-force/link-ztna.mjs`로 ZTNA 모의 연동을 확인합니다.
 
 ## 주의사항 및 취약점 안내
 

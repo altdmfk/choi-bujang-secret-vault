@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Single IP High Volume Failures",
+    "condition": "짧은 시간 안에 같은 출발지 주소에서 로그인 실패가 비정상적으로 많이 연속 발생",
+    "reference": "MITRE ATT&CK T1110 (Brute Force): 단일 출발지에서 짧은 시간 내 다수의 인증 실패가 발생하는 무차별 대입 형태"
+  },
+  {
+    "name": "Password Spraying",
+    "condition": "한 출발지 주소가 짧은 시간에 여러 계정에 걸쳐 같은 비밀번호를 반복적으로 대입 시도",
+    "reference": "MITRE ATT&CK T1110.003 (Password Spraying): 한 주소에서 여러 계정에 공통 비밀번호를 대입해 계정 잠금을 피하는 형태"
+  }
+]
