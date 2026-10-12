@@ -17,6 +17,7 @@ export function clearNoteOwnership() {
   noteOwnership.clear();
 }
 
+
 /**
  * 정확한 요청 경로와 서비스로부터 구역 및 자원 ID를 분리·추출합니다.
  * - 쿼리 스트링으로 기능을 분기하지 않으며 순수 경로에서 자료 ID만 추출합니다.
@@ -187,6 +188,26 @@ export async function decide(request) {
   }
 
   // 6. 8단계 구역 규칙 검사 (자기 메모 읽기·수정 허용, 타인 메모 및 강사 공지 수정 거부)
+  const route = typeof request?.route === 'string' ? request.route : '';
+  const cleanPath = typeof request?.path === 'string' ? request.path.split('?')[0].replace(/\/+$/u, '') || '/' : '';
+
+  // 1) 강사 공지 수정 시도 거부 (경로, 서비스, 라우트 등에서 공지 구역 수정 시도 시 거부)
+  const isNoticeTarget = (
+    request?.service === 'notices'
+    || /\/notices?\b/i.test(cleanPath)
+    || /\bnotices?\b/i.test(route)
+  );
+
+  if (isNoticeTarget && request.method !== 'GET') {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
   const parsed = parseResourcePath(request?.path, request?.service);
 
   // 알 수 없는 경로나 규정 깊이를 벗어난 경로인 경우 거부
@@ -226,6 +247,7 @@ export async function decide(request) {
 
   // A. 강사 공지 구역 ('notices')
   if (serviceName === 'notices') {
+
     // 공지 읽기(GET)는 모든 확인된 사용자에게 허용
     if (request.method === 'GET') {
       return {
@@ -249,6 +271,7 @@ export async function decide(request) {
 
   // B. 메모 구역 ('notes')
   if (serviceName === 'notes') {
+
     // 목록 조회(GET) 또는 신규 생성(POST)
     if (!resourceId) {
       if (request.method === 'GET' || request.method === 'POST') {
@@ -282,11 +305,12 @@ export async function decide(request) {
     }
 
     // 메모 소유권 검증 (자기 메모 읽기·수정 허용, 타인 메모 거부)
-    const noteKey = `${request.classId || ''}:${request.projectId || ''}:${resourceId}`;
+    const noteKey = resourceId;
+
+    // 등록된 메모인 경우 소유자 일치 여부 검사 (타인 메모 접근 거부)
     if (noteOwnership.has(noteKey)) {
       const owner = noteOwnership.get(noteKey);
       if (owner !== request.subjectId) {
-        // B 사용자가 A 사용자의 메모에 접근 시 거부
         return {
           schema: 'aleph.decision.v1',
           requestId: safeRequestId,
@@ -296,11 +320,11 @@ export async function decide(request) {
         };
       }
     } else {
-      // 최초 생성/접근한 사용자를 해당 메모의 소유자로 바인딩
+      // 신규 메모 등록 (최초 생성/접근한 사용자를 해당 메모의 소유자로 바인딩)
       noteOwnership.set(noteKey, request.subjectId);
     }
 
-    // A 자기 메모의 읽기 및 수정 정상 허용
+    // 자기 메모의 읽기 및 수정 정상 허용
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
