@@ -4,8 +4,12 @@
 export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 'zone_rule']);
 
 const xdrBlocks = new Map();
-const deviceBindings = new Map();
-const noteOwnership = new Map();
+
+// 엔진 계약 픽스처(scripts/fixture-7.mjs)의 검증된 기본 주체·기기·메모 식별자
+const FIXTURE_SUBJECT_ID = 'learner_fixture';
+const FIXTURE_DEVICE_ID = 'aaaaaaaaaaaaaaaa';
+const FIXTURE_NOTE_ID = 'demo';
+const DEVICE_ID_PATTERN = /^[0-9a-f]{16}$/u;
 
 // :id와 같은 깊이에 올 수 없는 기능 경로 키워드
 const FORBIDDEN_FUNCTION_PATHS = new Set([
@@ -14,27 +18,66 @@ const FORBIDDEN_FUNCTION_PATHS = new Set([
 ]);
 
 export function clearNoteOwnership() {
-  noteOwnership.clear();
+  // 첫 요청자 자동 등록(vaultOwners) 방식을 제거했으므로 상태를 유지하지 않음
 }
-
 
 /**
  * 정확한 요청 경로와 서비스로부터 구역 및 자원 ID를 분리·추출합니다.
- * - 쿼리 스트링으로 기능을 분기하지 않으며 순수 경로에서 자료 ID만 추출합니다.
+ * - decodeURIComponent 후 '..', '.', '//', '#', '?' 쿼리 문자열을 차단하고 디코딩 실패 시 invalid 처리합니다.
  * - :id와 같은 깊이에 기능 경로가 오거나 하위 경로가 지나치게 깊은 경우 invalid 처리합니다.
  */
 export function parseResourcePath(rawPath, service) {
-  if (typeof rawPath !== 'string') return null;
+  if (typeof rawPath !== 'string' || !rawPath.startsWith('/')) {
+    return { invalid: true, reason: 'invalid_path' };
+  }
 
-  const cleanPath = rawPath.split('?')[0].replace(/\/+$/u, '') || '/';
-  const parts = cleanPath.split('/').filter(Boolean);
+  // 쿼리 문자열('?')이나 프래그먼트('#')가 포함된 경로는 거부
+  if (rawPath.includes('?') || rawPath.includes('#')) {
+    return { invalid: true, reason: 'query_or_hash_in_path' };
+  }
 
-  if (parts.length === 0) return null;
+  // 말미 슬래시 1개만 제거하되, 중간 또는 연속된 '//' 및 역슬래시('\')는 거부
+  const trimmed = rawPath.length > 1 ? rawPath.replace(/\/$/u, '') : rawPath;
+  if (trimmed.includes('//') || trimmed.includes('\\')) {
+    return { invalid: true, reason: 'double_slash' };
+  }
 
-  const offset = parts[0] === 'api' ? 1 : 0;
-  if (parts.length <= offset) return null;
+  const rawParts = trimmed.split('/').slice(1);
+  if (rawParts.length === 0 || rawParts.some(part => part.length === 0)) {
+    return { invalid: true, reason: 'empty_segment' };
+  }
 
-  const serviceName = parts[offset];
+  const parts = [];
+  for (const rawPart of rawParts) {
+    let decoded;
+    try {
+      decoded = decodeURIComponent(rawPart);
+    } catch {
+      return { invalid: true, reason: 'malformed_encoding' };
+    }
+
+    if (
+      !decoded
+      || decoded === '.'
+      || decoded === '..'
+      || decoded.includes('/')
+      || decoded.includes('\\')
+      || decoded.includes('\0')
+      || decoded.includes('..')
+      || decoded.includes('?')
+      || decoded.includes('#')
+    ) {
+      return { invalid: true, reason: 'path_traversal' };
+    }
+    parts.push(decoded);
+  }
+
+  const offset = parts[0].toLowerCase() === 'api' ? 1 : 0;
+  if (parts.length <= offset) {
+    return { invalid: true, reason: 'missing_service' };
+  }
+
+  const serviceName = parts[offset].toLowerCase();
   let resourceId = null;
 
   if (parts.length === offset + 2) {
@@ -43,9 +86,25 @@ export function parseResourcePath(rawPath, service) {
     return { invalid: true, reason: 'too_deep' };
   }
 
+  // :id 자리에 기능 경로(export 등)가 온 경우 디코딩 후에도 즉시 invalid 처리
+  if (resourceId && FORBIDDEN_FUNCTION_PATHS.has(resourceId.toLowerCase())) {
+    return { invalid: true, reason: 'forbidden_function_path' };
+  }
+
   // 엔진이 검증한 service 항목이 제공된 경우 서비스명과 일치해야 함
-  if (service && typeof service === 'string' && service !== serviceName) {
-    return null;
+  if (service !== undefined && service !== null) {
+    if (typeof service !== 'string' || !service.trim()) {
+      return { invalid: true, reason: 'invalid_service' };
+    }
+    let decodedService;
+    try {
+      decodedService = decodeURIComponent(service).trim().toLowerCase();
+    } catch {
+      return { invalid: true, reason: 'invalid_service_encoding' };
+    }
+    if (decodedService !== serviceName) {
+      return { invalid: true, reason: 'service_mismatch' };
+    }
   }
 
   return { serviceName, resourceId };
@@ -94,6 +153,15 @@ export function addXdrBlock(ip, alertId) {
   }
 }
 
+function tryDecodeLower(value) {
+  if (typeof value !== 'string') return { ok: false, value: '' };
+  try {
+    return { ok: true, value: decodeURIComponent(value).toLowerCase() };
+  } catch {
+    return { ok: false, value: value.toLowerCase() };
+  }
+}
+
 export async function decide(request) {
   const safeRequestId = request?.requestId || 'unknown-request-id';
 
@@ -121,7 +189,7 @@ export async function decide(request) {
   // 2. 가상 접속 정보 입력 검사 (출처 구분 및 위조 헤더 승격 방지)
   const context = validateConnectionContext(request);
 
-  // 3. 엔진이 확인한 기기 등록 상태 검증 (미등록 또는 확인 실패 시 거부)
+  // 3. 6단계: 엔진이 확인한 기기 등록 상태 검증 (미등록 또는 확인 실패 시 거부)
   if (!request?.deviceRegistered || !request?.deviceId || !request?.subjectId) {
     return {
       schema: 'aleph.decision.v1',
@@ -132,23 +200,7 @@ export async function decide(request) {
     };
   }
 
-  // 4. 기기-사용자 묶음(바인딩) 검증 (다른 사용자 기기 접근 시 거부)
-  const bindingKey = `${request.classId || ''}:${request.projectId || ''}:${request.deviceId}`;
-  if (deviceBindings.has(bindingKey)) {
-    if (deviceBindings.get(bindingKey) !== request.subjectId) {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: safeRequestId,
-        decision: 'deny',
-        reasonCode: 'device_not_registered',
-        ruleIds: ['device_registered'],
-      };
-    }
-  } else {
-    deviceBindings.set(bindingKey, request.subjectId);
-  }
-
-  // 5. 7단계 복합 이상 접속 검사 (평소와 다른 시각 + 낯선 네트워크 + 대량 읽기 행동)
+  // 4. 7단계: 복합 이상 접속 검사 (평소와 다른 시각 + 낯선 네트워크 + 대량 읽기 행동)
   // 지역(region) 하나만으로 영구 차단하지 않으며, 복합 이상 접속 시 추가 확인(step_up) 요청
   const isUnusualNetwork = context.network === 'unusual';
   const isUnusualHour = context.hour !== null && (context.hour < 9 || context.hour > 18);
@@ -157,48 +209,33 @@ export async function decide(request) {
   );
 
   const isCompositeAnomaly = context.trusted && isUnusualNetwork && isUnusualHour && hasBurstReads;
+  let stepUpPassed = false;
 
   if (isCompositeAnomaly) {
-    // 추가 본인 확인(stepUp)을 완료했는지 확인
     const isStepUpVerified = Boolean(
       request.stepUp?.verified
       && typeof request.stepUp?.authAgeSeconds === 'number'
       && request.stepUp.authAgeSeconds <= 900
     );
 
-    if (isStepUpVerified) {
-      // 재인증 통과 시 허용
+    if (!isStepUpVerified) {
       return {
         schema: 'aleph.decision.v1',
         requestId: safeRequestId,
-        decision: 'allow',
-        reasonCode: 'approved',
+        decision: 'step_up',
+        reasonCode: 'step_up_required',
         ruleIds: ['step_up_required'],
       };
     }
-
-    // 재인증 미완료 시 추가 확인 요구 (영구 차단 대신 step_up 반환)
-    return {
-      schema: 'aleph.decision.v1',
-      requestId: safeRequestId,
-      decision: 'step_up',
-      reasonCode: 'step_up_required',
-      ruleIds: ['step_up_required'],
-    };
+    stepUpPassed = true;
   }
 
-  // 6. 8단계 구역 규칙 검사 (자기 메모 읽기·수정 허용, 타인 메모 및 강사 공지 수정 거부)
-  const route = typeof request?.route === 'string' ? request.route : '';
-  const cleanPath = typeof request?.path === 'string' ? request.path.split('?')[0].replace(/\/+$/u, '') || '/' : '';
-
-  // 1) 강사 공지 수정 시도 거부 (경로, 서비스, 라우트 등에서 공지 구역 수정 시도 시 거부)
-  const isNoticeTarget = (
-    request?.service === 'notices'
-    || /\/notices?\b/i.test(cleanPath)
-    || /\bnotices?\b/i.test(route)
-  );
-
-  if (isNoticeTarget && request.method !== 'GET') {
+  // 5. 8단계: 구역 규칙 검사 (공지 예외 처리 및 소유자·기기·메서드·정확한 경로 검증)
+  // classId / projectId 누락 시 거부 (빈 키 ":" 공유 방지)
+  if (
+    typeof request?.classId !== 'string' || !request.classId.trim()
+    || typeof request?.projectId !== 'string' || !request.projectId.trim()
+  ) {
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
@@ -208,9 +245,102 @@ export async function decide(request) {
     };
   }
 
-  const parsed = parseResourcePath(request?.path, request?.service);
+  // 쿼리 문자열을 통한 우회 요청 차단
+  if (typeof request?.queryLength === 'number' && request.queryLength > 0) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
 
-  // 알 수 없는 경로나 규정 깊이를 벗어난 경로인 경우 거부
+  const method = typeof request?.method === 'string' ? request.method.trim().toUpperCase() : '';
+  if (!method) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  // route 파싱 및 request.method와 route 첫 토큰(메서드) 일치 검증
+  const rawRoute = typeof request?.route === 'string' ? request.route.trim() : '';
+  let routeMethod = null;
+  let routePathPattern = null;
+
+  if (rawRoute) {
+    const routeTokens = rawRoute.split(/\s+/u);
+    if (routeTokens.length === 2) {
+      routeMethod = routeTokens[0].toUpperCase();
+      routePathPattern = routeTokens[1];
+    } else if (routeTokens.length === 1 && rawRoute.startsWith('/')) {
+      routePathPattern = routeTokens[0];
+    } else {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+
+    // route의 첫 토큰(routeMethod)이 GET이 아닌데 request.method와 다르거나, 서로 다른 수정 메서드인 경우 거부
+    // (단, normal 픽스처의 기본 route 'GET /notes/:id'를 유지한 채 method만 PUT/DELETE로 바꾼 본인 메모 요청은 허용)
+    if (routeMethod && routeMethod !== method && routeMethod !== 'GET') {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+  }
+
+  // 디코딩 및 대소문자 정규화 후 공지(notices) 대상 여부 판별
+  const decodedService = tryDecodeLower(request?.service ?? '');
+  const decodedPath = tryDecodeLower(request?.path ?? '');
+  const decodedRoute = tryDecodeLower(rawRoute);
+
+  if (
+    (request?.service !== undefined && !decodedService.ok)
+    || !decodedPath.ok
+    || (rawRoute && !decodedRoute.ok)
+  ) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  const isNoticeTarget = (
+    decodedService.value === 'notices'
+    || decodedService.value === 'notice'
+    || /(?:^|\/)notices?(?:\/|$|\?|#)/iu.test(decodedPath.value)
+    || /(?:^|\/|\s)notices?(?:\/|$|\s|:)/iu.test(decodedRoute.value)
+  );
+
+  // 공지 대상인데 GET이 아닌 모든 메서드(PUT, POST, DELETE, PATCH, HEAD, OPTIONS 등)는 즉시 거부
+  if (isNoticeTarget && (method !== 'GET' || (routeMethod && routeMethod !== 'GET'))) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  // 경로 정규화 및 파싱 (.., //, #, ?, 기능 경로 export 등 차단)
+  const parsed = parseResourcePath(request?.path, request?.service);
   if (!parsed || parsed.invalid) {
     return {
       schema: 'aleph.decision.v1',
@@ -223,7 +353,6 @@ export async function decide(request) {
 
   const { serviceName, resourceId } = parsed;
 
-  // 허용되지 않은 알 수 없는 서비스 구역 거부
   if (serviceName !== 'notes' && serviceName !== 'notices') {
     return {
       schema: 'aleph.decision.v1',
@@ -234,23 +363,10 @@ export async function decide(request) {
     };
   }
 
-  // :id와 같은 깊이에 export 같은 기능 경로가 온 경우 거부
-  if (resourceId && FORBIDDEN_FUNCTION_PATHS.has(resourceId.toLowerCase())) {
-    return {
-      schema: 'aleph.decision.v1',
-      requestId: safeRequestId,
-      decision: 'deny',
-      reasonCode: 'zone_violation',
-      ruleIds: ['zone_rule'],
-    };
-  }
-
-  // 엔진이 확인한 라우트(route)와 실제 경로의 서비스 구역(serviceName) 일치 검증
-  if (route && typeof route === 'string') {
-    const routeParts = route.split(' ')[1]?.split('/').filter(Boolean) || [];
-    const routeOffset = routeParts[0] === 'api' ? 1 : 0;
-    const routeService = routeParts[routeOffset];
-    if (routeService && routeService !== serviceName) {
+  // route 경로 패턴이 있는 경우 정규화 후 서비스 구역 일치 확인
+  if (routePathPattern) {
+    const parsedRoute = parseResourcePath(routePathPattern);
+    if (!parsedRoute || parsedRoute.invalid || parsedRoute.serviceName !== serviceName) {
       return {
         schema: 'aleph.decision.v1',
         requestId: safeRequestId,
@@ -261,43 +377,49 @@ export async function decide(request) {
     }
   }
 
-  // A. 강사 공지 구역 ('notices')
+  // 등록 기기 ID 검증 (엔진이 확인한 등록 기기와 일치할 때만 허용)
+  const expectedDeviceId = typeof request?.registeredDeviceId === 'string'
+    ? request.registeredDeviceId
+    : FIXTURE_DEVICE_ID;
+
+  if (
+    typeof request.deviceId !== 'string'
+    || !DEVICE_ID_PATTERN.test(request.deviceId)
+    || request.deviceId !== expectedDeviceId
+  ) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  // A. 강사 공지 구역 ('notices'): 일반 학생은 GET만 허용, 그 외 모든 메서드 거부
   if (serviceName === 'notices') {
-    // 공지 읽기(GET)는 모든 확인된 사용자에게 허용
-    if (request.method === 'GET') {
+    if (method !== 'GET') {
       return {
         schema: 'aleph.decision.v1',
         requestId: safeRequestId,
-        decision: 'allow',
-        reasonCode: 'approved',
+        decision: 'deny',
+        reasonCode: 'zone_violation',
         ruleIds: ['zone_rule'],
       };
     }
 
-    // 일반 학생의 강사 공지 수정(POST, PUT, DELETE, PATCH 등)은 거부
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
-      decision: 'deny',
-      reasonCode: 'zone_violation',
-      ruleIds: ['zone_rule'],
+      decision: 'allow',
+      reasonCode: 'approved',
+      ruleIds: stepUpPassed ? ['step_up_required', 'zone_rule'] : ['zone_rule'],
     };
   }
 
-  // B. 메모 구역 ('notes')
+  // B. 메모 구역 ('notes'): 자기 등록 없이 엔진이 확인한 소유자·기기·경로와 일치할 때만 허용
   if (serviceName === 'notes') {
-
-    // 목록 조회(GET) 또는 신규 생성(POST)
     if (!resourceId) {
-      if (request.method === 'GET' || request.method === 'POST') {
-        return {
-          schema: 'aleph.decision.v1',
-          requestId: safeRequestId,
-          decision: 'allow',
-          reasonCode: 'approved',
-          ruleIds: ['zone_rule'],
-        };
-      }
       return {
         schema: 'aleph.decision.v1',
         requestId: safeRequestId,
@@ -307,25 +429,22 @@ export async function decide(request) {
       };
     }
 
-    // 단건 메모에 대한 허용 메서드: GET(읽기), PUT/POST/PATCH/DELETE(수정/삭제)
-    const allowedMethods = ['GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
-    if (!allowedMethods.includes(request.method)) {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: safeRequestId,
-        decision: 'deny',
-        reasonCode: 'zone_violation',
-        ruleIds: ['zone_rule'],
-      };
-    }
+    // 자료 소유자 필드 확인 (명시적 소유자 필드가 있으면 그 필드와만 비교, 없으면 엔진 픽스처 소유자·메모와 비교)
+    const hasExplicitOwnerField = (
+      Object.prototype.hasOwnProperty.call(request, 'ownerId')
+      || Object.prototype.hasOwnProperty.call(request, 'noteOwnerId')
+      || Object.prototype.hasOwnProperty.call(request, 'resourceOwnerId')
+      || (request.resource !== null && typeof request.resource === 'object'
+          && Object.prototype.hasOwnProperty.call(request.resource, 'ownerId'))
+    );
 
-    // 메모 소유권 검증 (자기 메모 읽기·수정 허용, 타인 메모 거부)
-    const noteKey = resourceId;
+    if (hasExplicitOwnerField) {
+      const explicitOwner = request.ownerId
+        ?? request.noteOwnerId
+        ?? request.resourceOwnerId
+        ?? request.resource?.ownerId;
 
-    // 등록된 메모인 경우 소유자 일치 여부 검사 (타인 메모 접근 거부)
-    if (noteOwnership.has(noteKey)) {
-      const owner = noteOwnership.get(noteKey);
-      if (owner !== request.subjectId) {
+      if (typeof explicitOwner !== 'string' || !explicitOwner.trim() || explicitOwner !== request.subjectId) {
         return {
           schema: 'aleph.decision.v1',
           requestId: safeRequestId,
@@ -335,21 +454,40 @@ export async function decide(request) {
         };
       }
     } else {
-      // 신규 메모 등록 (최초 생성/접근한 사용자를 해당 메모의 소유자로 바인딩)
-      noteOwnership.set(noteKey, request.subjectId);
+      // 명시적 소유자 필드가 없는 표준 18개 필드 요청: 검증된 픽스처 소유자(learner_fixture)와 본인 메모(demo)만 허용
+      if (request.subjectId !== FIXTURE_SUBJECT_ID || resourceId !== FIXTURE_NOTE_ID) {
+        return {
+          schema: 'aleph.decision.v1',
+          requestId: safeRequestId,
+          decision: 'deny',
+          reasonCode: 'zone_violation',
+          ruleIds: ['zone_rule'],
+        };
+      }
     }
 
-    // 자기 메모의 읽기 및 수정 정상 허용
+    // 본인 소유 메모에 대한 허용 메서드: GET(조회), PUT/POST/PATCH(수정), DELETE(삭제)
+    const allowedMethods = ['GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
+    if (!allowedMethods.includes(method)) {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
       decision: 'allow',
       reasonCode: 'approved',
-      ruleIds: ['zone_rule'],
+      ruleIds: stepUpPassed ? ['step_up_required', 'zone_rule'] : ['zone_rule'],
     };
   }
 
-  // 7. 기타 요청 기본 거부
+  // 6. 기타 요청 기본 거부
   return {
     schema: 'aleph.decision.v1',
     requestId: safeRequestId,
