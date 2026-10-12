@@ -50,6 +50,16 @@ export default async function handler(request, response) {
   const method = request.method;
   const id = request.query?.id;
 
+  // 구역 검증: 공지 구역 자원 ID로 직접 접근 시도 시 교차 접근 차단
+  if (id && (String(id).startsWith('notice:') || String(id).startsWith('notice-'))) {
+    return response.status(403).json({ error: 'CROSS_ZONE_ACCESS_DENIED' });
+  }
+
+  // 기능 경로 차단 (:id 자리에 export 등 기능 경로 접근 방지)
+  if (id && ['export', 'import', 'backup', 'admin'].includes(String(id).toLowerCase())) {
+    return response.status(400).json({ error: 'INVALID_RESOURCE_ID' });
+  }
+
   // 1. 목록 조회: GET /api/notes (본인 소유 메모만 조회)
   if (method === 'GET' && !id) {
     try {
@@ -65,6 +75,7 @@ export default async function handler(request, response) {
 
       const formatted = (notes || []).map(note => ({
         id: String(note.id),
+        resourceId: `note:${note.id}`,
         title: note.title,
         body: note.content,
       }));
@@ -91,11 +102,12 @@ export default async function handler(request, response) {
         return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       }
       if (note.owner_id !== currentUserId) {
-        return response.status(403).json({ error: 'FORBIDDEN' });
+        return response.status(403).json({ error: 'FORBIDDEN_NOT_OWNER' });
       }
 
       return response.status(200).json({
         id: String(note.id),
+        resourceId: `note:${note.id}`,
         title: note.title,
         body: note.content,
       });
@@ -135,6 +147,7 @@ export default async function handler(request, response) {
 
       return response.status(201).json({
         id: String(data.id),
+        resourceId: `note:${data.id}`,
         title: data.title,
         body: data.content,
       });
@@ -153,9 +166,12 @@ export default async function handler(request, response) {
     }
     const { title, body } = bodyData || {};
 
-    // 본문에서 owner_id를 조작하려 하거나 본인이 아닌 다른 ID로 바꾸려는 경우 거부
+    // 본문에서 role을 조작해 권한 승격을 꾀하려 하거나, owner_id를 타인 ID로 바꾸려는 경우 거부
+    if (bodyData?.role && bodyData.role !== 'student') {
+      return response.status(403).json({ error: 'ROLE_ELEVATION_DENIED' });
+    }
     if (bodyData?.owner_id !== undefined && bodyData.owner_id !== currentUserId) {
-      return response.status(403).json({ error: 'FORBIDDEN' });
+      return response.status(403).json({ error: 'FORBIDDEN_NOT_OWNER' });
     }
 
     try {
@@ -173,7 +189,7 @@ export default async function handler(request, response) {
         return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       }
       if (existing.owner_id !== currentUserId) {
-        return response.status(403).json({ error: 'FORBIDDEN' });
+        return response.status(403).json({ error: 'FORBIDDEN_NOT_OWNER' });
       }
 
       // 2) 수정 payload 구성 (owner_id는 항상 본인 ID 유지)
@@ -200,6 +216,7 @@ export default async function handler(request, response) {
 
       return response.status(200).json({
         id: String(data.id),
+        resourceId: `note:${data.id}`,
         title: data.title,
         body: data.content,
       });
@@ -227,7 +244,7 @@ export default async function handler(request, response) {
         return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
       }
       if (existing.owner_id !== currentUserId) {
-        return response.status(403).json({ error: 'FORBIDDEN' });
+        return response.status(403).json({ error: 'FORBIDDEN_NOT_OWNER' });
       }
 
       // 2) 본인 소유 메모 삭제

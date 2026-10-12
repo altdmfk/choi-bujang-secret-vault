@@ -78,8 +78,17 @@
       </div>
     </div>
 
-    <div class="notice">로그인 상태에 따라 메모를 추가·수정·삭제할 수 있습니다.</div>
-    <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
+    <div class="notice">로그인 상태에 따라 메모를 추가·수정·삭제할 수 있습니다. 강사 공지는 읽기 전용 구역입니다.</div>
+
+    <div style="margin-top: 24px;">
+      <h2 style="font-size: 18px; color: #8ad8df; margin-bottom: 12px;">강사 공지 (구역: notices)</h2>
+      <ul id="notices" aria-live="polite"><li>강사 공지를 불러오는 중입니다.</li></ul>
+    </div>
+
+    <div style="margin-top: 28px;">
+      <h2 style="font-size: 18px; color: #8ad8df; margin-bottom: 12px;">내 메모 (구역: notes)</h2>
+      <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
+    </div>
   </main>
   <script type="module">
     const loggedOutView = document.querySelector('#loggedOutView');
@@ -91,6 +100,7 @@
     const authError = document.querySelector('#authError');
     const logoutBtn = document.querySelector('#logoutBtn');
     const list = document.querySelector('#notes');
+    const noticesList = document.querySelector('#notices');
 
     const noteForm = document.querySelector('#noteForm');
     const editingNoteId = document.querySelector('#editingNoteId');
@@ -125,6 +135,52 @@
 
     cancelEditBtn.addEventListener('click', resetEditor);
 
+    async function loadNotices(session) {
+      if (!session?.access_token) {
+        noticesList.replaceChildren();
+        const item = document.createElement('li');
+        item.textContent = '로그인 후 강사 공지를 확인할 수 있습니다.';
+        noticesList.replaceChildren(item);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/notices', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('강사 공지 API를 읽을 수 없습니다.');
+        const notices = await response.json();
+        if (!Array.isArray(notices) || notices.length === 0) {
+          const item = document.createElement('li');
+          item.textContent = '등록된 강사 공지가 없습니다.';
+          noticesList.replaceChildren(item);
+          return;
+        }
+
+        noticesList.replaceChildren(...notices.map(notice => {
+          const item = document.createElement('li');
+          const badge = document.createElement('div');
+          badge.style.cssText = 'font-size: 12px; color: #8ad8df; margin-bottom: 6px; font-weight: 600;';
+          badge.textContent = `[자원 ID: ${notice.resourceId || 'notice:' + notice.id}]`;
+
+          const title = document.createElement('strong');
+          title.textContent = notice.title;
+          const content = document.createElement('span');
+          content.textContent = notice.body || '';
+
+          item.append(badge, title, content);
+          return item;
+        }));
+      } catch (error) {
+        const item = document.createElement('li');
+        item.textContent = error.message;
+        noticesList.replaceChildren(item);
+      }
+    }
+
     async function loadNotes(session) {
       currentSession = session;
       if (!session?.access_token) {
@@ -155,6 +211,10 @@
 
         list.replaceChildren(...notes.map(note => {
           const item = document.createElement('li');
+          const badge = document.createElement('div');
+          badge.style.cssText = 'font-size: 12px; color: #3ecf8e; margin-bottom: 6px; font-weight: 600;';
+          badge.textContent = `[자원 ID: ${note.resourceId || 'note:' + note.id}]`;
+
           const title = document.createElement('strong');
           const content = document.createElement('span');
           title.textContent = note.title;
@@ -170,7 +230,7 @@
             editingNoteId.value = note.id;
             noteTitleInput.value = note.title;
             noteBodyInput.value = note.body || '';
-            editorTitle.textContent = `메모 수정 (ID: ${note.id})`;
+            editorTitle.textContent = `메모 수정 (자원 ID: ${note.resourceId || 'note:' + note.id})`;
             cancelEditBtn.style.display = 'inline-block';
             noteTitleInput.focus();
           });
@@ -193,7 +253,7 @@
           });
 
           actionRow.append(editBtn, deleteBtn);
-          item.append(title, content, actionRow);
+          item.append(badge, title, content, actionRow);
           return item;
         }));
       } catch (error) {
@@ -271,6 +331,7 @@
 
         updateAuthUI(session.user);
         await loadNotes(session);
+        await loadNotices(session);
       } catch (error) {
         authError.textContent = `로그인 실패: ${error.message}`;
         authError.style.display = 'block';
@@ -281,6 +342,7 @@
       sessionStorage.removeItem('auth_session');
       updateAuthUI(null);
       await loadNotes(null);
+      await loadNotices(null);
     });
 
     // 초기 세션 확인 (sessionStorage 사용)
@@ -291,6 +353,7 @@
 
     updateAuthUI(savedSession?.user || null);
     await loadNotes(savedSession || null);
+    await loadNotices(savedSession || null);
   </script>
 </body>
 </html>

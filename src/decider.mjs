@@ -1,10 +1,54 @@
 // ALEPH SDP 엔진이 확인한 요청만 받는 학생 판정기 시작점입니다.
 // 6단계부터 규칙을 하나씩 추가합니다. 이 기본 응답은 모든 요청을 거부합니다.
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
-export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required']);
+export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 'zone_rule']);
 
 const xdrBlocks = new Map();
 const deviceBindings = new Map();
+const noteOwnership = new Map();
+
+// :id와 같은 깊이에 올 수 없는 기능 경로 키워드
+const FORBIDDEN_FUNCTION_PATHS = new Set([
+  'export', 'import', 'backup', 'admin', 'batch', 'search',
+  'download', 'upload', 'config', 'settings', 'all', 'manage', 'execute'
+]);
+
+export function clearNoteOwnership() {
+  noteOwnership.clear();
+}
+
+/**
+ * 정확한 요청 경로와 서비스로부터 구역 및 자원 ID를 분리·추출합니다.
+ * - 쿼리 스트링으로 기능을 분기하지 않으며 순수 경로에서 자료 ID만 추출합니다.
+ * - :id와 같은 깊이에 기능 경로가 오거나 하위 경로가 지나치게 깊은 경우 invalid 처리합니다.
+ */
+export function parseResourcePath(rawPath, service) {
+  if (typeof rawPath !== 'string') return null;
+
+  const cleanPath = rawPath.split('?')[0].replace(/\/+$/u, '') || '/';
+  const parts = cleanPath.split('/').filter(Boolean);
+
+  if (parts.length === 0) return null;
+
+  const offset = parts[0] === 'api' ? 1 : 0;
+  if (parts.length <= offset) return null;
+
+  const serviceName = parts[offset];
+  let resourceId = null;
+
+  if (parts.length === offset + 2) {
+    resourceId = parts[offset + 1];
+  } else if (parts.length > offset + 2) {
+    return { invalid: true, reason: 'too_deep' };
+  }
+
+  // 엔진이 검증한 service 항목이 제공된 경우 서비스명과 일치해야 함
+  if (service && typeof service === 'string' && service !== serviceName) {
+    return null;
+  }
+
+  return { serviceName, resourceId };
+}
 
 /**
  * 엔진이 검증해 넘긴 가상 접속 정보의 출처 및 유효성을 검사합니다.
@@ -142,15 +186,127 @@ export async function decide(request) {
     };
   }
 
-  // 6. 정상 등록 기기 및 사용자 묶음 확인 시 자료실 읽기 허용
-  const isNotesRead = request.service === 'notes' && request.method === 'GET';
-  if (isNotesRead) {
+  // 6. 8단계 구역 규칙 검사 (자기 메모 읽기·수정 허용, 타인 메모 및 강사 공지 수정 거부)
+  const parsed = parseResourcePath(request?.path, request?.service);
+
+  // 알 수 없는 경로나 규정 깊이를 벗어난 경로인 경우 거부
+  if (!parsed || parsed.invalid) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  const { serviceName, resourceId } = parsed;
+
+  // 허용되지 않은 알 수 없는 서비스 구역 거부
+  if (serviceName !== 'notes' && serviceName !== 'notices') {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  // :id와 같은 깊이에 export 같은 기능 경로가 온 경우 거부
+  if (resourceId && FORBIDDEN_FUNCTION_PATHS.has(resourceId.toLowerCase())) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  // A. 강사 공지 구역 ('notices')
+  if (serviceName === 'notices') {
+    // 공지 읽기(GET)는 모든 확인된 사용자에게 허용
+    if (request.method === 'GET') {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'allow',
+        reasonCode: 'approved',
+        ruleIds: ['zone_rule'],
+      };
+    }
+
+    // 일반 학생의 강사 공지 수정(POST, PUT, DELETE, PATCH 등)은 거부
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  // B. 메모 구역 ('notes')
+  if (serviceName === 'notes') {
+    // 목록 조회(GET) 또는 신규 생성(POST)
+    if (!resourceId) {
+      if (request.method === 'GET' || request.method === 'POST') {
+        return {
+          schema: 'aleph.decision.v1',
+          requestId: safeRequestId,
+          decision: 'allow',
+          reasonCode: 'approved',
+          ruleIds: ['zone_rule'],
+        };
+      }
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+
+    // 단건 메모에 대한 허용 메서드: GET(읽기), PUT/POST/PATCH/DELETE(수정/삭제)
+    const allowedMethods = ['GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
+    if (!allowedMethods.includes(request.method)) {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+
+    // 메모 소유권 검증 (자기 메모 읽기·수정 허용, 타인 메모 거부)
+    const noteKey = `${request.classId || ''}:${request.projectId || ''}:${resourceId}`;
+    if (noteOwnership.has(noteKey)) {
+      const owner = noteOwnership.get(noteKey);
+      if (owner !== request.subjectId) {
+        // B 사용자가 A 사용자의 메모에 접근 시 거부
+        return {
+          schema: 'aleph.decision.v1',
+          requestId: safeRequestId,
+          decision: 'deny',
+          reasonCode: 'zone_violation',
+          ruleIds: ['zone_rule'],
+        };
+      }
+    } else {
+      // 최초 생성/접근한 사용자를 해당 메모의 소유자로 바인딩
+      noteOwnership.set(noteKey, request.subjectId);
+    }
+
+    // A 자기 메모의 읽기 및 수정 정상 허용
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
       decision: 'allow',
       reasonCode: 'approved',
-      ruleIds: ['device_registered'],
+      ruleIds: ['zone_rule'],
     };
   }
 
@@ -160,6 +316,6 @@ export async function decide(request) {
     requestId: safeRequestId,
     decision: 'deny',
     reasonCode: 'starter_not_ready',
-    ruleIds: ['device_registered'],
+    ruleIds: ['zone_rule'],
   };
 }
