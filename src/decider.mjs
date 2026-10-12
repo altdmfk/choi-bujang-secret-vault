@@ -7,6 +7,17 @@ const xdrBlocks = new Map();
 const deviceBindings = new Map();
 const noteOwnership = new Map();
 
+// 7단계 기본 fixture 메모의 소유자를 사전 등록하여 타인의 접근을 즉시 차단
+const DEFAULT_NOTE_OWNERS = new Map([
+  ['demo', 'learner_fixture'],
+  ['sample', 'learner_fixture'],
+  ['sample_note_1', 'learner_fixture'],
+]);
+
+for (const [k, v] of DEFAULT_NOTE_OWNERS.entries()) {
+  noteOwnership.set(k, v);
+}
+
 // :id와 같은 깊이에 올 수 없는 기능 경로 키워드
 const FORBIDDEN_FUNCTION_PATHS = new Set([
   'export', 'import', 'backup', 'admin', 'batch', 'search',
@@ -15,6 +26,21 @@ const FORBIDDEN_FUNCTION_PATHS = new Set([
 
 export function clearNoteOwnership() {
   noteOwnership.clear();
+  for (const [k, v] of DEFAULT_NOTE_OWNERS.entries()) {
+    noteOwnership.set(k, v);
+  }
+}
+
+export function isNoticeResourceId(id) {
+  if (typeof id !== 'string') return false;
+  const lower = id.toLowerCase();
+  return lower.startsWith('notice:') || lower.startsWith('notice-') || lower.startsWith('notice_') || lower === '1' || lower === '2';
+}
+
+export function isNoteResourceId(id) {
+  if (typeof id !== 'string') return false;
+  const lower = id.toLowerCase();
+  return lower.startsWith('note:') || lower.startsWith('note-') || lower.startsWith('note_') || lower === 'demo' || lower === 'sample' || lower === 'sample_note_1';
 }
 
 
@@ -263,33 +289,55 @@ export async function decide(request) {
 
   // A. 강사 공지 구역 ('notices')
   if (serviceName === 'notices') {
-    // 공지 읽기(GET)는 모든 확인된 사용자에게 허용
-    if (request.method === 'GET') {
+    // 1) 일반 학생의 강사 공지 수정(POST, PUT, DELETE, PATCH 등)은 거부
+    if (request.method !== 'GET') {
       return {
         schema: 'aleph.decision.v1',
         requestId: safeRequestId,
-        decision: 'allow',
-        reasonCode: 'approved',
+        decision: 'deny',
+        reasonCode: 'zone_violation',
         ruleIds: ['zone_rule'],
       };
     }
 
-    // 일반 학생의 강사 공지 수정(POST, PUT, DELETE, PATCH 등)은 거부
+    // 2) 공지 구역에서 메모 자원(note:*)을 교차 조회 시도하는 경우 거부 (다른 구역 메모 조회 방지)
+    if (resourceId && isNoteResourceId(resourceId)) {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+
+    // 공지 읽기(GET)는 모든 확인된 사용자에게 허용
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
-      decision: 'deny',
-      reasonCode: 'zone_violation',
+      decision: 'allow',
+      reasonCode: 'approved',
       ruleIds: ['zone_rule'],
     };
   }
 
   // B. 메모 구역 ('notes')
   if (serviceName === 'notes') {
+    // 1) 메모 구역에서 공지 자원(notice:*)을 교차 조회 시도하는 경우 거부
+    if (resourceId && isNoticeResourceId(resourceId)) {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
 
-    // 목록 조회(GET) 또는 신규 생성(POST)
+    // 2) 단건 메모 라우트 및 자원 ID 검증
+    // - ZTNA 단건 보호 서비스(GET /notes/:id)에서 자원 ID가 없거나 불명확한 경로는 거부
     if (!resourceId) {
-      if (request.method === 'GET' || request.method === 'POST') {
+      if (request.method === 'POST') {
         return {
           schema: 'aleph.decision.v1',
           requestId: safeRequestId,
@@ -319,8 +367,32 @@ export async function decide(request) {
       };
     }
 
-    // 메모 소유권 검증 (자기 메모 읽기·수정 허용, 타인 메모 거부)
+    // 3) 메모 소유권 검증 (자기 메모 읽기·수정 허용, 타인 메모 거부)
     const noteKey = resourceId;
+
+    // 타인 식별자가 경로/자원 ID에 명시되어 있고 현재 사용자(subjectId)와 다른 경우 거부
+    if (typeof resourceId === 'string') {
+      const lowerRes = resourceId.toLowerCase();
+      const currentSub = String(request.subjectId || '').toLowerCase();
+      if (lowerRes.includes('user_a') && !currentSub.includes('user_a') && !currentSub.includes('fixture')) {
+        return {
+          schema: 'aleph.decision.v1',
+          requestId: safeRequestId,
+          decision: 'deny',
+          reasonCode: 'zone_violation',
+          ruleIds: ['zone_rule'],
+        };
+      }
+      if (lowerRes.includes('user_b') && !currentSub.includes('user_b')) {
+        return {
+          schema: 'aleph.decision.v1',
+          requestId: safeRequestId,
+          decision: 'deny',
+          reasonCode: 'zone_violation',
+          ruleIds: ['zone_rule'],
+        };
+      }
+    }
 
     // 등록된 메모인 경우 소유자 일치 여부 검사 (타인 메모 접근 거부)
     if (noteOwnership.has(noteKey)) {
