@@ -245,9 +245,24 @@ export async function decide(request) {
     };
   }
 
+  // 엔진이 확인한 라우트(route)와 실제 경로의 서비스 구역(serviceName) 일치 검증
+  if (route && typeof route === 'string') {
+    const routeParts = route.split(' ')[1]?.split('/').filter(Boolean) || [];
+    const routeOffset = routeParts[0] === 'api' ? 1 : 0;
+    const routeService = routeParts[routeOffset];
+    if (routeService && routeService !== serviceName) {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+  }
+
   // A. 강사 공지 구역 ('notices')
   if (serviceName === 'notices') {
-
     // 공지 읽기(GET)는 모든 확인된 사용자에게 허용
     if (request.method === 'GET') {
       return {
