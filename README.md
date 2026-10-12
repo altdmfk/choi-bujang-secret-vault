@@ -18,15 +18,17 @@
 
 로컬에서 화면만 확인할 때는 `npm run build -- --local`을 사용합니다. 로컬 실행은 Vercel 배포나 심판 접수를 증명하지 않습니다.
 
-## 6단계 저장점 현재 작동하는 기능 및 다시 실행하는 방법
+## 7단계 저장점 현재 작동하는 기능 및 다시 실행하는 방법
 
 - **작동하는 기능**:
   - (5단계) Supabase Auth를 통한 사용자 로그인(A, B 계정) 및 로그아웃 지원, 본인 소유 메모만 조회/수정/삭제 허용, 원본 자료 저장소 직접 접근 차단(`originalApiUrl`).
   - (6단계) 반 엔진과 연동하여 보호 서비스 ID(`notes`) 및 읽기 경로(`GET /notes/:id`)를 설정 파일(`aleph.config.json`)에 연결하고, ZTNA 판정기(`src/decider.mjs`)에 기기 등록 및 사용자 바인딩 검증 규칙(`device_registered`)을 구현하여 미등록 기기 또는 타인 기기의 접근을 차단(`device_not_registered`)하며 정상 등록 기기의 자료실 읽기만 허용.
+  - (7단계) 가상 접속 정보 입력 검증(`validateConnectionContext`) 및 복합 이상 접속 검사 규칙(`step_up_required`)을 구현하여 평소와 다른 시각 + 낯선 네트워크 + 대량 읽기가 복합 발생한 가상 사건에 대해 단순 영구 차단 대신 추가 확인(`step_up`)을 요청하고, 재인증 통과 시(`stepUp.verified === true`) 정상 허용.
   - (보너스 XDR-01 & XDR-02) 무차별 로그인 대입 및 웹 주입 공격 패턴 탐지 및 ZTNA 판정기 차단 연동 보존.
 - **다시 실행하는 방법**:
   - 로컬 환경: `.env.local`에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 작성한 뒤 `npx vercel dev`로 실행합니다.
-  - 판정기 가상 요청 연습: `node scripts/decider-test.mjs` 명령으로 등록 기기 허용 및 미등록 기기 거부를 확인합니다.
+  - 가상 사건 연습: `node scripts/fixture-7.mjs` 명령으로 정상 사건(`allow`)과 복합 이상 사건(`step_up`) 판정을 비교합니다.
+  - 판정기 종합 연습: `node scripts/decider-test.mjs` 명령으로 6~7단계 전체 규칙(`device_registered`, `step_up_required`) 통과를 확인합니다.
   - 배포 환경: GitHub 푸시 시 Vercel에서 자동 배포되며 `https://choi-bujang-secret-vault-neon.vercel.app`에서 확인할 수 있습니다.
   - XDR 실행: `npm run xdr:run -- web-injection` 명령으로 경보 판정 및 `node xdr/web-injection/respond.mjs`로 모의 연동 확인.
 
