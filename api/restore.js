@@ -157,7 +157,12 @@ async function getVerifier(supabaseSecretKey) {
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
-  const send = ({ status, json }) => response.status(status).json(json);
+  // 진단용: 요청 본문의 항목 이름(값 제외)과 응답 상태·오류 코드만 기록합니다. 토큰·본문 값·메모 내용은 기록하지 않습니다.
+  let bodyKeys = [];
+  const send = ({ status, json }) => {
+    console.log(`[restore] method=${request.method} status=${status} code=${json?.error ?? 'OK'} bodyKeys=${JSON.stringify(bodyKeys)}`);
+    return response.status(status).json(json);
+  };
 
   if ((request.method || '').toUpperCase() !== 'POST') {
     return send(reply(405, 'METHOD_NOT_ALLOWED', '허용되지 않은 HTTP 메서드입니다.'));
@@ -188,6 +193,7 @@ export default async function handler(request, response) {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch { body = null; }
   }
+  if (body && typeof body === 'object' && !Array.isArray(body)) bodyKeys = Object.keys(body).slice(0, 20);
   try {
     return send(await restoreOne({
       supabase: createClient(supabaseUrl, supabaseSecretKey),
