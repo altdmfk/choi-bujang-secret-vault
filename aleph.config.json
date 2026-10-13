@@ -22,10 +22,11 @@
     "GET /api/notices",
     "GET /api/notices/:id",
     "GET /notices",
-    "GET /notices/:id"
+    "GET /notices/:id",
+    "POST /api/restore"
   ],
   "originalApiUrl": "https://lklooocegqcqbhayaofm.supabase.co/rest/v1/notes",
-  "restoreRoute": null,
+  "restoreRoute": "POST /api/restore",
   "protectedService": {
     "serviceId": "notes",
     "route": "GET /notes/:id"
