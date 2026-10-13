@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { verifyDeviceApproval } from '../src/device-verifier.mjs';
 
 let loginVerifier = null;
 
@@ -53,9 +54,10 @@ export default async function handler(request, response) {
   }
 
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || '';
+  let verifiedUser = null;
   try {
     const verifyLogin = await getVerifier(supabaseSecretKey);
-    const verifiedUser = await verifyLogin(authorization);
+    verifiedUser = await verifyLogin(authorization);
     if (!verifiedUser || !verifiedUser.userId) {
       return response.status(401).json({
         error: 'UNAUTHORIZED',
@@ -69,6 +71,24 @@ export default async function handler(request, response) {
       reason: '유효하지 않은 인증 토큰입니다.',
       message: '유효하지 않은 인증 토큰입니다.',
     });
+  }
+
+  // 기기 승인 검증: 심판 토큰이 아닌 경우 승인된 기기 토큰(x-device-approval)이 필수
+  if (verifiedUser.kind !== 'judge') {
+    const approvalToken = request.headers['x-device-approval'];
+    const deviceApproval = verifyDeviceApproval({
+      token: approvalToken,
+      userId: verifiedUser.userId,
+      secretKey: supabaseSecretKey,
+    });
+
+    if (!deviceApproval) {
+      return response.status(403).json({
+        error: 'DEVICE_NOT_APPROVED',
+        reason: '승인되지 않은 기기에서는 강사 공지 구역을 읽을 수 없습니다.',
+        message: '승인되지 않은 기기에서는 강사 공지 구역을 읽을 수 없습니다.',
+      });
+    }
   }
 
   const method = (request.method || '').toUpperCase();

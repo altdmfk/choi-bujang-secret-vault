@@ -67,7 +67,7 @@
         <button type="button" class="btn btn-secondary btn-sm" id="installPwaBtn">📲 앱으로 설치</button>
       </div>
       <div class="device-caution">
-        <strong>※ 보안 안내:</strong> 설치형 웹앱(PWA) 바로가기나 앱 설치 표시만으로 기기 확인 및 승인이 끝난 것이 아닙니다. 실제 자료 접근 및 권한은 서버 ZTNA 판정기(<code>device_registered</code> 규칙)의 기기 등록부 및 서명 검증을 통과해야만 정상 승인됩니다.
+        <strong>※ 보안 안내:</strong> 승인되지 않은 기기에서는 보호 자료 API(/api/notes, /api/notices) 접근이 서버에서 403으로 차단됩니다. 서버의 기기 승인 확인을 거친 뒤에만 자료 조회가 허용됩니다.
       </div>
     </div>
     
@@ -167,6 +167,21 @@
     const cancelEditBtn = document.querySelector('#cancelEditBtn');
 
     let currentSession = null;
+    let currentApprovalToken = null;
+    let currentDeviceId = null;
+
+    function getAuthHeaders(session = currentSession) {
+      const headers = {
+        'Authorization': `Bearer ${session?.access_token || ''}`,
+      };
+      if (currentApprovalToken) {
+        headers['x-device-approval'] = currentApprovalToken;
+      }
+      if (currentDeviceId) {
+        headers['x-device-id'] = currentDeviceId;
+      }
+      return headers;
+    }
 
     function updateAuthUI(user) {
       if (user) {
@@ -282,9 +297,7 @@
 
       try {
         const response = await fetch('/api/notices', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          },
+          headers: getAuthHeaders(session),
           cache: 'no-store'
         });
         if (!response.ok) throw new Error('강사 공지를 불러올 수 없습니다. (인증 실패 또는 거부)');
@@ -334,9 +347,7 @@
 
       try {
         const response = await fetch('/api/notes', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          },
+          headers: getAuthHeaders(session),
           cache: 'no-store'
         });
         if (!response.ok) throw new Error('자료 API를 읽을 수 없습니다. (인증 실패 또는 거부)');
@@ -389,7 +400,7 @@
             try {
               const res = await fetch(`/api/notes/${note.id}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
+                headers: getAuthHeaders(currentSession),
               });
               if (!res.ok) throw new Error('삭제에 실패했습니다.');
               await loadNotes(currentSession);
@@ -424,7 +435,7 @@
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${currentSession.access_token}`,
+              ...getAuthHeaders(currentSession),
             },
             body: JSON.stringify({ title, body }),
           });
@@ -435,7 +446,7 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${currentSession.access_token}`,
+              ...getAuthHeaders(currentSession),
             },
             body: JSON.stringify({ title, body }),
           });
@@ -517,11 +528,17 @@
           throw new Error(data.message || data.reason || '서버가 이 기기의 승인을 거부했습니다.');
         }
 
+        // 서버 서명 승인 토큰 및 기기 ID 메모리 변수에 보관 (브라우저 저장소 미사용)
+        currentApprovalToken = data.approvalToken || null;
+        currentDeviceId = data.deviceId || null;
+
         // 서버가 등록 기기로 확인한 뒤에만 기존 자료실 오픈 및 자료 로드
         showApprovedVault(data);
         await loadNotices(currentSession);
         await loadNotes(currentSession);
       } catch (err) {
+        currentApprovalToken = null;
+        currentDeviceId = null;
         if (approvalResultTitle) {
           approvalResultTitle.textContent = '❌ 기기 승인 거부';
           approvalResultTitle.style.color = '#ff8b9e';
@@ -541,6 +558,8 @@
     logoutBtn.addEventListener('click', async () => {
       sessionStorage.removeItem('auth_session');
       currentSession = null;
+      currentApprovalToken = null;
+      currentDeviceId = null;
       updateAuthUI(null);
     });
 

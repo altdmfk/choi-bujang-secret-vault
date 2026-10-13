@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { verifyDeviceApproval } from '../src/device-verifier.mjs';
 
 let loginVerifier = null;
 
@@ -79,6 +80,24 @@ export default async function handler(request, response) {
   }
 
   const currentUserId = verifiedUser.userId;
+
+  // 기기 승인 검증: 심판 토큰이 아닌 경우 승인된 기기 토큰(x-device-approval)이 필수
+  if (verifiedUser.kind !== 'judge') {
+    const approvalToken = request.headers['x-device-approval'];
+    const deviceApproval = verifyDeviceApproval({
+      token: approvalToken,
+      userId: currentUserId,
+      secretKey: supabaseSecretKey,
+    });
+
+    if (!deviceApproval) {
+      return response.status(403).json({
+        error: 'DEVICE_NOT_APPROVED',
+        reason: '승인되지 않은 기기에서는 메모 구역을 읽거나 수정할 수 없습니다.',
+        message: '승인되지 않은 기기에서는 메모 구역을 읽거나 수정할 수 없습니다.',
+      });
+    }
+  }
   const supabase = createClient(supabaseUrl, supabaseSecretKey);
   const method = (request.method || '').toUpperCase();
 
