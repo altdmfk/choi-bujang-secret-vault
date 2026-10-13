@@ -4,6 +4,8 @@
 export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 'zone_rule']);
 
 const xdrBlocks = new Map();
+const noteOwnership = new Map();
+const noticeResources = new Set();
 
 const DEVICE_ID_PATTERN = /^[0-9a-f]{16}$/u;
 
@@ -26,7 +28,8 @@ const FORBIDDEN_FUNCTION_PATHS = new Set([
 ]);
 
 export function clearNoteOwnership() {
-  // 요청 간 상태(Map)를 저장하지 않는 무상태(stateless) 판정기이므로 초기화할 내부 상태 없음
+  noteOwnership.clear();
+  noticeResources.clear();
 }
 
 /**
@@ -398,7 +401,7 @@ export async function decide(request) {
     };
   }
 
-  // 5) 강사 공지 구역 ('notices'): GET 경로만 allow, 나머지 deny
+  // A. 강사 공지 구역 ('notices'): GET 경로만 allow, 나머지 deny
   if (serviceName === 'notices') {
     if (method !== 'GET') {
       return {
@@ -410,6 +413,20 @@ export async function decide(request) {
       };
     }
 
+    if (resourceId) {
+      const resourceKey = `${request.classId.trim()}:${request.projectId.trim()}:${resourceId}`;
+      if (noteOwnership.has(resourceKey)) {
+        return {
+          schema: 'aleph.decision.v1',
+          requestId: safeRequestId,
+          decision: 'deny',
+          reasonCode: 'zone_violation',
+          ruleIds: ['zone_rule'],
+        };
+      }
+      noticeResources.add(resourceKey);
+    }
+
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
@@ -419,7 +436,7 @@ export async function decide(request) {
     };
   }
 
-  // 4) 메모 구역 ('notes'): allowedRoutes에 있고 구조·메서드가 일치하면 allow
+  // B. 메모 구역 ('notes'): 소유자(subjectId)·기기(deviceId) 일치 확인 및 공지 자원 교차 접근 차단
   if (serviceName === 'notes') {
     const allowedMethods = ['GET', 'PUT', 'POST', 'DELETE'];
     if (!allowedMethods.includes(method)) {
@@ -430,6 +447,37 @@ export async function decide(request) {
         reasonCode: 'zone_violation',
         ruleIds: ['zone_rule'],
       };
+    }
+
+    if (resourceId) {
+      const resourceKey = `${request.classId.trim()}:${request.projectId.trim()}:${resourceId}`;
+      if (noticeResources.has(resourceKey)) {
+        return {
+          schema: 'aleph.decision.v1',
+          requestId: safeRequestId,
+          decision: 'deny',
+          reasonCode: 'zone_violation',
+          ruleIds: ['zone_rule'],
+        };
+      }
+
+      if (noteOwnership.has(resourceKey)) {
+        const owner = noteOwnership.get(resourceKey);
+        if (owner.subjectId !== request.subjectId || owner.deviceId !== request.deviceId) {
+          return {
+            schema: 'aleph.decision.v1',
+            requestId: safeRequestId,
+            decision: 'deny',
+            reasonCode: 'zone_violation',
+            ruleIds: ['zone_rule'],
+          };
+        }
+      } else {
+        noteOwnership.set(resourceKey, {
+          subjectId: request.subjectId,
+          deviceId: request.deviceId,
+        });
+      }
     }
 
     return {

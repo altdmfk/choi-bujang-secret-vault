@@ -48,17 +48,16 @@ export default async function handler(request, response) {
   const currentUserId = verifiedUser.userId;
   const supabase = createClient(supabaseUrl, supabaseSecretKey);
   const method = request.method;
-  const id = request.query?.id;
-
-  // 구역 검증: 공지 구역 자원 ID로 직접 접근 시도 시 교차 접근 차단
-  if (id && (String(id).startsWith('notice:') || String(id).startsWith('notice-'))) {
-    return response.status(403).json({ error: 'CROSS_ZONE_ACCESS_DENIED' });
+  const queryKeys = Object.keys(request.query || {});
+  if (queryKeys.some(key => key !== 'id')) {
+    return response.status(403).json({ error: 'FORBIDDEN_QUERY_PARAMETER' });
   }
 
-  // 기능 경로 차단 (:id 자리에 export 등 기능 경로 접근 방지)
-  if (id && ['export', 'import', 'backup', 'admin'].includes(String(id).toLowerCase())) {
+  const rawId = request.query?.id;
+  if (Array.isArray(rawId)) {
     return response.status(400).json({ error: 'INVALID_RESOURCE_ID' });
   }
+  const id = typeof rawId === 'string' ? rawId.trim() : undefined;
 
   // 1. 목록 조회: GET /api/notes (본인 소유 메모만 조회)
   if (method === 'GET' && !id) {
