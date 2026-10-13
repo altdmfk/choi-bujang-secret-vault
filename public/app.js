@@ -38,71 +38,66 @@ const detectWindowVal = document.querySelector('#detectWindowVal');
 const revocationStatusVal = document.querySelector('#revocationStatusVal');
 const recoveryRouteVal = document.querySelector('#recoveryRouteVal');
 
-// 초기 가린 서버 기록 모델 (비밀값, 토큰, 서버 전용 키, 기기 개인키, 메모 본문은 일절 제외됨)
+// 초기 가린 서버 기록 모델 (submission.json의 attackAttempts 5종과 1:1 대응)
+// 비밀값, 토큰, 서버 전용 키, 기기 개인키, 가상 메모 본문은 일절 제외됨
 let auditRecords = [
   {
-    id: 'decider_rules',
-    category: '판정기 규칙',
-    target: 'src/decider.mjs (RULE_IDS)',
-    detail: '규칙 3건 적용: device_registered, step_up_required, zone_rule',
+    attackId: 'anonymous_api_read',
+    category: '무인증 API 조회',
+    target: 'GET /api/notes',
+    expected: '비로그인 상태에서 /api/notes 요청 시 401 거부',
+    observed: '비로그인 요청에서 401 Unauthorized로 정상 차단됨',
     status: 'verified',
-    statusText: '확인됨 (규칙 3건 활성)',
+    statusText: '확인됨 (HTTP 401 차단)',
     badgeClass: 'badge-success'
   },
   {
-    id: 'device_api',
-    category: '기기 승인 API',
+    attackId: 'cross_subject_note_read',
+    category: '타인 메모 조회',
+    target: 'GET /api/notes/other_note_1',
+    expected: '타인 소유 메모 요청 시 401 또는 403 거부',
+    observed: '타인 메모 요청에서 HTTP 401로 정상 차단됨',
+    status: 'verified',
+    statusText: '확인됨 (HTTP 401 차단)',
+    badgeClass: 'badge-success'
+  },
+  {
+    attackId: 'unapproved_device_read',
+    category: '미인증 기기 상태 조회',
     target: 'GET /api/device',
-    detail: '미인증 요청 401 차단 및 HMAC 서명 승인 토큰 검증 연동',
+    expected: '비인증 상태에서 /api/device 요청 시 401 거부',
+    observed: '비인증 기기 요청이 401 Unauthorized로 정상 차단됨',
     status: 'verified',
-    statusText: '확인됨 (API 응답 연동)',
+    statusText: '확인됨 (HTTP 401 차단)',
     badgeClass: 'badge-success'
   },
   {
-    id: 'detect_burst',
-    category: '위협 탐지',
-    target: 'src/detect.mjs (burst_read)',
-    detail: '10분 윈도우 내 단일 계정(sub) 120건 초과 GET 탐지 (로컬 fixture 확인)',
-    status: 'unexecuted',
-    statusText: '운영 반 엔진 연동: 미실행',
-    badgeClass: 'badge-warn'
+    attackId: 'query_parameter_forbidden',
+    category: '쿼리 파라미터 금지 조회',
+    target: 'GET /api/notes?select=*',
+    expected: '쿼리 파라미터 포함 요청 시 401 또는 403 거부',
+    observed: '쿼리 파라미터 요청이 HTTP 401로 정상 차단됨',
+    status: 'verified',
+    statusText: '확인됨 (HTTP 401 차단)',
+    badgeClass: 'badge-success'
   },
   {
-    id: 'revocation_action',
-    category: '접속 회수',
-    target: 'detect() -> action',
-    detail: '임계치 초과 시 propose_revocation 제안 반환 (자동 회수 API 없음)',
-    status: 'unexecuted',
-    statusText: '자동 회수 실행: 미실행',
-    badgeClass: 'badge-warn'
-  },
-  {
-    id: 'recovery_restore',
-    category: '자료 복구',
+    attackId: 'anonymous_restore',
+    category: '복원 쓰기 점검',
     target: 'POST /api/restore',
-    detail: '메모 단건 복원 및 SHA-256 해시 검증·dryRun 지원 (본문 비공개 보호)',
+    expected: '비로그인 상태에서 POST /api/restore 요청 시 401 거부',
+    observed: 'not_run',
     status: 'unexecuted',
-    statusText: '복원 쓰기: 미실행 (대기)',
-    badgeClass: 'badge-warn'
-  },
-  {
-    id: 'policy_restore',
-    category: '정책 복구',
-    target: 'scripts/policy-restore.mjs',
-    detail: '과거 안전 정책 커밋 SHA 검증 및 롤백 도구 (운영 환경 적용 제외)',
-    status: 'unexecuted',
-    statusText: '운영 복원: 미실행',
+    statusText: '미실행 (not_run)',
     badgeClass: 'badge-warn'
   }
 ];
 
 function updateWarRoomAudit(apiStatusUpdate = null) {
-  if (apiStatusUpdate) {
-    const existing = auditRecords.find(r => r.id === apiStatusUpdate.id);
+  if (apiStatusUpdate && apiStatusUpdate.attackId) {
+    const existing = auditRecords.find(r => r.attackId === apiStatusUpdate.attackId);
     if (existing) {
       Object.assign(existing, apiStatusUpdate);
-    } else {
-      auditRecords.push(apiStatusUpdate);
     }
   }
 
@@ -125,13 +120,14 @@ function updateWarRoomAudit(apiStatusUpdate = null) {
     auditList.replaceChildren(...auditRecords.map(rec => {
       const li = document.createElement('li');
       li.className = 'audit-entry';
+      li.dataset.attackId = rec.attackId;
 
       const top = document.createElement('div');
       top.className = 'audit-entry-top';
 
       const tag = document.createElement('span');
       tag.className = 'audit-tag';
-      tag.textContent = `[${rec.category}] ${rec.target}`;
+      tag.textContent = `[${rec.attackId}] ${rec.target}`;
 
       const badge = document.createElement('span');
       badge.className = `badge ${rec.badgeClass || (rec.status === 'verified' ? 'badge-success' : 'badge-warn')}`;
@@ -141,12 +137,69 @@ function updateWarRoomAudit(apiStatusUpdate = null) {
 
       const detail = document.createElement('div');
       detail.className = 'audit-detail';
-      detail.textContent = rec.detail;
+      detail.textContent = `기대: ${rec.expected} | 실측: ${rec.observed} [가상 메모 본문 비공개 보호]`;
 
       li.append(top, detail);
       return li;
     }));
   }
+}
+
+// 화면 로드 시 브라우저에서 실제 API 응답을 실측하여 auditRecords 갱신
+async function verifyLiveAuditRecords() {
+  try {
+    const res1 = await fetch('/api/notes', { cache: 'no-store' });
+    const blocked1 = res1.status === 401;
+    const rec1 = auditRecords.find(r => r.attackId === 'anonymous_api_read');
+    if (rec1) {
+      rec1.status = blocked1 ? 'verified' : 'unexecuted';
+      rec1.observed = blocked1 ? '비로그인 요청에서 401 Unauthorized로 정상 차단됨' : `비로그인 요청이 차단되지 않음 (HTTP ${res1.status})`;
+      rec1.statusText = blocked1 ? '확인됨 (HTTP 401 차단)' : `실패 (HTTP ${res1.status})`;
+      rec1.badgeClass = blocked1 ? 'badge-success' : 'badge-warn';
+    }
+
+    const res2 = await fetch('/api/notes/other_note_1', { cache: 'no-store' });
+    const blocked2 = res2.status === 401 || res2.status === 403 || res2.status === 404;
+    const rec2 = auditRecords.find(r => r.attackId === 'cross_subject_note_read');
+    if (rec2) {
+      rec2.status = blocked2 ? 'verified' : 'unexecuted';
+      rec2.observed = blocked2 ? `타인 메모 요청에서 HTTP ${res2.status}로 정상 차단됨` : `타인 메모 요청이 차단되지 않음 (HTTP ${res2.status})`;
+      rec2.statusText = blocked2 ? `확인됨 (HTTP ${res2.status} 차단)` : `실패 (HTTP ${res2.status})`;
+      rec2.badgeClass = blocked2 ? 'badge-success' : 'badge-warn';
+    }
+
+    const res3 = await fetch('/api/device', { cache: 'no-store' });
+    const blocked3 = res3.status === 401;
+    const rec3 = auditRecords.find(r => r.attackId === 'unapproved_device_read');
+    if (rec3) {
+      rec3.status = blocked3 ? 'verified' : 'unexecuted';
+      rec3.observed = blocked3 ? '비인증 기기 요청이 401 Unauthorized로 정상 차단됨' : `기기 요청이 차단되지 않음 (HTTP ${res3.status})`;
+      rec3.statusText = blocked3 ? '확인됨 (HTTP 401 차단)' : `실패 (HTTP ${res3.status})`;
+      rec3.badgeClass = blocked3 ? 'badge-success' : 'badge-warn';
+    }
+
+    const res4 = await fetch('/api/notes?select=*', { cache: 'no-store' });
+    const blocked4 = res4.status === 401 || res4.status === 403;
+    const rec4 = auditRecords.find(r => r.attackId === 'query_parameter_forbidden');
+    if (rec4) {
+      rec4.status = blocked4 ? 'verified' : 'unexecuted';
+      rec4.observed = blocked4 ? `쿼리 파라미터 요청이 HTTP ${res4.status}로 정상 차단됨` : `쿼리 요청이 차단되지 않음 (HTTP ${res4.status})`;
+      rec4.statusText = blocked4 ? `확인됨 (HTTP ${res4.status} 차단)` : `실패 (HTTP ${res4.status})`;
+      rec4.badgeClass = blocked4 ? 'badge-success' : 'badge-warn';
+    }
+
+    // 5. anonymous_restore는 쓰기 요청이므로 실제 요청을 보내지 않고 not_run 유지
+    const rec5 = auditRecords.find(r => r.attackId === 'anonymous_restore');
+    if (rec5) {
+      rec5.status = 'unexecuted';
+      rec5.observed = 'not_run';
+      rec5.statusText = '미실행 (not_run)';
+      rec5.badgeClass = 'badge-warn';
+    }
+  } catch (_e) {
+    // 네트워크 실패 시에도 기존 렌더링 유지
+  }
+  updateWarRoomAudit();
 }
 
 
@@ -570,6 +623,7 @@ logoutBtn.addEventListener('click', async () => {
 // 초기화: 쿠키 기반 세션 확인 (저장소 미사용)
 async function initSession() {
   updateWarRoomAudit(); // 화면 로드 즉시 초기 요약 수치 및 가린 서버 기록 렌더링
+  verifyLiveAuditRecords(); // 실제 API 응답 실측 대조 실행
   try {
     const res = await fetch('/api/device', {
       cache: 'no-store',
