@@ -11,7 +11,12 @@ const DECIDER_FILE = 'src/decider.mjs';
 const LIST_KEYS = ['allowedRoutes'];
 export const VALUE_KEYS = ['protectedService', 'originalApiUrl', 'restoreRoute', 'identityProvider'];
 
-export class Stop extends Error {}
+export class Stop extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'Stop';
+  }
+}
 
 function git(args) {
   try {
@@ -50,8 +55,8 @@ export function loadBackup(sha) {
   return { full, subject, date, policy };
 }
 
-export function loadCurrent() {
-  const policy = parsePolicy(readFileSync(CONFIG_FILE, 'utf8'), readFileSync(DECIDER_FILE, 'utf8'));
+export function loadCurrent(configPath = CONFIG_FILE) {
+  const policy = parsePolicy(readFileSync(configPath, 'utf8'), readFileSync(DECIDER_FILE, 'utf8'));
   if (!policy) throw new Stop('중단: 현재 시험 정책을 읽지 못했습니다.');
   return policy;
 }
