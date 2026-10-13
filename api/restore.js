@@ -105,6 +105,11 @@ export async function restoreOne({ supabase, userId, body }) {
   const backup = second.backup;
   const actualHash = second.hash;
 
+  // 복원할 사본 버전(해시)과 바뀔 항목 목록을 쓰기 전에 계산합니다. 본문은 응답에 넣지 않습니다.
+  const changed = [];
+  if (!existing || existing.title !== backup.title) changed.push('title');
+  if (!existing || sha256Hex(existing.content) !== actualHash) changed.push('content');
+
   // 4. 재검증한 그 한 건만 복원하고 다른 메모와 감사 기록은 건드리지 않습니다.
   const write = existing
     ? await supabase.from('notes')
@@ -138,9 +143,12 @@ export async function restoreOne({ supabase, userId, body }) {
     status: 200,
     json: {
       restored: true,
+      verified: true,
       id: rawId,
       resourceId: `note:${rawId}`,
       ownerMatched: true,
+      backupVersion: actualHash,
+      changed,
       contentHash: actualHash,
     },
   };

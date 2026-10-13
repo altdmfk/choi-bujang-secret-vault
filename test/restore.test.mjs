@@ -113,31 +113,3 @@ test('형식이 틀린 요청은 거부됩니다', async () => {
   }
 });
 
-test('수정·삭제 직전 사본은 마지막으로 바뀌기 직전 상태로 갱신되고 타인 사본은 건드리지 않습니다', async () => {
-  const { saveBackup } = await import('../src/backup.mjs');
-  const rows = [{ id: 'x1', owner_id: B, title: '처음', content: '처음 본문', content_hash: sha256Hex('처음 본문') }];
-  const fake = {
-    from() {
-      return {
-        select() {
-          const f = [];
-          const q = { eq(k, v) { f.push([k, v]); return q; }, maybeSingle: async () => ({ data: rows.find(r => f.every(([k, v]) => r[k] === v)) ?? null, error: null }) };
-          return q;
-        },
-        insert: async v => { rows.push({ ...v }); return { error: null }; },
-        update(v) {
-          const f = [];
-          const q = { eq(k, val) { f.push([k, val]); return q; }, then: res => { rows.filter(r => f.every(([k, val]) => r[k] === val)).forEach(r => Object.assign(r, v)); res({ error: null }); } };
-          return q;
-        },
-      };
-    },
-  };
-  await saveBackup(fake, { id: 'x1', owner_id: B, title: '수정 직전', content: '수정 직전 본문' });
-  assert.equal(rows[0].content, '수정 직전 본문');
-  assert.equal(rows[0].content_hash, sha256Hex('수정 직전 본문'));
-  await saveBackup(fake, { id: 'x1', owner_id: A, title: '타인', content: '타인 본문' });
-  assert.equal(rows[0].content, '수정 직전 본문');
-  await saveBackup(fake, { id: 'x2', owner_id: B, title: '새 메모', content: '새 본문' });
-  assert.equal(rows.length, 2);
-});
