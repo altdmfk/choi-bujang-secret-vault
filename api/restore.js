@@ -22,6 +22,35 @@ export function sha256Hex(text) {
   return createHash('sha256').update(String(text ?? ''), 'utf8').digest('hex');
 }
 
+// 사본을 읽어 소유자·ID·내용 해시를 검증합니다. 통과하면 { backup, hash }, 실패하면 { stop }(응답)을 돌려줍니다.
+async function loadVerifiedBackup(supabase, rawId, userId, clientHash) {
+  const { data: backup, error } = await supabase
+    .from('notes_backup')
+    .select('id, owner_id, title, content, content_hash')
+    .eq('id', rawId)
+    .maybeSingle();
+  if (error) return { stop: reply(500, 'BACKUP_QUERY_FAILED', '사본 조회에 실패했습니다.') };
+
+  // 사본이 없거나 타인 소유인 경우 같은 거부 응답으로 존재 여부를 알려 주지 않고 멈춥니다.
+  if (!backup || backup.owner_id !== userId || backup.id !== rawId) {
+    return { stop: reply(403, 'RESTORE_REFUSED', '이 메모는 복원할 수 없습니다.') };
+  }
+
+  // 사본의 content_hash가 없거나 형식이 틀리거나 내용이 없으면 검증할 수 없으므로 멈춥니다.
+  const backupHash = typeof backup.content_hash === 'string' ? backup.content_hash.trim().toLowerCase() : '';
+  if (!backupHash || !HASH_PATTERN.test(backupHash) || typeof backup.content !== 'string') {
+    return { stop: reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 올바르지 않아 복원하지 않았습니다.') };
+  }
+  const hash = sha256Hex(backup.content);
+  if (hash !== backupHash) {
+    return { stop: reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 일치하지 않아 복원하지 않았습니다.') };
+  }
+  if (clientHash && clientHash.trim().toLowerCase() !== hash) {
+    return { stop: reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 요청과 일치하지 않아 복원하지 않았습니다.') };
+  }
+  return { backup, hash };
+}
+
 // 순수 로직: 검증된 사용자 번호와 요청 본문만 받아 한 건만 복원합니다.
 export async function restoreOne({ supabase, userId, body }) {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
@@ -51,41 +80,35 @@ export async function restoreOne({ supabase, userId, body }) {
     }
   }
 
-  // 1. 사본(notes_backup)을 다시 읽어 존재 여부와 소유자를 확인합니다.
-  const { data: backup, error: backupError } = await supabase
-    .from('notes_backup')
-    .select('id, owner_id, title, content, content_hash')
-    .eq('id', rawId)
-    .maybeSingle();
-  if (backupError) return reply(500, 'BACKUP_QUERY_FAILED', '사본 조회에 실패했습니다.');
+  // 1~2. 사본(notes_backup)을 읽고 소유자·ID·내용 해시를 검증합니다. 실패하면 아무것도 쓰지 않고 멈춥니다.
+  const first = await loadVerifiedBackup(supabase, rawId, userId, clientHash);
+  if (first.stop) return first.stop;
 
-  // 사본이 없거나 타인 소유인 경우 같은 거부 응답으로 존재 여부를 알려 주지 않고 멈춥니다.
-  if (!backup || backup.owner_id !== userId) {
-    return reply(403, 'RESTORE_REFUSED', '이 메모는 복원할 수 없습니다.');
-  }
-
-  // 2. 사본 자체의 내용 해시를 다시 계산하여 사본 무결성을 검증합니다. 사본 검증이 실패하면 멈춥니다.
-  const actualHash = sha256Hex(backup.content);
-  if (backup.content_hash && actualHash !== backup.content_hash) {
-    return reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 일치하지 않아 복원하지 않았습니다.');
-  }
-  if (clientHash && actualHash !== clientHash) {
-    return reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 요청과 일치하지 않아 복원하지 않았습니다.');
-  }
-
-  // 3. 현재 메모 테이블의 상태를 확인합니다.
+  // 3. 현재 메모 테이블의 상태를 확인합니다. 타인 소유의 메모가 이미 있다면 건드리지 않고 멈춥니다.
   const { data: existing, error: existingError } = await supabase
     .from('notes')
     .select('id, owner_id')
     .eq('id', rawId)
     .maybeSingle();
   if (existingError) return reply(500, 'DATABASE_QUERY_FAILED', '현재 메모 조회에 실패했습니다.');
+  if (existing && existing.owner_id !== userId) {
+    return reply(403, 'RESTORE_REFUSED', '이 메모는 복원할 수 없습니다.');
+  }
 
-  // 4. 그 한 건만 복원하고 다른 메모와 감사 기록은 건드리지 않습니다.
+  // 3-1. 쓰기 직전에 검증한 사본을 다시 읽어 같은 사본인지 재검증합니다. 달라졌으면 쓰지 않고 멈춥니다.
+  const second = await loadVerifiedBackup(supabase, rawId, userId, clientHash);
+  if (second.stop) return second.stop;
+  if (second.hash !== first.hash || second.backup.title !== first.backup.title) {
+    return reply(409, 'HASH_MISMATCH', '검증한 사본이 복원 직전에 달라져 복원하지 않았습니다.');
+  }
+  const backup = second.backup;
+  const actualHash = second.hash;
+
+  // 4. 재검증한 그 한 건만 복원하고 다른 메모와 감사 기록은 건드리지 않습니다.
   const write = existing
     ? await supabase.from('notes')
       .update({ title: backup.title, content: backup.content, owner_id: userId })
-      .eq('id', rawId).select('id').maybeSingle()
+      .eq('id', rawId).eq('owner_id', userId).select('id').maybeSingle()
     : await supabase.from('notes')
       .insert({ id: rawId, title: backup.title, content: backup.content, owner_id: userId })
       .select('id').single();

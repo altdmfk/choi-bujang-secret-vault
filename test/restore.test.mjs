@@ -57,6 +57,7 @@ function setup() {
     { id: 'a1', owner_id: A, title: 'A 원본', content: 'A 본문', content_hash: sha256Hex('A 본문') },
     { id: 'b2', owner_id: B, title: 'B 삭제됨', content: '삭제 전 본문', content_hash: sha256Hex('삭제 전 본문') },
     { id: 'b3', owner_id: B, title: 'B 변조', content: '변조된 사본', content_hash: sha256Hex('원래 본문') },
+    { id: 'b4', owner_id: B, title: 'B 해시누락', content: '내용 있음', content_hash: null },
   ];
   return { supabase: fakeSupabase({ notes, backups }), notes, hash };
 }
@@ -116,6 +117,13 @@ test('해시 없이 요청해도 사본이 변조되었으면 검증 실패로 �
   const result = await restoreOne({ supabase, userId: B, body: { id: 'b3' } });
   assert.equal(result.status, 409);
   assert.equal(notes.some(n => n.id === 'b3'), false);
+});
+
+test('사본에 content_hash가 누락되어 검증할 수 없는 사본은 거부되고 복원하지 않습니다', async () => {
+  const { supabase, notes } = setup();
+  const result = await restoreOne({ supabase, userId: B, body: { id: 'b4' } });
+  assert.equal(result.status, 409);
+  assert.equal(notes.some(n => n.id === 'b4'), false);
 });
 
 test('형식이 틀린 요청은 거부됩니다', async () => {
