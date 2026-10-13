@@ -4,13 +4,9 @@ import { createLoginVerifier } from '../src/verify-login.mjs';
 
 let loginVerifier = null;
 
-const FORBIDDEN_FUNCTION_KEYWORD = /(?:^|[:_-])(?:export|import|backup|admin|batch|search|download|upload|config|settings?|all|manage|exec(?:ute)?|list|dump|restore|sync|share|public|raw|status|health|metrics?|debug|test|eval|run|query|filter|stats?|summary|count|bulk|migrat(?:e|ion)|archiv(?:e|es)|clone|copy|audit|report|flush|clear|reset|purge|system|whoami|me)(?:$|[:_-]|\d)/iu;
-
 function isValidNoticeResourceId(resourceId) {
-  if (typeof resourceId !== 'string' || !resourceId.trim()) return false;
-  const lower = resourceId.trim().toLowerCase();
-  if (FORBIDDEN_FUNCTION_KEYWORD.test(lower)) return false;
-  return /^(?:notices?[:_-])?\d{1,6}$/u.test(lower);
+  if (typeof resourceId !== 'string') return false;
+  return /^(?:notice:)?\d+$/iu.test(resourceId.trim());
 }
 
 // 서버가 검증한 사용자의 저장된 역할만 조회 (요청 본문이나 헤더의 role은 신뢰하지 않음)

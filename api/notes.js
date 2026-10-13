@@ -8,27 +8,11 @@ let loginVerifier = null;
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
-const FORBIDDEN_FUNCTION_KEYWORD = /(?:^|[:_-])(?:export|import|backup|admin|batch|search|download|upload|config|settings?|all|manage|exec(?:ute)?|list|dump|restore|sync|share|public|raw|status|health|metrics?|debug|test|eval|run|query|filter|stats?|summary|count|bulk|migrat(?:e|ion)|archiv(?:e|es)|clone|copy|audit|report|flush|clear|reset|purge|system|whoami|me)(?:$|[:_-]|\d)/iu;
-
 function isValidNoteResourceId(resourceId) {
-  if (typeof resourceId !== 'string' || !resourceId.trim()) return false;
-  const trimmed = resourceId.trim();
-  const lower = trimmed.toLowerCase();
-
-  if (/^notices?(?:[:_-]|$)/iu.test(lower)) return false;
-  if (FORBIDDEN_FUNCTION_KEYWORD.test(lower)) return false;
-
-  const hasNotePrefix = /^(?:notes?|memos?)[:_-]/iu.test(lower);
-  const coreId = lower.replace(/^(?:notes?|memos?)[:_-]/iu, '');
-  if (!coreId || FORBIDDEN_FUNCTION_KEYWORD.test(coreId)) return false;
-
-  if (coreId === 'demo') return true;
-  if (UUID_REGEX.test(coreId)) return true;
-  if (/^\d{1,12}$/u.test(coreId)) return true;
-  if (hasNotePrefix && /^[a-z0-9][a-z0-9_-]{0,63}$/u.test(coreId)) return true;
-  if (/^[a-z0-9][a-z0-9_-]{0,63}$/u.test(coreId) && /\d/u.test(coreId)) return true;
-
-  return false;
+  if (typeof resourceId !== 'string') return false;
+  return /^(?:note:[a-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d+|demo)$/iu.test(
+    resourceId.trim()
+  );
 }
 
 // 서버가 검증한 사용자의 저장된 역할만 조회 (요청 본문이나 헤더의 role은 신뢰하지 않음)
