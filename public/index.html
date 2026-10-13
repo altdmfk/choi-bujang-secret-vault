@@ -233,7 +233,7 @@
           editBtn.className = 'btn btn-secondary btn-sm';
           editBtn.textContent = '수정';
           editBtn.addEventListener('click', () => {
-            editingNoteId.value = resId;
+            editingNoteId.value = note.id;
             noteTitleInput.value = note.title;
             noteBodyInput.value = note.body || '';
             editorTitle.textContent = `메모 수정 (자원 ID: ${resId})`;
@@ -247,7 +247,7 @@
           deleteBtn.addEventListener('click', async () => {
             if (!confirm(`'${note.title}' 메모를 삭제하시겠습니까?`)) return;
             try {
-              const res = await fetch(`/api/notes/${encodeURIComponent(resId)}`, {
+              const res = await fetch(`/api/notes/${note.id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
               });
@@ -280,7 +280,7 @@
       try {
         if (id) {
           // 수정: PUT /api/notes/:id
-          const res = await fetch(`/api/notes/${encodeURIComponent(id)}`, {
+          const res = await fetch(`/api/notes/${id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',

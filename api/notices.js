@@ -9,12 +9,6 @@ function isValidNoticeResourceId(resourceId) {
   return /^(?:notice:)?\d+$/iu.test(resourceId.trim());
 }
 
-// 서버가 검증한 사용자의 저장된 역할만 조회 (요청 본문이나 헤더의 role은 신뢰하지 않음)
-function getServerVerifiedRole(verifiedUser) {
-  if (!verifiedUser || !verifiedUser.userId) return null;
-  return 'student';
-}
-
 async function getVerifier(supabaseSecretKey) {
   if (!loginVerifier) {
     const configPath = resolve(process.cwd(), 'aleph.config.json');
@@ -31,31 +25,24 @@ const INSTRUCTOR_NOTICES = [
   {
     id: '1',
     resourceId: 'notice:1',
-    zone: 'notices',
-    type: 'notice',
-    owner: 'instructor',
-    author: 'instructor',
-    category: 'notice',
     title: '[강사 공지] 8단계 구역 분리 지침',
     body: '자료실 메모(notes)와 강사 공지(notices)는 분리된 구역 및 자원 ID로 통제됩니다.',
+    author: 'instructor',
+    category: 'notice',
   },
   {
     id: '2',
     resourceId: 'notice:2',
-    zone: 'notices',
-    type: 'notice',
-    owner: 'instructor',
-    author: 'instructor',
-    category: 'notice',
     title: '[수업 공지] 시스템 보안 실습 주의사항',
     body: '실습 중 인가되지 않은 타인 메모나 시스템 자원에 접근을 시도하지 마세요.',
+    author: 'instructor',
+    category: 'notice',
   },
 ];
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
-  // 로그인 없는 구역 읽기 전면 거부 (제목이나 본문을 노출하지 않음)
   const authorization = request.headers.authorization;
   if (!authorization) {
     return response.status(401).json({
@@ -66,10 +53,16 @@ export default async function handler(request, response) {
   }
 
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || '';
-  let verifiedUser = null;
   try {
     const verifyLogin = await getVerifier(supabaseSecretKey);
-    verifiedUser = await verifyLogin(authorization);
+    const verifiedUser = await verifyLogin(authorization);
+    if (!verifiedUser || !verifiedUser.userId) {
+      return response.status(401).json({
+        error: 'UNAUTHORIZED',
+        reason: '검증된 사용자 신원을 확인할 수 없습니다.',
+        message: '검증된 사용자 신원을 확인할 수 없습니다.',
+      });
+    }
   } catch (_err) {
     return response.status(401).json({
       error: 'UNAUTHORIZED',
@@ -78,59 +71,13 @@ export default async function handler(request, response) {
     });
   }
 
-  if (!verifiedUser || !verifiedUser.userId) {
-    return response.status(401).json({
-      error: 'UNAUTHORIZED',
-      reason: '검증된 사용자 신원을 확인할 수 없습니다.',
-      message: '검증된 사용자 신원을 확인할 수 없습니다.',
-    });
-  }
-
-  const serverRole = getServerVerifiedRole(verifiedUser);
-
   const method = (request.method || '').toUpperCase();
   const queryKeys = Object.keys(request.query || {});
   if (queryKeys.some(key => key !== 'id')) {
     return response.status(403).json({
       error: 'FORBIDDEN_QUERY_PARAMETER',
-      reason: '쿼리 파라미터로 역할이나 기능을 선택할 수 없습니다.',
-      message: '쿼리 파라미터로 역할이나 기능을 선택할 수 없습니다.',
-    });
-  }
-
-  // 헤더나 요청 본문에 적힌 role / menu 값을 서버 저장 역할(serverRole)과 대조하여 불일치 시 즉시 거부
-  const headerRole = request.headers['x-role'] || request.headers['x-user-role'];
-  if (typeof headerRole === 'string' && headerRole.trim() && headerRole.trim().toLowerCase() !== serverRole) {
-    return response.status(403).json({
-      error: 'ROLE_ELEVATION_DENIED',
-      reason: '요청 헤더의 role은 신뢰하지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
-      message: '요청 헤더의 role은 신뢰하지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
-    });
-  }
-
-  if (request.body !== undefined && request.body !== null && request.body !== '') {
-    let rawBody = request.body;
-    if (typeof rawBody === 'string') {
-      try { rawBody = JSON.parse(rawBody); } catch { rawBody = {}; }
-    }
-    if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)) {
-      const clientRole = rawBody.role ?? rawBody.userRole;
-      if (clientRole !== undefined && String(clientRole).trim().toLowerCase() !== serverRole) {
-        return response.status(403).json({
-          error: 'ROLE_ELEVATION_DENIED',
-          reason: '요청 본문에 적힌 role은 믿지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
-          message: '요청 본문에 적힌 role은 믿지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
-        });
-      }
-    }
-  }
-
-  // 강사 공지 수정·추가·삭제는 서버에 저장된 역할이 instructor인 경우에만 허용 (일반 학생은 403 거부)
-  if (method !== 'GET' && serverRole !== 'instructor') {
-    return response.status(403).json({
-      error: 'INSTRUCTOR_ROLE_REQUIRED',
-      reason: '서버에서 확인된 강사 권한이 없어 공지를 수정하거나 삭제할 수 없습니다.',
-      message: '서버에서 확인된 강사 권한이 없어 공지를 수정하거나 삭제할 수 없습니다.',
+      reason: '쿼리 파라미터로 기능이나 다른 구역 자료를 선택할 수 없습니다.',
+      message: '쿼리 파라미터로 기능이나 다른 구역 자료를 선택할 수 없습니다.',
     });
   }
 
@@ -172,44 +119,54 @@ export default async function handler(request, response) {
     }
 
     const lowerId = decodedId.toLowerCase();
-    // 공지 구역에서 메모 자원(note:*)을 교차 조회하려는 시도 차단
+    // 구역 검증: 메모 구역 자원 ID(note:*)로 직접 접근 시도 시 교차 접근 차단
     if (
       /^notes?[:_-]/iu.test(decodedId)
       || lowerId === 'demo'
-      || lowerId === 'sample_note_1'
       || lowerId.includes('note')
       || lowerId.includes('memo')
     ) {
       return response.status(403).json({
-        error: 'FORBIDDEN_CROSS_ZONE',
+        error: 'CROSS_ZONE_ACCESS_DENIED',
         reason: '강사 공지 구역에서 메모 자원을 조회할 수 없습니다.',
         message: '강사 공지 구역에서 메모 자원을 조회할 수 없습니다.',
       });
     }
 
-    // 화이트리스트 기반 공지 자원 ID 검증 (임의의 기능 경로 및 비인가 자원 ID 전면 차단)
+    // 화이트리스트 기반 공지 자원 ID 검증 (:id 자리에 export 등 기능 경로 접근 방지)
     if (!isValidNoticeResourceId(decodedId)) {
       return response.status(403).json({
-        error: 'FORBIDDEN_FUNCTION_PATH',
+        error: 'INVALID_RESOURCE_ID',
         reason: '유효한 강사 공지 자원 ID가 아니거나 허용되지 않은 기능 경로입니다.',
         message: '유효한 강사 공지 자원 ID가 아니거나 허용되지 않은 기능 경로입니다.',
       });
     }
-
-    const normalizedNoticeId = decodedId.replace(/^notices?[:_-]/iu, '');
-    const notice = INSTRUCTOR_NOTICES.find(
-      n => n.id === normalizedNoticeId || n.resourceId.toLowerCase() === lowerId
-    );
-    if (!notice) {
-      return response.status(403).json({
-        error: 'FORBIDDEN_CROSS_ZONE',
-        reason: '허용되지 않은 공지 자원 ID이거나 다른 구역 자료입니다.',
-        message: '허용되지 않은 공지 자원 ID이거나 다른 구역 자료입니다.',
-      });
-    }
-
-    return response.status(200).json(notice);
   }
 
-  return response.status(200).json(INSTRUCTOR_NOTICES);
+  if (method === 'GET') {
+    if (decodedId) {
+      const normalizedNoticeId = decodedId.replace(/^notices?[:_-]/iu, '');
+      const notice = INSTRUCTOR_NOTICES.find(
+        n => n.id === normalizedNoticeId || n.resourceId.toLowerCase() === decodedId.toLowerCase()
+      );
+      if (!notice) {
+        return response.status(403).json({
+          error: 'CROSS_ZONE_ACCESS_DENIED',
+          reason: '허용되지 않은 공지 자원 ID이거나 다른 구역 자료입니다.',
+          message: '허용되지 않은 공지 자원 ID이거나 다른 구역 자료입니다.',
+        });
+      }
+      return response.status(200).json(notice);
+    }
+    return response.status(200).json(INSTRUCTOR_NOTICES);
+  }
+
+  // 공지사항 수정/추가/삭제 시도 시:
+  // 클라이언트 요청 본문이나 헤더의 role을 믿지 않고,
+  // 검증된 사용자가 학생이므로 강사 권한 부재로 403 거부
+  return response.status(403).json({
+    error: 'INSTRUCTOR_ROLE_REQUIRED',
+    reason: '검증된 사용자에게 강사 권한이 없어 공지를 수정하거나 삭제할 수 없습니다.',
+    message: '검증된 사용자에게 강사 권한이 없어 공지를 수정하거나 삭제할 수 없습니다.',
+  });
 }

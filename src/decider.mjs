@@ -299,21 +299,6 @@ export async function decide(request) {
     return denyZone(safeRequestId);
   }
 
-  // 계약 외 위조 필드(role, ownerId 등)를 통한 권한 사칭 거부
-  if (
-    request.role !== undefined
-    && String(request.role).trim().toLowerCase() !== 'student'
-    && String(request.role).trim().toLowerCase() !== 'authenticated'
-  ) {
-    return denyZone(safeRequestId);
-  }
-  if (request.ownerId !== undefined && request.ownerId !== request.subjectId) {
-    return denyZone(safeRequestId);
-  }
-  if (request.owner_id !== undefined && request.owner_id !== request.subjectId) {
-    return denyZone(safeRequestId);
-  }
-
   const method = typeof request.method === 'string' ? request.method.trim().toUpperCase() : '';
   if (!ALLOWED_METHODS.has(method)) {
     return denyZone(safeRequestId);
