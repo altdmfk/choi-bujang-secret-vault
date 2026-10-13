@@ -42,9 +42,19 @@ export async function runAttackChecks(config) {
 
   const blocked = response.status === 401;
 
+  const restore = await fetch(new URL('/api/restore', app), {
+    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10000),
+    headers: { 'content-type': 'application/json' }, body: '{}',
+  });
+  const restoreBlocked = restore.status === 401;
+
   return [{
     attackId: 'anonymous_api_read',
     expected: '비로그인 상태에서 /api/notes 요청 시 401 거부',
     observed: blocked ? '비로그인 요청에서 401 Unauthorized로 정상 차단됨' : `비로그인 요청이 차단되지 않음 (HTTP ${response.status})`
+  }, {
+    attackId: 'anonymous_restore',
+    expected: '비로그인 상태에서 POST /api/restore 요청 시 401 거부',
+    observed: restoreBlocked ? '비로그인 복원 요청이 401 Unauthorized로 정상 차단됨' : `비로그인 복원 요청이 차단되지 않음 (HTTP ${restore.status})`
   }];
 }

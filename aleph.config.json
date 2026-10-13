@@ -1,5 +1,5 @@
 {
-  "step": 8,
+  "step": 10,
   "repoUrl": "https://github.com/altdmfk/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-neon.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -17,11 +17,16 @@
     "PUT /api/notes/:id",
     "DELETE /api/notes/:id",
     "GET /notes/:id",
+    "PUT /notes/:id",
+    "DELETE /notes/:id",
     "GET /api/notices",
-    "GET /api/notices/:id"
+    "GET /api/notices/:id",
+    "GET /notices",
+    "GET /notices/:id",
+    "POST /api/restore"
   ],
   "originalApiUrl": "https://lklooocegqcqbhayaofm.supabase.co/rest/v1/notes",
-  "restoreRoute": null,
+  "restoreRoute": "POST /api/restore",
   "protectedService": {
     "serviceId": "notes",
     "route": "GET /notes/:id"

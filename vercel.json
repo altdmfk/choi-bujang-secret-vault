@@ -13,6 +13,10 @@
   ],
   "rewrites": [
     { "source": "/api/notes/:id", "destination": "/api/notes?id=:id" },
-    { "source": "/api/notices/:id", "destination": "/api/notices?id=:id" }
+    { "source": "/notes/:id", "destination": "/api/notes?id=:id" },
+    { "source": "/notes", "destination": "/api/notes" },
+    { "source": "/api/notices/:id", "destination": "/api/notices?id=:id" },
+    { "source": "/notices/:id", "destination": "/api/notices?id=:id" },
+    { "source": "/notices", "destination": "/api/notices" }
   ]
 }

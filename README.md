@@ -18,20 +18,62 @@
 
 로컬에서 화면만 확인할 때는 `npm run build -- --local`을 사용합니다. 로컬 실행은 Vercel 배포나 심판 접수를 증명하지 않습니다.
 
-## 8단계 저장점 현재 작동하는 기능 및 다시 실행하는 방법
+## 8단계 현재 작동하는 기능 및 다시 실행하는 방법
 
 - **작동하는 기능**:
   - (5단계) Supabase Auth를 통한 사용자 로그인(A, B 계정) 및 로그아웃 지원, 본인 소유 메모만 조회/수정/삭제 허용, 원본 자료 저장소 직접 접근 차단(`originalApiUrl`).
-  - (6단계) 반 엔진과 연동하여 보호 서비스 ID(`notes`) 및 읽기 경로(`GET /notes/:id`)를 설정 파일(`aleph.config.json`)에 연결하고, ZTNA 판정기(`src/decider.mjs`)에 기기 등록 및 사용자 바인딩 검증 규칙(`device_registered`)을 구현하여 미등록 기기 또는 타인 기기의 접근을 차단(`device_not_registered`)하며 정상 등록 기기의 자료실 읽기만 허용.
+  - (6단계) 반 엔진과 연동하여 보호 서비스 ID(`notes`) 및 읽기 경로(`GET /notes/:id`)를 설정 파일(`aleph.config.json`)에 연결하고, ZTNA 판정기(`src/decider.mjs`)에 기기 등록 및 사용자 바인딩 검증 규칙(`device_registered`)을 구현하여 미등록 기기 또는 타인 기기의 접근을 차단(`device_not_registered`).
   - (7단계) 가상 접속 정보 입력 검증(`validateConnectionContext`) 및 복합 이상 접속 검사 규칙(`step_up_required`)을 구현하여 평소와 다른 시각 + 낯선 네트워크 + 대량 읽기가 복합 발생한 가상 사건에 대해 단순 영구 차단 대신 추가 확인(`step_up`)을 요청하고, 재인증 통과 시(`stepUp.verified === true`) 정상 허용.
-  - (8단계) 자료실 메모(`notes`)와 강사 공지(`notices`)를 독립된 자원 ID 체계로 분리하고 화면에 표시. ZTNA 판정기(`src/decider.mjs`)에 구역 규칙(`zone_rule`)을 구현하여 본인 메모 읽기·수정 및 공지 읽기 허용, 타인 메모 접근·일반 학생의 공지 수정·기능 경로(`export` 등) 시도 차단. 자료 API(`api/notes.js`, `api/notices.js`)에서도 검증된 사용자 소유권과 강사 권한을 대조하여 우회 및 교차 구역 직접 요청(`CROSS_ZONE_ACCESS_DENIED`, `FORBIDDEN_NOT_OWNER`, `INSTRUCTOR_ROLE_REQUIRED`)을 차단.
-  - (보너스 XDR-01 & XDR-02) 무차별 로그인 대입 및 웹 주입 공격 패턴 탐지 및 ZTNA 판정기 차단 연동 보존.
+  - (8단계) 내 자료실 메모(`note:<id>`)와 강사 공지(`notice:<id>`)를 서로 다른 자원 ID로 분리 표시하고, 판정기(`src/decider.mjs`)에 구역 규칙(`zone_rule`)을 추가하여 자기 메모 읽기·수정은 허용하고 타인 메모 접근·강사 공지 수정·알 수 없는 경로·쿼리 선택·`:id` 깊이의 `export` 등 기능 경로를 거부(`zone_violation`). 또한 자료 API(`api/notes.js`, `api/notices.js`)에서도 검증된 사용자와 저장된 소유자·강사 권한을 대조하여 본문·헤더의 `role`이나 `owner_id` 위조 및 교차 구역 조회를 `403`과 짧은 거부 사유로 차단.
+  - (보너스 XDR-01 ~ XDR-06) 무차별 로그인 대입(`brute-force`), 웹 주입(`web-injection`), 알려진 취약점 악용(`known-cve`), 지속성 프로그램(`persistence`), 권한 가로채기(`privilege`), 자료 빼돌리기(`exfiltration`) 공격 패턴 탐지 및 ZTNA 판정기 차단 연동 보존.
 - **다시 실행하는 방법**:
   - 로컬 환경: `.env.local`에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 작성한 뒤 `npx vercel dev`로 실행합니다.
   - 가상 사건 연습: `node scripts/fixture-7.mjs` 명령으로 정상 사건(`allow`)과 복합 이상 사건(`step_up`) 판정을 비교합니다.
-  - 판정기 종합 연습: `node scripts/decider-test.mjs` 명령으로 전체 규칙(`device_registered`, `step_up_required`, `zone_rule`) 통과를 확인합니다.
+  - 판정기 종합 연습: `node scripts/decider-test.mjs` 명령으로 6~8단계 규칙(`device_registered`, `step_up_required`, `zone_rule`) 통과를 확인합니다.
   - 배포 환경: GitHub 푸시 시 Vercel에서 자동 배포되며 `https://choi-bujang-secret-vault-neon.vercel.app`에서 확인할 수 있습니다.
-  - XDR 실행: `npm run xdr:run -- web-injection` 명령으로 경보 판정 및 `node xdr/web-injection/respond.mjs`로 모의 연동 확인.
+  - XDR 실행: `npm run xdr:run -- exfiltration` 명령으로 경보 판정(`xdr/exfiltration/result.json`) 및 `node xdr/exfiltration/respond.mjs`로 ZTNA 차단 연동 확인.
+
+## 9단계 현재 작동하는 기능 및 다시 실행하는 방법
+
+- **작동하는 기능**: `src/detect.mjs`의 `detect(events)`가 가상 사건에서 `at`, `method`, `identity.sub`만 읽습니다(메모 내용·토큰·실명은 복사하지 않음). 같은 `sub`의 `GET`이 어느 10분 구간에서든 120건을 넘으면 `{ action: 'propose_revocation', reasonCode: 'burst_read', subject }`를, 그 밖에는 `{ action: 'observe' }`를 돌려줍니다. 접속 허용/거부 판정기(`src/decider.mjs`)의 응답은 바꾸지 않았습니다.
+- **한계**: 네트워크·기기 값은 사건 계약에 없어 이 규칙에 쓰지 않았습니다. 회수 API나 기기 권한 변경은 없고 제안만 돌려줍니다. 운영 반 엔진의 사건 전달·접속 회수 연결과 실제 회수 시간은 심판이 확인합니다.
+- **다시 실행하는 방법**: `npm run detect:test` (가상 사건 6건 연습이며 심판 판정이 아닙니다.)
+
+## 10단계 메모 한 건 복원
+
+- **서비스·경로**: 보호 서비스 `notes`의 복원 경로 `POST /api/restore` (`aleph.config.json`의 `restoreRoute`, `api/restore.js`). 본문은 `{ "id": "<메모 ID>", "contentHash": "<sha256 16진수 64자리>" }`이고 로그인 토큰이 필요합니다.
+- **동작**: 비공개 사본 테이블 `notes_backup`(`id`, `owner_id`, `title`, `content`, `content_hash`)에서 지정한 한 건만 `notes`로 되돌립니다. 사본의 ID·소유자(검증된 로그인 사용자)·내용 해시가 모두 같을 때만 쓰고, 다르면 쓰지 않습니다. 다른 메모와 감사 기록은 건드리지 않습니다. 응답에는 메모 본문을 넣지 않습니다.
+- **거부**: 로그인 없음 `401`, 타인 소유 또는 사본 없음 `403`(같은 응답), 해시 불일치·변조된 사본 `409`, 형식 오류 `400`.
+- **사본 준비(학생이 Supabase 화면의 SQL 편집기에서 직접)**: `notes_backup` 테이블을 만들고 행 수준 보안을 켠 뒤 `anon`·`authenticated` 권한을 모두 회수합니다. 가상 메모 사본은 **공개 저장소에 두지 말고** 시험 계정 B의 가상 메모로만 넣습니다. 해시는 `encode(sha256(convert_to(content,'UTF8')),'hex')`로 계산합니다.
+- **시험**: `npm run test:restore` (가상 데이터 5건. 실제 DB·배포·심판 확인이 아닙니다.) 배포한 뒤 계정 B로 `POST /api/restore`를 보내는 실제 확인은 학생이 따로 해야 합니다.
+
+## 복구 뒤 1~9단계 다시 확인하는 순서
+
+복구한 뒤 아래 순서대로 실행하고, **결과 칸은 직접 실행한 것만** 고칩니다. 실행하지 않은 항목은 `미실행`으로 둡니다. 토큰·비밀번호는 이 표나 로그에 붙이지 않습니다. 로컬 연습은 가상 요청이며 심판 판정이 아닙니다.
+
+**0. 먼저: 자료와 정책이 돌아왔는지**
+
+| 확인 | 명령·방법 | 정상 | 결과 |
+| --- | --- | --- | --- |
+| 정책 차이 | `npm run policy:diff -- <복원한 커밋 SHA>` | 변경 범위 0건 | 미실행 |
+| 복원 시험 | `npm run test:restore` | 5건 통과 | 2026-10-13 로컬 통과(가상 데이터) |
+| 메모 한 건 | 배포 뒤 계정 B가 `POST /api/restore` (`{id, contentHash}`) | `200`, `notes`의 ID·소유자·내용 해시가 사본과 같음 | 2026-10-13 배포 주소: B 맞는 해시 `200`, 틀린 해시 `409`, B가 A 메모 복원 `403`, 복원 뒤 B 조회 `200`(학생 실행 보고). 행 내용 대조는 상태 코드만으로 확인할 수 없어 미실행 |
+
+**1~9단계 정상 요청 → 금지 요청** (정상이 먼저 성공해야 금지 결과가 의미 있습니다.)
+
+| 단계 | 정상 요청 (유지되어야 함) | 금지 요청 (다시 거부되어야 함) | 방법 | 결과 |
+| --- | --- | --- | --- | --- |
+| 1 | `/`와 `/data.json`의 공개 가상 메모 | 해당 없음(공개 자료 확인) | 배포 주소를 브라우저로 열기 | 미실행 |
+| 2 | 단계 카드 기준 | 단계 카드 기준 | 저장소에 이 단계 계약 문서가 없어 학생이 단계 카드를 보고 채움 | 미실행 |
+| 3 | 로그인 후 `GET /api/notes` | 로그인 없는 `GET /api/notes` → `401` | `npm run bundle`의 자기 점검(실제 요청 1건) 또는 브라우저 | 2026-10-13 배포 주소: 로그인 없음 `401`, 로그인 후 목록 `200`(학생 실행 보고) |
+| 4 | 단계 카드 기준 | 단계 카드 기준 | 저장소에 이 단계 계약 문서가 없어 학생이 단계 카드를 보고 채움 | 미실행 |
+| 5 | A가 자기 메모 조회·수정, B가 자기 메모 조회 | B가 A 메모 조회·수정·삭제 → `403`, 원본 저장소 주소(`originalApiUrl`) 직접 요청 거부 | 배포 주소에서 A·B 로그인 후 각각 요청 | 2026-10-13 배포 주소: A 자기 메모 조회 `200`, B가 A 메모 조회 `403`(학생 실행 보고) / 수정·삭제·`originalApiUrl` 직접 요청 미실행 |
+| 6 | 등록된 기기의 `GET /notes/:id` 허용 | 미등록·타인 기기 → `device_not_registered` | `node scripts/decider-test.mjs` | 2026-10-13 로컬 통과(가상 요청) |
+| 7 | 평소와 같은 접속 `allow`, 재인증 통과(`stepUp.verified`) 시 허용 | 시각·네트워크·대량 읽기가 겹친 접속 → `step_up_required` | `node scripts/fixture-7.mjs`, `node scripts/decider-test.mjs` | 미실행(`fixture-7`) / 2026-10-13 로컬 통과(`decider-test`) |
+| 8 | 자기 `note:<id>` 읽기·수정, 강사 공지 읽기 | 타인 메모·강사 공지 수정·`export` 등 기능 경로·쿼리 선택 → `zone_violation` 또는 `403` | `node scripts/decider-test.mjs`, 배포 주소에서 B가 A 메모 요청 | 2026-10-13 배포 주소: B가 A 메모 조회 `403`(학생 실행 보고) / 공지·`export`·쿼리 선택 배포 요청 미실행 / 로컬 통과(`decider-test`) |
+| 9 | 같은 사용자의 `GET` 120건 이하는 `observe` | 10분 안 120건 초과 → `propose_revocation`/`burst_read` | `npm run detect:test` | 2026-10-13 로컬 통과(가상 사건) |
+
+**마지막**: `git status`로 의도하지 않은 변경이 없는지 확인한 뒤 `npm run bundle`을 실행합니다. 번들의 `attackAttempts`에는 실제로 보낸 요청만 남으며 심판의 판정이 아닙니다.
 
 ## 주의사항 및 취약점 안내
 

@@ -1,0 +1,137 @@
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { createClient } from '@supabase/supabase-js';
+import { createLoginVerifier } from '../src/verify-login.mjs';
+
+// 비공개 가상 메모 사본(notes_backup)에서 지정한 메모 한 건만 notes로 복원합니다.
+// 사본: notes_backup(id, owner_id, title, content, content_hash) — 서버 전용 키로만 읽고, 공개 저장소에는 두지 않습니다.
+// 응답과 로그에 메모 본문·토큰을 넣지 않습니다.
+
+const ID_PATTERN = /^(?:[a-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu;
+const HASH_PATTERN = /^[0-9a-f]{64}$/u;
+const ALLOWED_KEYS = new Set(['id', 'contentHash', 'owner_id']);
+
+let loginVerifier = null;
+
+function reply(status, error, reason) {
+  return { status, json: { error, reason, message: reason } };
+}
+
+export function sha256Hex(text) {
+  return createHash('sha256').update(String(text ?? ''), 'utf8').digest('hex');
+}
+
+// 순수 로직: 검증된 사용자 번호와 요청 본문만 받아 한 건만 복원합니다.
+export async function restoreOne({ supabase, userId, body }) {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return reply(400, 'INVALID_BODY', '요청 본문이 올바르지 않습니다.');
+  }
+  if (Object.keys(body).some(key => !ALLOWED_KEYS.has(key))) {
+    return reply(400, 'INVALID_BODY', '허용되지 않은 항목이 포함되어 있습니다.');
+  }
+  // 본문의 소유자는 신뢰하지 않습니다. 있더라도 검증된 사용자와 같아야 합니다.
+  if (body.owner_id !== undefined && body.owner_id !== userId) {
+    return reply(403, 'FORBIDDEN_NOT_OWNER', '다른 사용자의 메모는 복원할 수 없습니다.');
+  }
+  const rawId = typeof body.id === 'string' ? body.id.trim().replace(/^notes?:/iu, '') : '';
+  if (!rawId || /^notices?[:_-]/iu.test(rawId) || !ID_PATTERN.test(rawId)) {
+    return reply(400, 'INVALID_RESOURCE_ID', '유효한 메모 ID 한 건이 필요합니다.');
+  }
+  if (typeof body.contentHash !== 'string' || !HASH_PATTERN.test(body.contentHash)) {
+    return reply(400, 'INVALID_CONTENT_HASH', '내용 해시(sha256 16진수 64자리)가 필요합니다.');
+  }
+
+  const { data: backup, error: backupError } = await supabase
+    .from('notes_backup')
+    .select('id, owner_id, title, content, content_hash')
+    .eq('id', rawId)
+    .maybeSingle();
+  if (backupError) return reply(500, 'BACKUP_QUERY_FAILED', '사본 조회에 실패했습니다.');
+  // 사본이 없는 경우와 타인 사본인 경우를 같은 응답으로 돌려 존재 여부를 알려 주지 않습니다.
+  if (!backup || backup.owner_id !== userId) {
+    return reply(403, 'RESTORE_REFUSED', '이 메모는 복원할 수 없습니다.');
+  }
+  // 사본 자체의 무결성과 요청한 해시가 모두 같아야 합니다.
+  const actualHash = sha256Hex(backup.content);
+  if (actualHash !== backup.content_hash || actualHash !== body.contentHash) {
+    return reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 일치하지 않아 복원하지 않았습니다.');
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('notes')
+    .select('id, owner_id')
+    .eq('id', rawId)
+    .maybeSingle();
+  if (existingError) return reply(500, 'DATABASE_QUERY_FAILED', '현재 메모 조회에 실패했습니다.');
+  if (existing && existing.owner_id !== userId) {
+    return reply(403, 'RESTORE_REFUSED', '이 메모는 복원할 수 없습니다.');
+  }
+
+  // 그 한 건만 쓰고, 다른 메모와 감사 기록은 건드리지 않습니다.
+  const write = existing
+    ? await supabase.from('notes')
+      .update({ title: backup.title, content: backup.content, owner_id: userId })
+      .eq('id', rawId).eq('owner_id', userId).select('id').maybeSingle()
+    : await supabase.from('notes')
+      .insert({ id: rawId, title: backup.title, content: backup.content, owner_id: userId })
+      .select('id').single();
+  if (write.error || !write.data) return reply(500, 'DATABASE_RESTORE_FAILED', '메모 복원에 실패했습니다.');
+
+  return {
+    status: 200,
+    json: { restored: true, id: rawId, resourceId: `note:${rawId}`, ownerMatched: true, contentHash: actualHash },
+  };
+}
+
+async function getVerifier(supabaseSecretKey) {
+  if (!loginVerifier) {
+    const config = JSON.parse(await readFile(resolve(process.cwd(), 'aleph.config.json'), 'utf8'));
+    loginVerifier = createLoginVerifier({ config, supabaseSecretKey });
+  }
+  return loginVerifier;
+}
+
+export default async function handler(request, response) {
+  response.setHeader('Cache-Control', 'no-store');
+  const send = ({ status, json }) => response.status(status).json(json);
+
+  if ((request.method || '').toUpperCase() !== 'POST') {
+    return send(reply(405, 'METHOD_NOT_ALLOWED', '허용되지 않은 HTTP 메서드입니다.'));
+  }
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+  if (!supabaseUrl || !supabaseSecretKey) {
+    return send(reply(500, 'DATABASE_CONFIG_MISSING', '데이터베이스 설정이 누락되었습니다.'));
+  }
+  if (!request.headers.authorization) {
+    return send(reply(401, 'UNAUTHORIZED', '로그인 없이는 복원할 수 없습니다.'));
+  }
+  if (Object.keys(request.query || {}).length > 0) {
+    return send(reply(403, 'FORBIDDEN_QUERY_PARAMETER', '쿼리 파라미터로 복원 대상을 고를 수 없습니다.'));
+  }
+
+  let verifiedUser = null;
+  try {
+    verifiedUser = await (await getVerifier(supabaseSecretKey))(request.headers.authorization);
+  } catch {
+    return send(reply(401, 'UNAUTHORIZED', '유효하지 않은 인증 토큰입니다.'));
+  }
+  if (!verifiedUser || !verifiedUser.userId) {
+    return send(reply(401, 'UNAUTHORIZED', '검증된 사용자 신원을 확인할 수 없습니다.'));
+  }
+
+  let body = request.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { body = null; }
+  }
+  try {
+    return send(await restoreOne({
+      supabase: createClient(supabaseUrl, supabaseSecretKey),
+      userId: verifiedUser.userId,
+      body,
+    }));
+  } catch {
+    return send(reply(500, 'SERVER_ERROR', '서버 내부 오류가 발생했습니다.'));
+  }
+}
