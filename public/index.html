@@ -209,7 +209,7 @@
         deviceServerStatusBadge.style.color = '#3ecf8e';
       }
       if (deviceStatusDesc) {
-        deviceStatusDesc.textContent = `서버 확인 완료: ${data.message || '등록 기기 승인됨'} (기기 ID: ${data.deviceId || '확인됨'})`;
+        deviceStatusDesc.textContent = `서버 확인 완료: ${data.message || '등록 기기 승인됨'}`;
       }
       if (requestApprovalBtn) requestApprovalBtn.style.display = 'none';
       if (approvalResultBox) approvalResultBox.style.display = 'block';
@@ -218,7 +218,7 @@
         approvalResultTitle.style.color = '#3ecf8e';
       }
       if (approvalResultText) {
-        approvalResultText.textContent = `서버 ZTNA 정책에 따라 이 기기의 자료실 접근이 정상 승인되었습니다. (기기 ID: ${data.deviceId})`;
+        approvalResultText.textContent = '서버 ZTNA 정책에 따라 이 기기의 자료실 접근이 정상 승인되었습니다.';
       }
       if (vaultContent) vaultContent.style.display = 'block';
     }
@@ -484,10 +484,9 @@
           access_token: data.access_token,
           user: data.user,
         };
-        sessionStorage.setItem('auth_session', JSON.stringify(session));
-
-        updateAuthUI(session.user);
+        // 기기 키 및 토큰은 브라우저 저장소(Storage)에 저장하지 않고 JS 메모리 변수로만 관리
         currentSession = session;
+        updateAuthUI(session.user);
 
         // 로그인 직후 서버에 등록 기기 승인 상태 확인 (승인 전에는 보호 자료 로드 차단)
         const isApproved = await checkDeviceApproval(session);
@@ -556,28 +555,14 @@
     });
 
     logoutBtn.addEventListener('click', async () => {
-      sessionStorage.removeItem('auth_session');
       currentSession = null;
       currentApprovalToken = null;
       currentDeviceId = null;
       updateAuthUI(null);
     });
 
-    // 초기 세션 확인 (sessionStorage 사용)
-    let savedSession = null;
-    try {
-      savedSession = JSON.parse(sessionStorage.getItem('auth_session'));
-    } catch {}
-
-    updateAuthUI(savedSession?.user || null);
-    currentSession = savedSession || null;
-    if (savedSession) {
-      const isApproved = await checkDeviceApproval(savedSession);
-      if (isApproved) {
-        await loadNotices(savedSession);
-        await loadNotes(savedSession);
-      }
-    }
+    // 브라우저 저장소 미사용: 세션 및 토큰을 저장소에 남기지 않음
+    updateAuthUI(null);
 
     // 네트워크 상태(온라인/오프라인) 및 오프라인 배너 연동
     const offlineBanner = document.querySelector('#offlineBanner');
