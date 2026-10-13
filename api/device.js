@@ -73,8 +73,6 @@ export default async function handler(request, response) {
     return response.status(200).json({
       registered: true,
       status: 'approved',
-      deviceId: approval.deviceId,
-      expiresAt: approval.expiresAt,
       message: '서버에 의해 확인된 등록 기기입니다.',
     });
   }
@@ -112,7 +110,6 @@ export default async function handler(request, response) {
     return response.status(200).json({
       registered: true,
       status: 'approved',
-      deviceId,
       approvalToken,
       message: '서버가 이 기기를 등록 기기로 확인하고 정상 승인했습니다.',
     });

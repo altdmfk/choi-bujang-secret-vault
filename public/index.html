@@ -168,7 +168,6 @@
 
     let currentSession = null;
     let currentApprovalToken = null;
-    let currentDeviceId = null;
 
     function getAuthHeaders(session = currentSession) {
       const headers = {
@@ -526,9 +525,8 @@
           throw new Error(data.message || data.reason || '서버가 이 기기의 승인을 거부했습니다.');
         }
 
-        // 서버 서명 승인 토큰 및 기기 ID 메모리 변수에 보관 (브라우저 저장소 미사용)
+        // 서버 서명 승인 토큰 메모리 변수에 보관 (브라우저 저장소 미사용)
         currentApprovalToken = data.approvalToken || null;
-        currentDeviceId = data.deviceId || null;
 
         // 서버가 등록 기기로 확인한 뒤에만 기존 자료실 오픈 및 자료 로드
         showApprovedVault(data);
@@ -536,7 +534,6 @@
         await loadNotes(currentSession);
       } catch (err) {
         currentApprovalToken = null;
-        currentDeviceId = null;
         if (approvalResultTitle) {
           approvalResultTitle.textContent = '❌ 기기 승인 거부';
           approvalResultTitle.style.color = '#ff8b9e';
@@ -557,7 +554,6 @@
       sessionStorage.removeItem('auth_session');
       currentSession = null;
       currentApprovalToken = null;
-      currentDeviceId = null;
       updateAuthUI(null);
     });
 
