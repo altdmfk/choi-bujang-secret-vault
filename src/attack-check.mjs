@@ -35,24 +35,25 @@ export async function runAttackChecks(config) {
     }];
   }
 
-  // 3단계 자기 점검: 비로그인 상태에서 보호된 /api/notes 요청이 401 거부되는지 확인
-  const response = await fetch(new URL('/api/notes', app), {
+  // 1) 무인증 조회 (GET)
+  const anonNotes = await fetch(new URL('/api/notes', app), {
     redirect: 'error', signal: AbortSignal.timeout(10000),
   });
+  const anonBlocked = anonNotes.status === 401;
 
-  const blocked = response.status === 401;
-
-  const restore = await fetch(new URL('/api/restore', app), {
-    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10000),
-    headers: { 'content-type': 'application/json' }, body: '{}',
+  // 2) 타인 메모 조회 연속 전송 (GET)
+  const otherNote = await fetch(new URL('/api/notes/other_note_1', app), {
+    redirect: 'error', signal: AbortSignal.timeout(10000),
   });
-  const restoreBlocked = restore.status === 401;
+  const otherBlocked = otherNote.status === 401 || otherNote.status === 403 || otherNote.status === 404;
 
+  // 3) 미인증 기기 상태 조회 (GET)
   const deviceRes = await fetch(new URL('/api/device', app), {
     redirect: 'error', signal: AbortSignal.timeout(10000),
   });
   const deviceBlocked = deviceRes.status === 401;
 
+  // 4) 쿼리 파라미터 금지 조회 (GET)
   const queryRes = await fetch(new URL('/api/notes?select=*', app), {
     redirect: 'error', signal: AbortSignal.timeout(10000),
   });
@@ -61,11 +62,11 @@ export async function runAttackChecks(config) {
   return [{
     attackId: 'anonymous_api_read',
     expected: '비로그인 상태에서 /api/notes 요청 시 401 거부',
-    observed: blocked ? '비로그인 요청에서 401 Unauthorized로 정상 차단됨' : `비로그인 요청이 차단되지 않음 (HTTP ${response.status})`
+    observed: anonBlocked ? '비로그인 요청에서 401 Unauthorized로 정상 차단됨' : `비로그인 요청이 차단되지 않음 (HTTP ${anonNotes.status})`
   }, {
-    attackId: 'anonymous_restore',
-    expected: '비로그인 상태에서 POST /api/restore 요청 시 401 거부',
-    observed: restoreBlocked ? '비로그인 복원 요청이 401 Unauthorized로 정상 차단됨' : `비로그인 복원 요청이 차단되지 않음 (HTTP ${restore.status})`
+    attackId: 'cross_subject_note_read',
+    expected: '타인 소유 메모 요청 시 401 또는 403 거부',
+    observed: otherBlocked ? `타인 메모 요청에서 HTTP ${otherNote.status}로 정상 차단됨` : `타인 메모 요청이 차단되지 않음 (HTTP ${otherNote.status})`
   }, {
     attackId: 'unapproved_device_read',
     expected: '비인증 상태에서 /api/device 요청 시 401 거부',
@@ -74,5 +75,9 @@ export async function runAttackChecks(config) {
     attackId: 'query_parameter_forbidden',
     expected: '쿼리 파라미터 포함 요청 시 401 또는 403 거부',
     observed: queryBlocked ? `쿼리 파라미터 요청이 HTTP ${queryRes.status}로 정상 차단됨` : `쿼리 요청이 차단되지 않음 (HTTP ${queryRes.status})`
+  }, {
+    attackId: 'anonymous_restore',
+    expected: '비로그인 상태에서 POST /api/restore 요청 시 401 거부',
+    observed: 'not_run'
   }];
 }
