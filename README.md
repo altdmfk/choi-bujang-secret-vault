@@ -42,9 +42,11 @@
 ## 10단계 메모 한 건 복원
 
 - **서비스·경로**: 보호 서비스 `notes`의 복원 경로 `POST /api/restore` (`aleph.config.json`의 `restoreRoute`, `api/restore.js`). 본문은 `{ "id": "<메모 ID>", "contentHash": "<sha256 16진수 64자리>" }`이고 로그인 토큰이 필요합니다.
-- **미리보기**: 본문에 `"dryRun": true`를 포함하면 실제로 쓰지 않고 복원할 버전(`backupVersion`)과 바뀔 항목(`changed`)을 미리 확인할 수 있습니다(`{ "restored": false, "dryRun": true, "verified": true, "backupVersion": "...", "changed": [...] }`).
-- **동작**: 비공개 사본 테이블 `notes_backup`(`id`, `owner_id`, `title`, `content`, `content_hash`)에서 지정한 한 건만 `notes`로 되돌립니다. 사본의 ID·소유자(검증된 로그인 사용자)·내용 해시가 모두 같을 때만 쓰고, 다르면 쓰지 않습니다. 복원 쓰기 후 사후 재검증(`id`, `owner_id`, `title`, `contentHash`)이 실패하면 복원 전 상태로 자동으로 되돌립니다(롤백). 다른 메모와 감사 기록은 건드리지 않습니다. 응답에는 메모 본문을 넣지 않습니다.
-- **거부**: 로그인 없음 `401`, 타인 소유 또는 사본 없음 `403`(같은 응답), 해시 불일치·변조된 사본 `409`, 형식 오류 `400`(dryRun 타입 오류 포함).
+- **2단계 복원 절차**:
+  1. **1단계 (미리보기 기본)**: `{ "id": "<메모 ID>", "contentHash": "<sha256>" }`만 보내면 실제로 쓰지 않고 검증된 사본 버전(`backupVersion`), 현재 버전(`currentVersion`), 바뀔 항목 목록(`changed`)을 `200`으로 먼저 보여 줍니다(`{ "restored": false, "preview": true, "requiresConfirmation": true, "verified": true, "backupVersion": "...", "changed": [...] }`).
+  2. **2단계 (실제 복원 실행)**: 앞서 확인한 버전을 적용하려면 같은 요청에 `"confirm": true`를 붙여 보냅니다(`{ "id": "<메모 ID>", "contentHash": "<sha256>", "confirm": true }`). 비공개 사본 테이블 `notes_backup`(`id`, `owner_id`, `title`, `content`, `content_hash`)에서 지정한 한 건만 `notes`로 되돌립니다.
+- **동작**: 사본의 ID·소유자(검증된 로그인 사용자)·내용 해시가 모두 같을 때만 쓰고, 다르면 쓰지 않습니다. 복원 쓰기 후 사후 재검증(`id`, `owner_id`, `title`, `contentHash`)이 실패하면 복원 전 상태로 자동으로 되돌립니다(롤백). 다른 메모와 감사 기록은 건드리지 않습니다. 응답에는 메모 본문을 넣지 않습니다.
+- **거부**: 로그인 없음 `401`, 타인 소유 또는 사본 없음 `403`(같은 응답), 해시 불일치·변조된 사본 `409`(미리 보기를 주지 않고 즉시 거부), 형식 오류 `400`(`confirm` 타입 오류 포함).
 - **사본 준비(학생이 Supabase 화면의 SQL 편집기에서 직접)**: `notes_backup` 테이블을 만들고 행 수준 보안을 켠 뒤 `anon`·`authenticated` 권한을 모두 회수합니다. 가상 메모 사본은 **공개 저장소에 두지 말고** 시험 계정 B의 가상 메모로만 넣습니다. 해시는 `encode(sha256(convert_to(content,'UTF8')),'hex')`로 계산합니다.
 - **시험**: `npm run test:restore` (가상 데이터 9건. 실제 DB·배포·심판 확인이 아닙니다.) 배포한 뒤 계정 B로 `POST /api/restore`를 보내는 실제 확인은 학생이 따로 해야 합니다.
 
@@ -58,7 +60,8 @@
 | --- | --- | --- | --- |
 | 정책 차이 | `npm run policy:diff -- <복원한 커밋 SHA>` | 변경 범위 0건 | 2026-10-13 로컬 통과 (커밋 91371c4 기준 변경 범위 0건 차이 없음) |
 | 복원 시험 | `npm run test:restore` | 9건 통과 | 2026-10-13 로컬 통과(가상 데이터 9건) |
-| 메모 한 건 | 배포 뒤 계정 B가 `POST /api/restore` (`{id, contentHash}`) | `200`, `notes`의 ID·소유자·내용 해시가 사본과 같음 | 2026-10-13 배포 주소: B 맞는 해시 `200`, 틀린 해시 `409`, B가 A 메모 복원 `403`, 복원 뒤 B 조회 `200`(학생 실행 보고). 행 내용 대조는 상태 코드만으로 확인할 수 없어 미실행 |
+| 메모 한 건 (1단계 미리보기) | 배포 뒤 계정 B가 `POST /api/restore` (`{id, contentHash}`) | `200`, `preview: true`, `backupVersion`, `changed` 반환 (DB 변경 없음) | 미실행 |
+| 메모 한 건 (2단계 실제 복원) | 배포 뒤 계정 B가 `POST /api/restore` (`{id, contentHash, confirm: true}`) | `200`, `restored: true`, `notes`의 ID·소유자·내용 해시가 사본과 같음 | 미실행 |
 
 **1~9단계 정상 요청 → 금지 요청** (정상이 먼저 성공해야 금지 결과가 의미 있습니다.)
 

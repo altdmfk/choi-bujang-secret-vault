@@ -11,7 +11,7 @@ import { createLoginVerifier } from '../src/verify-login.mjs';
 const ID_PATTERN = /^(?:[a-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const ALLOWED_KEYS = new Set([
-  'id', 'contentHash', 'content_hash', 'owner_id', 'dryRun',
+  'id', 'contentHash', 'content_hash', 'owner_id', 'confirm',
 ]);
 
 let loginVerifier = null;
@@ -73,8 +73,8 @@ export async function restoreOne({ supabase, userId, body }) {
   if (Object.keys(body).some(key => !ALLOWED_KEYS.has(key))) {
     return reply(400, 'INVALID_BODY', '허용되지 않은 항목이 포함되어 있습니다.');
   }
-  if ('dryRun' in body && typeof body.dryRun !== 'boolean') {
-    return reply(400, 'INVALID_BODY', 'dryRun은 true 또는 false여야 합니다.');
+  if ('confirm' in body && typeof body.confirm !== 'boolean') {
+    return reply(400, 'INVALID_BODY', 'confirm은 true 또는 false여야 합니다.');
   }
 
   // 본문의 소유자는 신뢰하지 않습니다. 있더라도 검증된 사용자와 같아야 합니다.
@@ -127,13 +127,20 @@ export async function restoreOne({ supabase, userId, body }) {
   if (!existing || existing.title !== backup.title) changed.push('title');
   if (!existing || sha256Hex(existing.content) !== actualHash) changed.push('content');
 
-  // 실행 전에 버전과 바뀔 항목만 확인하는 미리보기 요청이면 쓰지 않고 멈춥니다.
-  if (body.dryRun === true) {
+  // 확인(confirm: true) 없이는 버전과 바뀔 항목만 보여 주고 쓰지 않습니다.
+  if (body.confirm !== true) {
     return {
       status: 200,
       json: {
-        restored: false, dryRun: true, verified: true,
-        id: rawId, backupVersion: actualHash, changed,
+        restored: false,
+        preview: true,
+        requiresConfirmation: true,
+        verified: true,
+        id: rawId,
+        backupVersion: actualHash,
+        currentVersion: existing ? sha256Hex(existing.content) : null,
+        changed,
+        next: '복원하려면 같은 요청에 "confirm": true를 넣어 다시 보내세요.',
       },
     };
   }

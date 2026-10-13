@@ -64,7 +64,7 @@ function setup() {
 
 test('B의 메모 한 건이 사본과 같을 때만 복원되고 다른 메모는 그대로입니다', async () => {
   const { supabase, notes, hash } = setup();
-  const result = await restoreOne({ supabase, userId: B, body: { id: 'note:b1', contentHash: hash } });
+  const result = await restoreOne({ supabase, userId: B, body: { id: 'note:b1', contentHash: hash, confirm: true } });
   assert.equal(result.status, 200);
   assert.equal(result.json.restored, true);
   assert.equal(result.json.contentHash, hash);
@@ -76,7 +76,7 @@ test('B의 메모 한 건이 사본과 같을 때만 복원되고 다른 메모�
 
 test('삭제된 B 메모도 그 한 건만 다시 만들어집니다', async () => {
   const { supabase, notes } = setup();
-  const result = await restoreOne({ supabase, userId: B, body: { id: 'b2', contentHash: sha256Hex('삭제 전 본문') } });
+  const result = await restoreOne({ supabase, userId: B, body: { id: 'b2', contentHash: sha256Hex('삭제 전 본문'), confirm: true } });
   assert.equal(result.status, 200);
   assert.equal(notes.length, 3);
   assert.equal(notes.find(n => n.id === 'b2').owner_id, B);
@@ -153,28 +153,30 @@ test('쓰기 뒤 다시 읽을 때 사본과 다르면 복원 전 상태로 되�
     },
   };
 
-  const result = await restoreOne({ supabase: fakeSupabase, userId: B, body: { id: 'b1', contentHash: hash } });
+  const result = await restoreOne({ supabase: fakeSupabase, userId: B, body: { id: 'b1', contentHash: hash, confirm: true } });
   assert.equal(result.status, 409);
   assert.equal(result.json.error, 'RESTORE_MISMATCH');
   assert.equal(notes.find(n => n.id === 'b1').content, '훼손됨');
 });
 
-test('dryRun: true로 호출하면 notes가 전혀 바뀌지 않고 backupVersion과 changed를 돌려줍니다', async () => {
+test('confirm 없이 호출하면 쓰지 않고 preview: true, backupVersion, changed를 돌려줍니다', async () => {
   const { supabase, notes, hash } = setup();
-  const result = await restoreOne({ supabase, userId: B, body: { id: 'b1', contentHash: hash, dryRun: true } });
+  const result = await restoreOne({ supabase, userId: B, body: { id: 'b1', contentHash: hash } });
   assert.equal(result.status, 200);
   assert.equal(result.json.restored, false);
-  assert.equal(result.json.dryRun, true);
+  assert.equal(result.json.preview, true);
+  assert.equal(result.json.requiresConfirmation, true);
   assert.equal(result.json.verified, true);
   assert.equal(result.json.backupVersion, hash);
+  assert.equal(result.json.currentVersion, sha256Hex('훼손됨'));
   assert.deepEqual(result.json.changed, ['title', 'content']);
   assert.equal(notes.find(n => n.id === 'b1').content, '훼손됨');
 });
 
-test('dryRun이 boolean이 아니면 400 INVALID_BODY를 돌려줍니다', async () => {
+test('confirm이 boolean이 아니면 400 INVALID_BODY를 돌려줍니다', async () => {
   const { supabase, hash } = setup();
-  for (const badDryRun of ['true', 'false', 1, 0, null, {}]) {
-    const result = await restoreOne({ supabase, userId: B, body: { id: 'b1', contentHash: hash, dryRun: badDryRun } });
+  for (const badConfirm of ['true', 'false', 1, 0, null, {}]) {
+    const result = await restoreOne({ supabase, userId: B, body: { id: 'b1', contentHash: hash, confirm: badConfirm } });
     assert.equal(result.status, 400);
     assert.equal(result.json.error, 'INVALID_BODY');
   }
@@ -220,7 +222,7 @@ test('쓰기 뒤 다시 읽을 때 제목이 사본과 다르면 복원 전 상�
     },
   };
 
-  const result = await restoreOne({ supabase: fakeSupabase, userId: B, body: { id: 'b1', contentHash: hash } });
+  const result = await restoreOne({ supabase: fakeSupabase, userId: B, body: { id: 'b1', contentHash: hash, confirm: true } });
   assert.equal(result.status, 409);
   assert.equal(result.json.error, 'RESTORE_MISMATCH');
   assert.equal(notes.find(n => n.id === 'b1').content, '훼손됨');
