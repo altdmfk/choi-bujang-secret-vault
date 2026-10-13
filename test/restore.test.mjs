@@ -102,11 +102,27 @@ test('해시가 다르거나 사본이 변조되었으면 거부되고 아무것
   assert.equal(notes.some(n => n.id === 'b3'), false);
 });
 
+test('B가 내용 해시 없이 ID만 보내도 사본을 다시 읽어 무결성을 검증하고 정상 복원합니다', async () => {
+  const { supabase, notes, hash } = setup();
+  const result = await restoreOne({ supabase, userId: B, body: { id: 'b1' } });
+  assert.equal(result.status, 200);
+  assert.equal(result.json.restored, true);
+  assert.equal(result.json.contentHash, hash);
+  assert.equal(notes.find(n => n.id === 'b1').content, '가상 메모 본문');
+});
+
+test('해시 없이 요청해도 사본이 변조되었으면 검증 실패로 거부되고 아무것도 쓰지 않습니다', async () => {
+  const { supabase, notes } = setup();
+  const result = await restoreOne({ supabase, userId: B, body: { id: 'b3' } });
+  assert.equal(result.status, 409);
+  assert.equal(notes.some(n => n.id === 'b3'), false);
+});
+
 test('형식이 틀린 요청은 거부됩니다', async () => {
   const { supabase } = setup();
   const hash = sha256Hex('x');
-  for (const body of [null, [], { id: 'b1' }, { contentHash: hash }, { id: 'b1', contentHash: 'abc' },
-    { id: 'notice:1', contentHash: hash }, { id: '../x', contentHash: hash }, { id: 'b1', contentHash: hash, role: 'teacher' }]) {
+  for (const body of [null, [], {}, { id: '' }, { contentHash: hash }, { id: 'b1', contentHash: 'abc' },
+    { id: 'notice:1' }, { id: '../x' }, { id: 'b1', role: 'teacher' }]) {
     const result = await restoreOne({ supabase, userId: B, body });
     assert.equal(result.status, 400);
   }
