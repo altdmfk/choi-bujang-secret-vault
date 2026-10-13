@@ -33,6 +33,12 @@
   - 배포 환경: GitHub 푸시 시 Vercel에서 자동 배포되며 `https://choi-bujang-secret-vault-neon.vercel.app`에서 확인할 수 있습니다.
   - XDR 실행: `npm run xdr:run -- exfiltration` 명령으로 경보 판정(`xdr/exfiltration/result.json`) 및 `node xdr/exfiltration/respond.mjs`로 ZTNA 차단 연동 확인.
 
+## 9단계 현재 작동하는 기능 및 다시 실행하는 방법
+
+- **작동하는 기능**: `src/detect.mjs`의 `detect(events)`가 가상 사건에서 `at`, `method`, `identity.sub`만 읽습니다(메모 내용·토큰·실명은 복사하지 않음). 같은 `sub`의 `GET`이 어느 10분 구간에서든 120건을 넘으면 `{ action: 'propose_revocation', reasonCode: 'burst_read', subject }`를, 그 밖에는 `{ action: 'observe' }`를 돌려줍니다. 접속 허용/거부 판정기(`src/decider.mjs`)의 응답은 바꾸지 않았습니다.
+- **한계**: 네트워크·기기 값은 사건 계약에 없어 이 규칙에 쓰지 않았습니다. 회수 API나 기기 권한 변경은 없고 제안만 돌려줍니다. 운영 반 엔진의 사건 전달·접속 회수 연결과 실제 회수 시간은 심판이 확인합니다.
+- **다시 실행하는 방법**: `npm run detect:test` (가상 사건 6건 연습이며 심판 판정이 아닙니다.)
+
 ## 주의사항 및 취약점 안내
 
 - **이전 공개 커밋·배포 이력은 지워지지 않았습니다**: 최신 코드와 정적 파일에서 자료를 제거하더라도, 과거의 공개 커밋 이력(Git history)이나 이전 Vercel 배포 버전 기록에는 과거 데이터가 남아 있을 수 있습니다.
