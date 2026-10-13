@@ -25,13 +25,13 @@
   - (6단계) 반 엔진과 연동하여 보호 서비스 ID(`notes`) 및 읽기 경로(`GET /notes/:id`)를 설정 파일(`aleph.config.json`)에 연결하고, ZTNA 판정기(`src/decider.mjs`)에 기기 등록 및 사용자 바인딩 검증 규칙(`device_registered`)을 구현하여 미등록 기기 또는 타인 기기의 접근을 차단(`device_not_registered`)하며 정상 등록 기기의 자료실 읽기만 허용.
   - (7단계) 가상 접속 정보 입력 검증(`validateConnectionContext`) 및 복합 이상 접속 검사 규칙(`step_up_required`)을 구현하여 평소와 다른 시각 + 낯선 네트워크 + 대량 읽기가 복합 발생한 가상 사건에 대해 단순 영구 차단 대신 추가 확인(`step_up`)을 요청하고, 재인증 통과 시(`stepUp.verified === true`) 정상 허용.
   - (8단계) 자료실 메모(`notes`)와 강사 공지(`notices`)를 독립된 자원 ID 체계로 분리하고 화면에 표시. ZTNA 판정기(`src/decider.mjs`)에 구역 규칙(`zone_rule`)을 구현하여 본인 메모 읽기·수정 및 공지 읽기 허용, 타인 메모 접근·일반 학생의 공지 수정·기능 경로(`export` 등) 시도 차단. 자료 API(`api/notes.js`, `api/notices.js`)에서도 검증된 사용자 소유권과 강사 권한을 대조하여 우회 및 교차 구역 직접 요청(`CROSS_ZONE_ACCESS_DENIED`, `FORBIDDEN_NOT_OWNER`, `INSTRUCTOR_ROLE_REQUIRED`)을 차단.
-  - (보너스 XDR-01, XDR-02, XDR-03) 무차별 로그인 대입(`brute-force`), 웹 주입(`web-injection`), 알려진 취약점 악용(`known-cve`) 공격 패턴 탐지 및 ZTNA 판정기 차단 연동 보존.
+  - (보너스 XDR-01 ~ XDR-04) 무차별 로그인 대입(`brute-force`), 웹 주입(`web-injection`), 알려진 취약점 악용(`known-cve`), 지속성 프로그램(`persistence`) 공격 패턴 탐지 및 ZTNA 판정기 차단 연동 보존.
 - **다시 실행하는 방법**:
   - 로컬 환경: `.env.local`에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 작성한 뒤 `npx vercel dev`로 실행합니다.
   - 가상 사건 연습: `node scripts/fixture-7.mjs` 명령으로 정상 사건(`allow`)과 복합 이상 사건(`step_up`) 판정을 비교합니다.
   - 판정기 종합 연습: `node scripts/decider-test.mjs` 명령으로 전체 규칙(`device_registered`, `step_up_required`, `zone_rule`) 통과를 확인합니다.
   - 배포 환경: GitHub 푸시 시 Vercel에서 자동 배포되며 `https://choi-bujang-secret-vault-neon.vercel.app`에서 확인할 수 있습니다.
-  - XDR 실행: `npm run xdr:run -- known-cve` 명령으로 경보 판정(`xdr/known-cve/result.json`) 및 `node xdr/known-cve/respond.mjs`로 ZTNA 차단 연동 확인.
+  - XDR 실행: `npm run xdr:run -- persistence` 명령으로 경보 판정(`xdr/persistence/result.json`) 및 `node xdr/persistence/respond.mjs`로 ZTNA 차단 연동 확인.
 
 ## 주의사항 및 취약점 안내
 
