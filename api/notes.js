@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { snapshotIfAbsent } from '../src/backup.mjs';
 
 let loginVerifier = null;
 
@@ -266,6 +267,7 @@ export default async function handler(request, response) {
         });
       }
 
+      await snapshotIfAbsent(supabase, { id: data.id, owner_id: currentUserId, title: data.title, content: data.content });
       return response.status(201).json(formatNote(data));
     } catch (_err) {
       return response.status(500).json({
@@ -312,7 +314,7 @@ export default async function handler(request, response) {
       // 1) 기존 행 조회하여 저장된 소유자 확인
       const { data: existing, error: fetchErr } = await supabase
         .from('notes')
-        .select('id, owner_id')
+        .select('id, owner_id, title, content')
         .eq('id', id)
         .maybeSingle();
 
@@ -330,6 +332,9 @@ export default async function handler(request, response) {
           message: '저장된 소유자와 일치하지 않는 다른 구역 메모는 수정할 수 없습니다.',
         });
       }
+
+      // 수정 전 한 건을 사본이 없을 때만 저장합니다(이미 있는 사본은 덮어쓰지 않음).
+      await snapshotIfAbsent(supabase, existing);
 
       // 2) 수정 payload 구성 (owner_id는 항상 본인 ID 유지)
       const updatePayload = {
@@ -385,7 +390,7 @@ export default async function handler(request, response) {
       // 1) 기존 행 소유자 확인
       const { data: existing, error: fetchErr } = await supabase
         .from('notes')
-        .select('id, owner_id')
+        .select('id, owner_id, title, content')
         .eq('id', id)
         .maybeSingle();
 
@@ -403,6 +408,9 @@ export default async function handler(request, response) {
           message: '저장된 소유자와 일치하지 않는 다른 구역 메모는 삭제할 수 없습니다.',
         });
       }
+
+      // 삭제 전 한 건을 사본이 없을 때만 저장합니다(이미 있는 사본은 덮어쓰지 않음).
+      await snapshotIfAbsent(supabase, existing);
 
       // 2) 본인 소유 메모 삭제
       const { error } = await supabase
