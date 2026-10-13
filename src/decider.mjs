@@ -4,8 +4,8 @@
 export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 'zone_rule']);
 
 const xdrBlocks = new Map();
+const deviceBindings = new Map();
 const noteOwnership = new Map();
-const noticeResources = new Set();
 
 const DEVICE_ID_PATTERN = /^[0-9a-f]{16}$/u;
 
@@ -21,6 +21,27 @@ const ALLOWED_ROUTES = new Set([
   'GET /api/notices/:id',
 ]);
 
+let cachedAllowedRoutes = null;
+
+async function getAllowedRoutes() {
+  if (cachedAllowedRoutes) return cachedAllowedRoutes;
+  try {
+    const { readFile } = await import('node:fs/promises');
+    const raw = await readFile(new URL('../aleph.config.json', import.meta.url), 'utf8');
+    const config = JSON.parse(raw);
+    if (Array.isArray(config?.allowedRoutes)) {
+      cachedAllowedRoutes = new Set(
+        config.allowedRoutes.filter(r => typeof r === 'string' && r.trim() !== 'POST /api/login')
+      );
+      return cachedAllowedRoutes;
+    }
+  } catch {
+    // 읽기·파싱 실패 시 기존 상수를 그대로 사용
+  }
+  cachedAllowedRoutes = ALLOWED_ROUTES;
+  return cachedAllowedRoutes;
+}
+
 // :id와 같은 깊이에 올 수 없는 기능 경로 키워드
 const FORBIDDEN_FUNCTION_PATHS = new Set([
   'export', 'import', 'backup', 'admin', 'batch', 'search',
@@ -28,8 +49,8 @@ const FORBIDDEN_FUNCTION_PATHS = new Set([
 ]);
 
 export function clearNoteOwnership() {
+  deviceBindings.clear();
   noteOwnership.clear();
-  noticeResources.clear();
 }
 
 /**
@@ -279,9 +300,10 @@ export async function decide(request) {
   }
 
   // 1) route가 aleph.config.json의 allowedRoutes(POST /api/login 제외)에 정확히 존재하는지 검증
+  const allowedRoutes = await getAllowedRoutes();
   const rawRoute = typeof request?.route === 'string' ? request.route.trim() : '';
   const routeTokens = rawRoute ? rawRoute.split(/\s+/u) : [];
-  if (routeTokens.length !== 2 || !ALLOWED_ROUTES.has(rawRoute)) {
+  if (routeTokens.length !== 2 || !allowedRoutes.has(rawRoute)) {
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
@@ -401,7 +423,7 @@ export async function decide(request) {
     };
   }
 
-  // A. 강사 공지 구역 ('notices'): GET 경로만 allow, 나머지 deny
+  // A. 강사 공지 구역 ('notices'): GET 경로만 allow, 나머지 deny (noteOwnership을 읽지도 쓰지도 않음)
   if (serviceName === 'notices') {
     if (method !== 'GET') {
       return {
@@ -413,20 +435,6 @@ export async function decide(request) {
       };
     }
 
-    if (resourceId) {
-      const resourceKey = `${request.classId.trim()}:${request.projectId.trim()}:${resourceId}`;
-      if (noteOwnership.has(resourceKey)) {
-        return {
-          schema: 'aleph.decision.v1',
-          requestId: safeRequestId,
-          decision: 'deny',
-          reasonCode: 'zone_violation',
-          ruleIds: ['zone_rule'],
-        };
-      }
-      noticeResources.add(resourceKey);
-    }
-
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
@@ -436,7 +444,7 @@ export async function decide(request) {
     };
   }
 
-  // B. 메모 구역 ('notes'): 소유자(subjectId)·기기(deviceId) 일치 확인 및 공지 자원 교차 접근 차단
+  // B. 메모 구역 ('notes'): 구역(classId:projectId) 내 기기↔사용자 묶음 및 단건 메모 소유자 확인
   if (serviceName === 'notes') {
     const allowedMethods = ['GET', 'PUT', 'POST', 'DELETE'];
     if (!allowedMethods.includes(method)) {
@@ -449,9 +457,24 @@ export async function decide(request) {
       };
     }
 
-    if (resourceId) {
-      const resourceKey = `${request.classId.trim()}:${request.projectId.trim()}:${resourceId}`;
-      if (noticeResources.has(resourceKey)) {
+    const zoneScope = `${request.classId.trim()}:${request.projectId.trim()}`;
+    const devKey = `dev:${zoneScope}:${request.deviceId}`;
+
+    // 이미 다른 subjectId에 묶인 deviceId로 오면 거부
+    if (deviceBindings.has(devKey) && deviceBindings.get(devKey) !== request.subjectId) {
+      return {
+        schema: 'aleph.decision.v1',
+        requestId: safeRequestId,
+        decision: 'deny',
+        reasonCode: 'zone_violation',
+        ruleIds: ['zone_rule'],
+      };
+    }
+
+    const resourceKey = resourceId ? `${zoneScope}:${resourceId}` : null;
+    if (resourceKey && noteOwnership.has(resourceKey)) {
+      const ownerSubjectId = noteOwnership.get(resourceKey);
+      if (ownerSubjectId !== request.subjectId) {
         return {
           schema: 'aleph.decision.v1',
           requestId: safeRequestId,
@@ -460,24 +483,12 @@ export async function decide(request) {
           ruleIds: ['zone_rule'],
         };
       }
+    }
 
-      if (noteOwnership.has(resourceKey)) {
-        const owner = noteOwnership.get(resourceKey);
-        if (owner.subjectId !== request.subjectId || owner.deviceId !== request.deviceId) {
-          return {
-            schema: 'aleph.decision.v1',
-            requestId: safeRequestId,
-            decision: 'deny',
-            reasonCode: 'zone_violation',
-            ruleIds: ['zone_rule'],
-          };
-        }
-      } else {
-        noteOwnership.set(resourceKey, {
-          subjectId: request.subjectId,
-          deviceId: request.deviceId,
-        });
-      }
+    // 모든 검증을 통과한 allow 직전에만 기록 (deny된 요청은 기록하지 않음)
+    deviceBindings.set(devKey, request.subjectId);
+    if (resourceKey && !noteOwnership.has(resourceKey)) {
+      noteOwnership.set(resourceKey, request.subjectId);
     }
 
     return {
