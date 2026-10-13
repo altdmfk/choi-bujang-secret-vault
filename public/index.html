@@ -15,9 +15,148 @@
       <strong>⚠️ 오프라인 안내:</strong> 현재 인터넷 연결이 끊어졌습니다. 오프라인 상태에서는 실시간 보안 정책 및 서버 ZTNA 기기 인증을 수행할 수 없어 자료 조회가 제한됩니다.
     </div>
 
-    <div class="eyebrow">BYTE BACK · 11단계 나만의 접속 앱</div>
-    <h1>BYTE BACK 자료실</h1>
-    <p>설치형 웹앱(PWA) 메타데이터와 오프라인 안내 및 기기 승인 상태가 구성된 자료실입니다.</p>
+    <div class="eyebrow">BYTE BACK · 12단계 탈환 작전실</div>
+    <h1>BYTE BACK 탈환 작전실 & 자료실</h1>
+    <p>판정기 규칙, 탐지 사건, 회수 상태, 복구 버전 요약 및 실제 API 연동 상태와 가린 서버 기록 대시보드입니다.</p>
+
+    <!-- 12단계 탈환 작전실 관제 대시보드 -->
+    <div class="war-room-card" id="warRoomSection">
+      <div class="war-room-header">
+        <h2>⚔️ 탈환 작전실 관제 현황</h2>
+        <span class="device-badge">12단계 실시간 관제</span>
+      </div>
+
+      <div class="war-room-grid">
+        <!-- 1. 판정기 규칙 요약 -->
+        <div class="war-room-item" id="warRoomItemRules">
+          <div class="war-room-item-title">
+            <span>🛡️ 판정기 규칙</span>
+            <span id="rulesStatusBadge" class="badge badge-success">확인됨 (3건)</span>
+          </div>
+          <div class="metric-val"><span id="rulesCountVal">3</span>개 규칙 활성</div>
+          <div class="war-room-desc">
+            <ul>
+              <li>• device_registered (기기 등록/소유자 검증)</li>
+              <li>• step_up_required (복합 이상 접속 Step-up)</li>
+              <li>• zone_rule (자료·공지 구역 격리 및 쿼리 차단)</li>
+            </ul>
+          </div>
+          <div style="font-size: 12px; color: #8ad8df;">상태: ZTNA 정책 적용 완료</div>
+        </div>
+
+        <!-- 2. 탐지 사건 요약 -->
+        <div class="war-room-item" id="warRoomItemDetect">
+          <div class="war-room-item-title">
+            <span>🔍 탐지 사건</span>
+            <span id="detectEngineBadge" class="badge badge-warn">운영 반 엔진: 미실행</span>
+          </div>
+          <div class="metric-val">임계치 <span id="detectLimitVal">120</span>건 / <span id="detectWindowVal">10</span>분</div>
+          <div class="war-room-desc">
+            <ul>
+              <li>• 감시 사건: GET 요청 폭주 (burst_read)</li>
+              <li>• 로컬 가상 사건: 6건 테스트 통과 확인</li>
+              <li>• 운영 반 엔진 연동: 미실행 (심판 검증 대상)</li>
+            </ul>
+          </div>
+          <div style="font-size: 12px; color: #a4bad4;">출처: docs/DETECT_EVENTS.md 규격</div>
+        </div>
+
+        <!-- 3. 회수 상태 요약 -->
+        <div class="war-room-item" id="warRoomItemRevocation">
+          <div class="war-room-item-title">
+            <span>⚠️ 회수 상태</span>
+            <span id="revocationExecBadge" class="badge badge-warn">자동 회수: 미실행</span>
+          </div>
+          <div class="metric-val">권한 상태: <span id="revocationStatusVal">observe</span></div>
+          <div class="war-room-desc">
+            <ul>
+              <li>• 기본 판정: 정상 관찰 (observe)</li>
+              <li>• 임계치 초과 시: propose_revocation 제안</li>
+              <li>• 자동 접속 회수: 미실행 (제안 반환 전용)</li>
+            </ul>
+          </div>
+          <div style="font-size: 12px; color: #a4bad4;">방식: 세션/권한 회수 제안 체계</div>
+        </div>
+
+        <!-- 4. 복구 버전 요약 -->
+        <div class="war-room-item" id="warRoomItemRecovery">
+          <div class="war-room-item-title">
+            <span>🔄 복구 버전</span>
+            <span id="recoveryExecBadge" class="badge badge-warn">복원 실행: 미실행 (대기)</span>
+          </div>
+          <div class="metric-val">복원 경로: <span id="recoveryRouteVal">POST /api/restore</span></div>
+          <div class="war-room-desc">
+            <ul>
+              <li>• 메모 복원: SHA-256 해시 대조 & dryRun 지원</li>
+              <li>• 정책 복원 도구: npm run policy:restore</li>
+              <li>• 실제 복원 쓰기: 미실행 (대기)</li>
+            </ul>
+          </div>
+          <div style="font-size: 12px; color: #3ecf8e;">※ 가상 메모 본문은 비공개 보호됩니다.</div>
+        </div>
+      </div>
+
+      <!-- 가린 서버 기록 섹션 -->
+      <div class="audit-section" id="serverAuditSection">
+        <div class="audit-header">
+          <h3>📋 가린 서버 기록 (Sanitized Audit Logs)</h3>
+          <div class="audit-summary-bar">
+            총 기록: <strong id="auditTotalCount">6</strong>건 |
+            확인된 결과: <strong id="auditVerifiedCount">2</strong>건 |
+            미실행: <strong id="auditUnexecutedCount">4</strong>건 |
+            본문 노출: <strong id="auditBodyExposeCount" style="color: #3ecf8e;">0건 (완전 차단)</strong>
+          </div>
+        </div>
+        <div class="audit-note">
+          ※ 보안 준수: 비밀번호, 인증 토큰, 서버 전용 키, 기기 개인키, 가상 메모 본문은 서버 기록 및 화면 어디에도 노출되지 않고 가려집니다.
+        </div>
+        <ul class="audit-list" id="auditList">
+          <!-- JS에서 동적으로 렌더링되며 화면의 수치와 정확히 일치 -->
+        </ul>
+      </div>
+
+      <!-- 1~11단계 정상·금지 실측 검증 매트릭스 섹션 -->
+      <div class="matrix-section" id="matrixSection">
+        <div class="matrix-header">
+          <h3>📊 1~11단계 정상·금지 실측 검증 매트릭스 (41종 시험)</h3>
+          <div class="matrix-summary-bar">
+            총 시험 항목: <strong id="matrixTotalCount">41</strong>종 |
+            실측 완료: <strong id="matrixExecutedCount">0</strong>건 |
+            정상 허용 실측: <strong id="matrixAllowCount" style="color: #3ecf8e;">0</strong>건 |
+            금지 거부 실측: <strong id="matrixDenyCount" style="color: #ff8b9e;">0</strong>건 |
+            미실행: <strong id="matrixPendingCount" style="color: #f6c878;">41</strong>건
+          </div>
+        </div>
+        <div class="matrix-desc">
+          ※ 1~11단계의 정상 요청 및 금지 요청에 대한 기대 결과와 실제 API 응답 코드, 요청 ID, 확인 시각을 실측합니다. 아직 실행하지 않은 시험은 임의로 통과 처리되지 않고 미실행으로 유지됩니다.
+        </div>
+        <div class="matrix-controls">
+          <button type="button" class="btn btn-primary btn-sm" id="runLiveTestBtn">🚀 1~11단계 실측 검증 실행</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="resetMatrixBtn">초기화</button>
+          <span id="liveTestProgress" style="font-size: 13px; color: #8ad8df; display: none;">실측 테스트 진행 중...</span>
+        </div>
+        <div class="matrix-table-wrap">
+          <table class="matrix-table" id="matrixTable">
+            <thead>
+              <tr>
+                <th style="width: 55px;">단계</th>
+                <th style="width: 60px;">구분</th>
+                <th>시험 항목 및 요청 대상</th>
+                <th>기대 결과</th>
+                <th>실제 API 결과</th>
+                <th style="width: 140px;">요청 ID</th>
+                <th style="width: 150px;">확인 시각</th>
+                <th style="width: 75px;">상태</th>
+              </tr>
+            </thead>
+            <tbody id="matrixTableBody">
+              <!-- JS에서 41종 항목이 렌더링되며, 실측 실행 시 실시간 업데이트됨 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
 
     <div class="device-status-card" id="deviceStatusSection">
       <div class="device-status-header">

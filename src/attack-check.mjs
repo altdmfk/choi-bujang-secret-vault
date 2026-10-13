@@ -48,6 +48,16 @@ export async function runAttackChecks(config) {
   });
   const restoreBlocked = restore.status === 401;
 
+  const deviceRes = await fetch(new URL('/api/device', app), {
+    redirect: 'error', signal: AbortSignal.timeout(10000),
+  });
+  const deviceBlocked = deviceRes.status === 401;
+
+  const queryRes = await fetch(new URL('/api/notes?select=*', app), {
+    redirect: 'error', signal: AbortSignal.timeout(10000),
+  });
+  const queryBlocked = queryRes.status === 401 || queryRes.status === 403;
+
   return [{
     attackId: 'anonymous_api_read',
     expected: '비로그인 상태에서 /api/notes 요청 시 401 거부',
@@ -56,5 +66,13 @@ export async function runAttackChecks(config) {
     attackId: 'anonymous_restore',
     expected: '비로그인 상태에서 POST /api/restore 요청 시 401 거부',
     observed: restoreBlocked ? '비로그인 복원 요청이 401 Unauthorized로 정상 차단됨' : `비로그인 복원 요청이 차단되지 않음 (HTTP ${restore.status})`
+  }, {
+    attackId: 'unapproved_device_read',
+    expected: '비인증 상태에서 /api/device 요청 시 401 거부',
+    observed: deviceBlocked ? '비인증 기기 요청이 401 Unauthorized로 정상 차단됨' : `기기 요청이 차단되지 않음 (HTTP ${deviceRes.status})`
+  }, {
+    attackId: 'query_parameter_forbidden',
+    expected: '쿼리 파라미터 포함 요청 시 401 또는 403 거부',
+    observed: queryBlocked ? `쿼리 파라미터 요청이 HTTP ${queryRes.status}로 정상 차단됨` : `쿼리 요청이 차단되지 않음 (HTTP ${queryRes.status})`
   }];
 }

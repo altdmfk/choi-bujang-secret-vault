@@ -1,4 +1,4 @@
-﻿:root { color-scheme: dark; font-family: system-ui, sans-serif; }
+:root { color-scheme: dark; font-family: system-ui, sans-serif; }
 body { margin: 0; min-height: 100vh; background: #101a28; color: #ecf4ff; }
 main { max-width: 760px; margin: 0 auto; padding: 44px 22px 64px; }
 .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
@@ -32,3 +32,50 @@ li span { color: #bfd0e5; }
 .action-row { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
 .editor-section { margin: 20px 0; padding: 18px; border: 1px solid #3ecf8e55; border-radius: 12px; background: #15293d; }
 .editor-section h3 { margin: 0 0 12px; font-size: 16px; color: #8ad8df; }
+
+/* 12단계 탈환 작전실 및 가린 서버 기록 스타일 */
+.war-room-card { margin: 20px 0; padding: 20px; border: 1px solid #3d5675; border-radius: 14px; background: #132235; }
+.war-room-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #23354d; padding-bottom: 12px; }
+.war-room-header h2 { margin: 0; font-size: 20px; color: #8ad8df; }
+.war-room-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.war-room-item { padding: 14px 16px; border-radius: 10px; background: #1a2a3d; border: 1px solid #354a63; display: flex; flex-direction: column; justify-content: space-between; }
+.war-room-item-title { font-size: 15px; font-weight: 700; color: #dfeaff; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+.metric-val { font-size: 18px; font-weight: 700; color: #3ecf8e; margin-bottom: 8px; }
+.metric-number { font-size: 22px; color: #8ad8df; }
+.war-room-desc { font-size: 13px; color: #a4bad4; line-height: 1.6; margin-bottom: 10px; }
+.war-room-desc ul { list-style: none; padding: 0; margin: 4px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.war-room-desc li { padding: 4px 6px; background: transparent; border: none; font-size: 12.5px; color: #c4d7ec; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; width: fit-content; }
+.badge-success { background: #1e453e; color: #3ecf8e; border: 1px solid #2f6b5f; }
+.badge-warn { background: #4a341b; color: #f6c878; border: 1px solid #6b4d29; }
+.badge-info { background: #1c3653; color: #8ad8df; border: 1px solid #2b5480; }
+
+.audit-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid #23354d; }
+.audit-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.audit-header h3 { margin: 0; font-size: 16px; color: #f6c878; }
+.audit-summary-bar { font-size: 13px; color: #c4d7ec; background: #162536; padding: 6px 12px; border-radius: 6px; border: 1px solid #2e445d; }
+.audit-note { font-size: 12px; color: #9bb1cb; margin-bottom: 12px; line-height: 1.5; }
+.audit-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.audit-entry { padding: 10px 14px; border-radius: 8px; background: #162638; border: 1px solid #2d425b; font-size: 13px; line-height: 1.5; }
+.audit-entry-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.audit-tag { font-weight: 700; color: #8ad8df; font-size: 12px; }
+.audit-detail { color: #d0e0f2; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; }
+
+/* 1~11단계 실측 검증 매트릭스 테이블 스타일 */
+.matrix-section { margin-top: 24px; padding-top: 18px; border-top: 1px solid #23354d; }
+.matrix-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.matrix-header h3 { margin: 0; font-size: 17px; color: #3ecf8e; }
+.matrix-summary-bar { font-size: 13px; color: #c4d7ec; background: #162536; padding: 6px 12px; border-radius: 6px; border: 1px solid #2e445d; }
+.matrix-desc { font-size: 13px; color: #a4bad4; margin-bottom: 14px; line-height: 1.6; }
+.matrix-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.matrix-table-wrap { overflow-x: auto; border: 1px solid #2d425b; border-radius: 8px; background: #132235; }
+.matrix-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+.matrix-table th { background: #1b2e44; color: #8ad8df; padding: 9px 10px; font-weight: 700; border-bottom: 1px solid #2d425b; white-space: nowrap; }
+.matrix-table td { padding: 8px 10px; border-bottom: 1px solid #1e334d; color: #d0e0f2; vertical-align: middle; }
+.matrix-table tr:last-child td { border-bottom: none; }
+.matrix-table tr:hover { background: #182b3f; }
+.type-allow { color: #3ecf8e; font-weight: 700; }
+.type-deny { color: #ff8b9e; font-weight: 700; }
+.badge-danger { background: #4a191e; color: #ff8b9e; border: 1px solid #8c2a38; }
+
+

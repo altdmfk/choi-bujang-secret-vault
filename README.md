@@ -67,6 +67,103 @@
 - **브라우저 저장소 배제 및 쿠키·메모리 세션 연동**: 기기 키나 토큰은 브라우저 저장소(Storage)에 일절 저장하지 않습니다. 세션은 HttpOnly 쿠키(`sb_token`) 및 JS 메모리 변수로 관리되며, 화면과 API 응답 어디에도 기기 식별자 텍스트를 노출하지 않습니다.
 - **시험**: `node --test test/device.test.mjs` (비인증 차단, 토큰 서명 및 승인 검증 3건 통과), `npm run build -- --local` (로컬 빌드 검증).
 
+## 12단계 탈환 작전실 완성: 4대 핵심 구성요소 운영 안내서
+
+기준 커밋: `c2b328c` (11단계 완결 및 12단계 탈환 작전실)
+
+본 시스템은 **ALEPH SDP 엔진**이 전달하는 검증된 요청·사건 스트림을 바탕으로 작동하며, 학생이 직접 구현한 판정기·탐지 규칙·접속 앱·자료실의 4대 요소로 방어선을 완성합니다.
+
+### 1. 출처 및 책임 경계 구분 (제공 엔진 vs 학생 몫)
+
+| 구성 요소 | ALEPH SDP 제공 엔진의 역할 | 학생 구현 몫 (저장소 코드) |
+|---|---|---|
+| **판정기** | 사전 신원·기기·경로 검증, 릴레이, `aleph.decision.v1` 계약 전달 | `src/decider.mjs`의 3대 인가 규칙 (`device_registered`, `step_up_required`, `zone_rule`) 및 가상 접속 출처 검증 |
+| **탐지 규칙** | 가상 사건 스트림 생성 및 전달 (`docs/DETECT_EVENTS.md`) | `src/detect.mjs`의 10분 구간 내 단일 `sub` 120건 초과 `burst_read` 감지 및 회수 제안(`propose_revocation`) |
+| **접속 앱** | 브라우저 PWA 표준 런타임 및 오프라인 서비스 지원 | PWA 메타데이터(`manifest.json`, `icon.svg`), 브라우저 저장소 배제(HttpOnly 쿠키/메모리 세션), 탈환 작전실 대시보드(`public/`) |
+| **자료실** | Vercel 서버리스 인프라 & Supabase BaaS 릴레이 | 자료 및 기기 승인 API(`api/notes.js`, `api/notices.js`, `api/device.js`), 단건 안전 복원(`api/restore.js`), 정책 복원(`policy-restore.mjs`) |
+
+> **※ 비밀값 취급 원칙 (비밀값 포장 금지):**  
+> 실제 Supabase 비밀키(`SUPABASE_SECRET_KEY`), 데이터베이스 접속 URL(`SUPABASE_URL`), 사용자 비밀번호, 세션 토큰, 기기 개인키는 코드나 문서, 저장소 커밋에 절대 넣지 않습니다. 환경변수 이름(`SUPABASE_URL`, `SUPABASE_SECRET_KEY`)만 등록하며 실제 값은 Vercel 프로젝트 대시보드(Settings > Environment Variables) 또는 로컬 비밀 파일(`.env.local`)에 학생이 직접 입력합니다.
+
+---
+
+### 2. 4대 구성요소별 설치·실행·중지·복구 절차
+
+#### ① 학생 판정기 (`src/decider.mjs`)
+- **설치**: 저장소 루트에서 의존성을 설치합니다 (`npm install`).
+- **실행(검증)**: 가상 요청 종합 검증 연습을 실행합니다.
+  ```bash
+  node scripts/decider-test.mjs
+  ```
+  복합 이상 접속 Step-up 판정을 비교할 때는 다음 명령을 실행합니다:
+  ```bash
+  node scripts/fixture-7.mjs
+  ```
+- **중지**: 비인가 기기·타인 구역·비정상 경로 요청 시 `deny` (`device_not_registered`, `zone_violation`) 또는 `step_up`을 반환하여 접근을 즉시 차단합니다.
+- **복구**: 판정 규칙이 손상되었을 경우 Git 히스토리에서 `src/decider.mjs`를 복원합니다 (`git checkout HEAD -- src/decider.mjs`).
+
+#### ② 탐지 규칙 (`src/detect.mjs`)
+- **설치**: Node.js 표준 내장 모듈 기반이므로 별도 설치가 필요하지 않습니다.
+- **실행(검증)**: 6건의 가상 조회 사건에 대한 탐지 규칙을 연습합니다.
+  ```bash
+  npm run detect:test
+  ```
+- **중지(회수 제안)**: 10분 내 120건 초과 읽기 발생 시 `{ action: 'propose_revocation', reasonCode: 'burst_read' }` 제안을 반환하여 권한을 회수 상태로 유도합니다. (120건 이하는 `{ action: 'observe' }` 유지)
+- **복구**: 탐지 로직을 원래 상태로 복원할 때는 `git checkout HEAD -- src/detect.mjs`를 실행합니다.
+
+#### ③ 접속 앱 (`public/`)
+- **설치**:
+  - 브라우저 주소창 우측 또는 화면 내 **[📲 앱으로 설치]** 버튼을 눌러 독립 설치형 웹앱(PWA Standalone)으로 설치합니다.
+- **실행**:
+  - 설치된 웹앱 아이콘 또는 브라우저에서 `https://<배포주소>`에 접속합니다.
+  - 로그인 폼에서 계정 인증 후 **[기기 승인 요청]** 버튼을 눌러 HMAC-SHA256 승인 토큰을 발급받고 보호 자료실을 엽니다.
+  - **탈환 작전실 대시보드**: 상단에서 판정기 3개 규칙, 탐지 임계치 120건, 관찰 상태, 복원 경로 요약과 가린 서버 기록(6건)을 확인합니다.
+  - **41종 실측 매트릭스**: **[🚀 1~11단계 실측 검증 실행]** 버튼을 눌러 1~11단계 정상·금지 요청에 대한 실제 API 응답 코드와 고유 요청 ID, 확인 시각을 실측합니다.
+- **중지**:
+  - 화면 상단의 **[로그아웃]** 버튼을 클릭하여 HttpOnly 세션 쿠키를 만료시키고 브라우저 메모리 세션을 완전히 초기화합니다.
+- **복구**:
+  - 오프라인 해제 후 온라인 연결 시 상단 오프라인 경고 배너가 자동 해제되며, 재로그인 및 기기 승인 요청으로 정상 상태로 복귀합니다.
+
+#### ④ 자료실 (`api/`)
+- **설치**:
+  - Vercel 프로젝트 환경변수에 `SUPABASE_URL` 및 `SUPABASE_SECRET_KEY`를 설정합니다.
+  - 정적 화면 및 메타데이터 빌드를 실행합니다:
+    ```bash
+    npm run build -- --local
+    ```
+- **실행**:
+  - 로컬 환경: `npx vercel dev` (포트 3000)
+  - 배포 환경: GitHub `main` 브랜치 푸시 시 Vercel 자동 배포
+- **중지**:
+  - 로컬 프로세스 종료: 터미널에서 `Ctrl + C`
+  - 접근 차단: 미승인 기기 및 비로그인 접근 시 서버 레벨에서 `401 Unauthorized` 또는 `403 DEVICE_NOT_APPROVED`를 반환하여 데이터 유출을 원천 차단합니다.
+- **복구 (메모 및 정책 롤백)**:
+  - **메모 단건 복원**: 비공개 사본(`notes_backup`)을 기반으로 SHA-256 내용 해시를 대조하여 단건 복원합니다.
+    - 미리보기: `POST /api/restore` 본문에 `{ "id": "<ID>", "contentHash": "<해시>", "dryRun": true }` 전송
+    - 실행 테스트: `npm run test:restore`
+  - **시험 정책 복구**: 과거 안전 정책 커밋 SHA를 검증하여 `aleph.config.json`의 시험 정책을 복원합니다.
+    - 미리보기: `npm run policy:restore -- <커밋 SHA>`
+    - 실제 적용: `npm run policy:restore -- <커밋 SHA> --apply --confirm <SHA 앞 12자리>`
+    - 단위 테스트: `npm run test:policy-restore`
+
+---
+
+### 3. 전체 시스템 재현 순서 (Step-by-Step Reproduction)
+
+1. **환경 준비**: 저장소를 클론하고 의존성을 설치합니다 (`npm install`).
+2. **비밀값 연결**: `.env.local` 또는 Vercel 대시보드 환경변수에 본인의 `SUPABASE_URL` 및 `SUPABASE_SECRET_KEY`를 등록합니다. (코드나 문서에는 절대 적지 않음)
+3. **로컬 단위 검증**:
+   - `node scripts/decider-test.mjs` (판정기 규칙 3건 통과 확인)
+   - `npm run detect:test` (탐지 규칙 통과 확인)
+   - `node --test test/device.test.mjs` (기기 승인 토큰 발급 및 차단 검증)
+   - `npm run test:restore` (메모 복원 로직 검증)
+4. **빌드 및 배포**:
+   - `npm run build -- --local` 명령으로 로컬 빌드 성공 확인
+   - GitHub 푸시를 통해 Vercel에 자동 배포
+5. **탈환 작전실 실측 확인**:
+   - 브라우저로 배포 주소에 접속하여 탈환 작전실 요약 수치(규칙 3건, 탐지 임계치 120건, 관찰 상태, 가린 서버 기록)를 확인합니다.
+   - **[🚀 1~11단계 실측 검증 실행]** 버튼을 클릭하여 금지 요청 거부와 정상 요청 허용이 실측값으로 표에 기록되는지 확인합니다.
+
 ## 복구 뒤 1~9단계 다시 확인하는 순서
 
 복구한 뒤 아래 순서대로 실행하고, **결과 칸은 직접 실행한 것만** 고칩니다. 실행하지 않은 항목은 `미실행`으로 둡니다. 토큰·비밀번호는 이 표나 로그에 붙이지 않습니다. 로컬 연습은 가상 요청이며 심판 판정이 아닙니다.
