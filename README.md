@@ -57,7 +57,7 @@
 | --- | --- | --- | --- |
 | 정책 차이 | `npm run policy:diff -- <복원한 커밋 SHA>` | 변경 범위 0건 | 미실행 |
 | 복원 시험 | `npm run test:restore` | 5건 통과 | 2026-10-13 로컬 통과(가상 데이터) |
-| 메모 한 건 | 배포 뒤 계정 B가 `POST /api/restore` (`{id, contentHash}`) | `200`, `notes`의 ID·소유자·내용 해시가 사본과 같음 | 미실행 |
+| 메모 한 건 | 배포 뒤 계정 B가 `POST /api/restore` (`{id, contentHash}`) | `200`, `notes`의 ID·소유자·내용 해시가 사본과 같음 | 2026-10-13 배포 주소: B 맞는 해시 `200`, 틀린 해시 `409`, B가 A 메모 복원 `403`, 복원 뒤 B 조회 `200`(학생 실행 보고). 행 내용 대조는 상태 코드만으로 확인할 수 없어 미실행 |
 
 **1~9단계 정상 요청 → 금지 요청** (정상이 먼저 성공해야 금지 결과가 의미 있습니다.)
 
@@ -65,12 +65,12 @@
 | --- | --- | --- | --- | --- |
 | 1 | `/`와 `/data.json`의 공개 가상 메모 | 해당 없음(공개 자료 확인) | 배포 주소를 브라우저로 열기 | 미실행 |
 | 2 | 단계 카드 기준 | 단계 카드 기준 | 저장소에 이 단계 계약 문서가 없어 학생이 단계 카드를 보고 채움 | 미실행 |
-| 3 | 로그인 후 `GET /api/notes` | 로그인 없는 `GET /api/notes` → `401` | `npm run bundle`의 자기 점검(실제 요청 1건) 또는 브라우저 | 미실행 |
+| 3 | 로그인 후 `GET /api/notes` | 로그인 없는 `GET /api/notes` → `401` | `npm run bundle`의 자기 점검(실제 요청 1건) 또는 브라우저 | 2026-10-13 배포 주소: 로그인 없음 `401`, 로그인 후 목록 `200`(학생 실행 보고) |
 | 4 | 단계 카드 기준 | 단계 카드 기준 | 저장소에 이 단계 계약 문서가 없어 학생이 단계 카드를 보고 채움 | 미실행 |
-| 5 | A가 자기 메모 조회·수정, B가 자기 메모 조회 | B가 A 메모 조회·수정·삭제 → `403`, 원본 저장소 주소(`originalApiUrl`) 직접 요청 거부 | 배포 주소에서 A·B 로그인 후 각각 요청 | 미실행 |
+| 5 | A가 자기 메모 조회·수정, B가 자기 메모 조회 | B가 A 메모 조회·수정·삭제 → `403`, 원본 저장소 주소(`originalApiUrl`) 직접 요청 거부 | 배포 주소에서 A·B 로그인 후 각각 요청 | 2026-10-13 배포 주소: A 자기 메모 조회 `200`, B가 A 메모 조회 `403`(학생 실행 보고) / 수정·삭제·`originalApiUrl` 직접 요청 미실행 |
 | 6 | 등록된 기기의 `GET /notes/:id` 허용 | 미등록·타인 기기 → `device_not_registered` | `node scripts/decider-test.mjs` | 2026-10-13 로컬 통과(가상 요청) |
 | 7 | 평소와 같은 접속 `allow`, 재인증 통과(`stepUp.verified`) 시 허용 | 시각·네트워크·대량 읽기가 겹친 접속 → `step_up_required` | `node scripts/fixture-7.mjs`, `node scripts/decider-test.mjs` | 미실행(`fixture-7`) / 2026-10-13 로컬 통과(`decider-test`) |
-| 8 | 자기 `note:<id>` 읽기·수정, 강사 공지 읽기 | 타인 메모·강사 공지 수정·`export` 등 기능 경로·쿼리 선택 → `zone_violation` 또는 `403` | `node scripts/decider-test.mjs`, 배포 주소에서 B가 A 메모 요청 | 미실행(배포 요청) / 2026-10-13 로컬 통과(`decider-test`) |
+| 8 | 자기 `note:<id>` 읽기·수정, 강사 공지 읽기 | 타인 메모·강사 공지 수정·`export` 등 기능 경로·쿼리 선택 → `zone_violation` 또는 `403` | `node scripts/decider-test.mjs`, 배포 주소에서 B가 A 메모 요청 | 2026-10-13 배포 주소: B가 A 메모 조회 `403`(학생 실행 보고) / 공지·`export`·쿼리 선택 배포 요청 미실행 / 로컬 통과(`decider-test`) |
 | 9 | 같은 사용자의 `GET` 120건 이하는 `observe` | 10분 안 120건 초과 → `propose_revocation`/`burst_read` | `npm run detect:test` | 2026-10-13 로컬 통과(가상 사건) |
 
 **마지막**: `git status`로 의도하지 않은 변경이 없는지 확인한 뒤 `npm run bundle`을 실행합니다. 번들의 `attackAttempts`에는 실제로 보낸 요청만 남으며 심판의 판정이 아닙니다.
