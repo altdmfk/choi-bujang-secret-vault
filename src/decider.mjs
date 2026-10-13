@@ -24,12 +24,43 @@ const ALLOWED_NOTICE_ROUTE_PATTERNS = new Set([
   '/api/notices/:id',
 ]);
 
-const FORBIDDEN_FUNCTION_PATHS = new Set([
-  'export', 'import', 'backup', 'admin', 'batch', 'search',
-  'download', 'upload', 'config', 'settings', 'all', 'manage', 'execute',
-  'list', 'dump', 'restore', 'sync', 'share', 'public', 'raw',
-  'status', 'health', 'metrics', 'debug', 'test', 'eval', 'run', 'query', 'filter',
-]);
+const FORBIDDEN_FUNCTION_KEYWORD = /(?:^|[:_-])(?:export|import|backup|admin|batch|search|download|upload|config|settings?|all|manage|exec(?:ute)?|list|dump|restore|sync|share|public|raw|status|health|metrics?|debug|test|eval|run|query|filter|stats?|summary|count|bulk|migrat(?:e|ion)|archiv(?:e|es)|clone|copy|audit|report|flush|clear|reset|purge|system|whoami|me)(?:$|[:_-]|\d)/iu;
+
+function isValidNoteResourceId(resourceId) {
+  if (typeof resourceId !== 'string' || !resourceId.trim()) return false;
+  const trimmed = resourceId.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 공지 자원(notice:*)이나 금지된 기능 키워드가 포함된 경우 즉시 거부
+  if (/^notices?(?:[:_-]|$)/iu.test(lower)) return false;
+  if (FORBIDDEN_FUNCTION_KEYWORD.test(lower)) return false;
+
+  const hasNotePrefix = /^(?:notes?|memos?)[:_-]/iu.test(lower);
+  const coreId = lower.replace(/^(?:notes?|memos?)[:_-]/iu, '');
+  if (!coreId || FORBIDDEN_FUNCTION_KEYWORD.test(coreId)) return false;
+
+  // 화이트리스트:
+  // 1) 공식 픽스처 ID ('demo')
+  // 2) 표준 UUID 형식
+  // 3) 순수 숫자 ID ('1', '2' 등)
+  // 4) 명시적 note:/memo: 접두사가 붙은 안전한 식별자
+  // 5) 숫자를 포함한 자료 식별자 (예: a_1, item-1 등) — 순수 영문 단어(임의 기능명)는 모두 차단
+  if (coreId === 'demo') return true;
+  if (UUID_REGEX.test(coreId)) return true;
+  if (/^\d{1,12}$/u.test(coreId)) return true;
+  if (hasNotePrefix && /^[a-z0-9][a-z0-9_-]{0,63}$/u.test(coreId)) return true;
+  if (/^[a-z0-9][a-z0-9_-]{0,63}$/u.test(coreId) && /\d/u.test(coreId)) return true;
+
+  return false;
+}
+
+function isValidNoticeResourceId(resourceId) {
+  if (typeof resourceId !== 'string' || !resourceId.trim()) return false;
+  const lower = resourceId.trim().toLowerCase();
+  if (FORBIDDEN_FUNCTION_KEYWORD.test(lower)) return false;
+  // 강사 공지 자원 ID는 'notice:1', 'notice:2' 또는 숫자 공지 ID만 허용 (화이트리스트)
+  return /^(?:notices?[:_-])?\d{1,6}$/u.test(lower);
+}
 
 /**
  * 엔진이 검증해 넘긴 가상 접속 정보의 출처 및 유효성을 검사합니다.
@@ -144,11 +175,10 @@ function parseZonePath(rawPath) {
 
   const resourceId = remaining === 2 ? segments[idx + 1] : null;
   if (resourceId !== null) {
-    const lowerResId = resourceId.toLowerCase();
-    const strippedResId = lowerResId.replace(/^(?:notes?|notices?)[:_-]/u, '');
-
-    // :id와 같은 깊이에 export 등 기능 경로 배치 금지
-    if (FORBIDDEN_FUNCTION_PATHS.has(lowerResId) || FORBIDDEN_FUNCTION_PATHS.has(strippedResId)) {
+    if (serviceName === 'notes' && !isValidNoteResourceId(resourceId)) {
+      return null;
+    }
+    if (serviceName === 'notices' && !isValidNoticeResourceId(resourceId)) {
       return null;
     }
   }

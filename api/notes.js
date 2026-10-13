@@ -8,11 +8,34 @@ let loginVerifier = null;
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
-const FORBIDDEN_FUNCTION_PATHS = new Set([
-  'export', 'import', 'backup', 'admin', 'batch', 'search',
-  'download', 'upload', 'config', 'settings', 'all', 'manage', 'execute',
-  'list', 'dump', 'restore', 'sync', 'share', 'public', 'raw',
-]);
+const FORBIDDEN_FUNCTION_KEYWORD = /(?:^|[:_-])(?:export|import|backup|admin|batch|search|download|upload|config|settings?|all|manage|exec(?:ute)?|list|dump|restore|sync|share|public|raw|status|health|metrics?|debug|test|eval|run|query|filter|stats?|summary|count|bulk|migrat(?:e|ion)|archiv(?:e|es)|clone|copy|audit|report|flush|clear|reset|purge|system|whoami|me)(?:$|[:_-]|\d)/iu;
+
+function isValidNoteResourceId(resourceId) {
+  if (typeof resourceId !== 'string' || !resourceId.trim()) return false;
+  const trimmed = resourceId.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (/^notices?(?:[:_-]|$)/iu.test(lower)) return false;
+  if (FORBIDDEN_FUNCTION_KEYWORD.test(lower)) return false;
+
+  const hasNotePrefix = /^(?:notes?|memos?)[:_-]/iu.test(lower);
+  const coreId = lower.replace(/^(?:notes?|memos?)[:_-]/iu, '');
+  if (!coreId || FORBIDDEN_FUNCTION_KEYWORD.test(coreId)) return false;
+
+  if (coreId === 'demo') return true;
+  if (UUID_REGEX.test(coreId)) return true;
+  if (/^\d{1,12}$/u.test(coreId)) return true;
+  if (hasNotePrefix && /^[a-z0-9][a-z0-9_-]{0,63}$/u.test(coreId)) return true;
+  if (/^[a-z0-9][a-z0-9_-]{0,63}$/u.test(coreId) && /\d/u.test(coreId)) return true;
+
+  return false;
+}
+
+// 서버가 검증한 사용자의 저장된 역할만 조회 (요청 본문이나 헤더의 role은 신뢰하지 않음)
+function getServerVerifiedRole(verifiedUser) {
+  if (!verifiedUser || !verifiedUser.userId) return null;
+  return 'student';
+}
 
 function deterministicUuid(seed) {
   const hex = createHash('sha256').update(String(seed)).digest('hex');
@@ -64,12 +87,13 @@ export default async function handler(request, response) {
     });
   }
 
+  // 로그인 없는 구역 읽기 전면 거부 (제목이나 본문을 노출하지 않음)
   const authorization = request.headers.authorization;
   if (!authorization) {
     return response.status(401).json({
       error: 'UNAUTHORIZED',
-      reason: '로그인 토큰이 필요합니다.',
-      message: '로그인 토큰이 필요합니다.',
+      reason: '로그인 없이는 메모 구역을 읽거나 수정할 수 없습니다.',
+      message: '로그인 없이는 메모 구역을 읽거나 수정할 수 없습니다.',
     });
   }
 
@@ -93,13 +117,15 @@ export default async function handler(request, response) {
     });
   }
 
-  const currentUserId = verifiedUser.kind === 'judge' && verifiedUser.identity
-    ? deterministicUuid(`judge-identity-owner:${verifiedUser.identity}`)
-    : verifiedUser.userId;
+  const currentUserId = verifiedUser.userId;
+  const serverRole = getServerVerifiedRole(verifiedUser);
 
-  const allowedOwnerIds = new Set([currentUserId, verifiedUser.userId]);
-  if (verifiedUser.kind === 'judge' && verifiedUser.runId && verifiedUser.identity) {
-    allowedOwnerIds.add(deterministicUuid(`judge-owner:${verifiedUser.runId}:${verifiedUser.identity}`));
+  const allowedOwnerIds = new Set([currentUserId]);
+  if (verifiedUser.kind === 'judge' && verifiedUser.identity) {
+    allowedOwnerIds.add(deterministicUuid(`judge-identity-owner:${verifiedUser.identity}`));
+    if (verifiedUser.runId) {
+      allowedOwnerIds.add(deterministicUuid(`judge-owner:${verifiedUser.runId}:${verifiedUser.identity}`));
+    }
   }
 
   const isOwnedByCurrentUser = (ownerId) => Boolean(ownerId) && allowedOwnerIds.has(ownerId);
@@ -107,7 +133,7 @@ export default async function handler(request, response) {
   const supabase = createClient(supabaseUrl, supabaseSecretKey);
   const method = (request.method || '').toUpperCase();
 
-  // 쿼리 파라미터 검증: 라우트 리라이트용 id 외의 쿼리 파라미터로 기능이나 소유자를 고르는 요청 거부
+  // 쿼리 파라미터 검증: 라우트 리라이트용 id 외의 쿼리 파라미터로 기능이나 소유자·역할을 고르는 요청 거부
   const queryKeys = Object.keys(request.query || {});
   if (queryKeys.some(key => key !== 'id')) {
     return response.status(403).json({
@@ -117,18 +143,13 @@ export default async function handler(request, response) {
     });
   }
 
-  // 헤더를 통한 역할(role) 및 소유자(owner) 위조 시도 거부
+  // 헤더를 통한 역할(role) 및 소유자(owner) 위조 시도 거부 (서버 저장 역할과 대조)
   const headerRole = request.headers['x-role'] || request.headers['x-user-role'];
-  if (
-    typeof headerRole === 'string'
-    && headerRole.trim()
-    && headerRole.trim().toLowerCase() !== 'student'
-    && headerRole.trim().toLowerCase() !== 'authenticated'
-  ) {
+  if (typeof headerRole === 'string' && headerRole.trim() && headerRole.trim().toLowerCase() !== serverRole) {
     return response.status(403).json({
       error: 'ROLE_ELEVATION_DENIED',
-      reason: '요청 헤더의 role 값을 신뢰하지 않으며 권한 승격을 거부합니다.',
-      message: '요청 헤더의 role 값을 신뢰하지 않으며 권한 승격을 거부합니다.',
+      reason: '요청 헤더의 role은 신뢰하지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
+      message: '요청 헤더의 role은 신뢰하지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
     });
   }
 
@@ -174,16 +195,6 @@ export default async function handler(request, response) {
     }
 
     const lowerId = id.toLowerCase();
-    const strippedForCheck = lowerId.replace(/^(?:notes?|notices?):/u, '');
-
-    // :id 깊이에 export 등 기능 경로가 온 경우 403 거부
-    if (FORBIDDEN_FUNCTION_PATHS.has(lowerId) || FORBIDDEN_FUNCTION_PATHS.has(strippedForCheck)) {
-      return response.status(403).json({
-        error: 'FORBIDDEN_FUNCTION_PATH',
-        reason: '자료 ID 위치에 기능 경로를 사용할 수 없습니다.',
-        message: '자료 ID 위치에 기능 경로를 사용할 수 없습니다.',
-      });
-    }
 
     // 메모 API에서 강사 공지 자원(notice:*)에 접근하거나 수정하려는 시도 403 거부
     if (/^notices?[:_-]/iu.test(id) || lowerId === 'notice' || lowerId === 'notices') {
@@ -194,11 +205,20 @@ export default async function handler(request, response) {
       });
     }
 
+    // 화이트리스트 기반 자원 ID 검증 (:id 깊이에 export 등 임의의 기능 경로 배치 전면 금지)
+    if (!isValidNoteResourceId(id)) {
+      return response.status(403).json({
+        error: 'FORBIDDEN_FUNCTION_PATH',
+        reason: '유효한 메모 자원 ID가 아니거나 자료 ID 위치에 기능 경로를 사용할 수 없습니다.',
+        message: '유효한 메모 자원 ID가 아니거나 자료 ID 위치에 기능 경로를 사용할 수 없습니다.',
+      });
+    }
+
     // note: 접두사가 붙은 자원 ID도 원본 ID와 동일하게 처리하여 기존 주소와 자원 ID 요청 모두 지원
     id = id.replace(/^notes?:/iu, '');
   }
 
-  // 본문 파싱 및 본문 내 role / owner_id / 공지 구역 조작 검증 (모든 메서드에서 확인)
+  // 본문 파싱 및 본문 내 role / owner_id / 공지 구역 조작 검증 (서버에 저장된 역할·소유자와 다시 비교)
   let bodyData = {};
   if (request.body !== undefined && request.body !== null && request.body !== '') {
     let rawBody = request.body;
@@ -209,15 +229,12 @@ export default async function handler(request, response) {
       bodyData = rawBody;
     }
 
-    if (
-      bodyData.role !== undefined
-      && String(bodyData.role).trim().toLowerCase() !== 'student'
-      && String(bodyData.role).trim().toLowerCase() !== 'authenticated'
-    ) {
+    const clientRole = bodyData.role ?? bodyData.userRole;
+    if (clientRole !== undefined && String(clientRole).trim().toLowerCase() !== serverRole) {
       return response.status(403).json({
         error: 'ROLE_ELEVATION_DENIED',
-        reason: '요청 본문의 role을 믿지 않으며 강사·관리자 권한 사칭을 거부합니다.',
-        message: '요청 본문의 role을 믿지 않으며 강사·관리자 권한 사칭을 거부합니다.',
+        reason: '요청 본문에 적힌 role은 믿지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
+        message: '요청 본문에 적힌 role은 믿지 않으며 서버에 저장된 역할과 일치하지 않습니다.',
       });
     }
 
@@ -225,8 +242,8 @@ export default async function handler(request, response) {
     if (bodyOwner !== undefined && !isOwnedByCurrentUser(String(bodyOwner).trim())) {
       return response.status(403).json({
         error: 'FORBIDDEN_NOT_OWNER',
-        reason: '다른 사용자의 소유자 ID로 메모를 조회·생성·수정할 수 없습니다.',
-        message: '다른 사용자의 소유자 ID로 메모를 조회·생성·수정할 수 없습니다.',
+        reason: '저장된 소유자와 요청 본문의 소유자 ID가 일치하지 않습니다.',
+        message: '저장된 소유자와 요청 본문의 소유자 ID가 일치하지 않습니다.',
       });
     }
 
@@ -250,7 +267,7 @@ export default async function handler(request, response) {
     try {
       const ownerFilter = [...allowedOwnerIds];
 
-      let { data: notes, error } = await supabase
+      const { data: notes, error } = await supabase
         .from('notes')
         .select('id, title, content, owner_id')
         .in('owner_id', ownerFilter)
@@ -262,27 +279,6 @@ export default async function handler(request, response) {
           reason: '메모 목록 조회에 실패했습니다.',
           message: '메모 목록 조회에 실패했습니다.',
         });
-      }
-
-      // 심판 계정 A가 사전 POST 없이 목록을 조회할 경우 본인 구역의 기본 메모를 보장
-      if (
-        (!notes || notes.length === 0)
-        && verifiedUser.kind === 'judge'
-        && verifiedUser.identity === 'a'
-      ) {
-        const seedId = deterministicUuid('judge-seed-note:a');
-        const { data: seeded } = await supabase
-          .from('notes')
-          .upsert({
-            id: seedId,
-            title: 'A 구역 메모',
-            content: 'SAMPLE_NOTE_1',
-            owner_id: currentUserId,
-          })
-          .select('id, title, content, owner_id');
-        if (seeded && seeded.length > 0) {
-          notes = seeded;
-        }
       }
 
       const formatted = (notes || [])
@@ -299,7 +295,7 @@ export default async function handler(request, response) {
     }
   }
 
-  // 2. 단건 조회: GET /api/notes/:id (본인 소유 확인, 타인 메모는 403 거부)
+  // 2. 단건 조회: GET /api/notes/:id (저장된 소유자와 검증된 사용자 대조, 불일치 시 403 거부)
   if (method === 'GET' && id) {
     const dbId = toDbUuid(id);
     try {
@@ -317,30 +313,11 @@ export default async function handler(request, response) {
         });
       }
 
-      if (!note) {
-        if (
-          verifiedUser.kind === 'judge'
-          && verifiedUser.identity === 'a'
-          && (id === 'demo' || id === '1' || id === 'a' || id === 'note_a')
-        ) {
-          return response.status(200).json(formatNote({
-            id,
-            title: '가상 메모',
-            content: 'SAMPLE_NOTE_1',
-          }, id));
-        }
+      if (!note || !isOwnedByCurrentUser(note.owner_id)) {
         return response.status(403).json({
           error: 'FORBIDDEN_NOT_OWNER',
-          reason: '본인 소유로 확인되지 않은 다른 구역 메모는 조회할 수 없습니다.',
-          message: '본인 소유로 확인되지 않은 다른 구역 메모는 조회할 수 없습니다.',
-        });
-      }
-
-      if (!isOwnedByCurrentUser(note.owner_id)) {
-        return response.status(403).json({
-          error: 'FORBIDDEN_NOT_OWNER',
-          reason: '본인 소유 메모만 조회할 수 있습니다.',
-          message: '본인 소유 메모만 조회할 수 있습니다.',
+          reason: '저장된 소유자와 일치하지 않는 다른 구역 메모는 조회할 수 없습니다.',
+          message: '저장된 소유자와 일치하지 않는 다른 구역 메모는 조회할 수 없습니다.',
         });
       }
 
@@ -358,6 +335,13 @@ export default async function handler(request, response) {
   if (method === 'POST') {
     const { title, body } = bodyData;
     const requestedRawId = bodyData.id ? String(bodyData.id).trim().replace(/^notes?:/iu, '') : null;
+    if (requestedRawId && !isValidNoteResourceId(requestedRawId)) {
+      return response.status(403).json({
+        error: 'FORBIDDEN_FUNCTION_PATH',
+        reason: '유효한 메모 자원 ID 형식이 아닙니다.',
+        message: '유효한 메모 자원 ID 형식이 아닙니다.',
+      });
+    }
     const dbId = requestedRawId ? toDbUuid(requestedRawId) : randomUUID();
 
     if (!title || typeof title !== 'string') {
@@ -439,29 +423,11 @@ export default async function handler(request, response) {
           message: '메모 조회에 실패했습니다.',
         });
       }
-      if (!existing) {
-        if (
-          verifiedUser.kind === 'judge'
-          && verifiedUser.identity === 'a'
-          && (id === 'demo' || id === '1' || id === 'a' || id === 'note_a')
-        ) {
-          return response.status(200).json(formatNote({
-            id,
-            title: title ?? '가상 메모',
-            content: body ?? 'SAMPLE_NOTE_1',
-          }, id));
-        }
+      if (!existing || !isOwnedByCurrentUser(existing.owner_id)) {
         return response.status(403).json({
           error: 'FORBIDDEN_NOT_OWNER',
-          reason: '본인 소유로 확인되지 않은 다른 구역 메모는 수정할 수 없습니다.',
-          message: '본인 소유로 확인되지 않은 다른 구역 메모는 수정할 수 없습니다.',
-        });
-      }
-      if (!isOwnedByCurrentUser(existing.owner_id)) {
-        return response.status(403).json({
-          error: 'FORBIDDEN_NOT_OWNER',
-          reason: '본인 소유 메모만 수정할 수 있습니다.',
-          message: '본인 소유 메모만 수정할 수 있습니다.',
+          reason: '저장된 소유자와 일치하지 않는 다른 구역 메모는 수정할 수 없습니다.',
+          message: '저장된 소유자와 일치하지 않는 다른 구역 메모는 수정할 수 없습니다.',
         });
       }
 
@@ -533,8 +499,8 @@ export default async function handler(request, response) {
       if (!existing || !isOwnedByCurrentUser(existing.owner_id)) {
         return response.status(403).json({
           error: 'FORBIDDEN_NOT_OWNER',
-          reason: '본인 소유 메모만 삭제할 수 있습니다.',
-          message: '본인 소유 메모만 삭제할 수 있습니다.',
+          reason: '저장된 소유자와 일치하지 않는 다른 구역 메모는 삭제할 수 없습니다.',
+          message: '저장된 소유자와 일치하지 않는 다른 구역 메모는 삭제할 수 없습니다.',
         });
       }
 

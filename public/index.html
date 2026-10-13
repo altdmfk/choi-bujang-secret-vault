@@ -131,10 +131,23 @@
 
     cancelEditBtn.addEventListener('click', resetEditor);
 
-    async function loadNotices() {
+    async function loadNotices(session) {
+      if (!session?.access_token) {
+        noticesList.replaceChildren();
+        const item = document.createElement('li');
+        item.textContent = '로그인 후 강사 공지를 확인할 수 있습니다.';
+        noticesList.replaceChildren(item);
+        return;
+      }
+
       try {
-        const response = await fetch('/api/notices', { cache: 'no-store' });
-        if (!response.ok) throw new Error('강사 공지를 불러올 수 없습니다.');
+        const response = await fetch('/api/notices', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('강사 공지를 불러올 수 없습니다. (인증 실패 또는 거부)');
         const notices = await response.json();
         if (!Array.isArray(notices) || notices.length === 0) {
           const item = document.createElement('li');
@@ -323,6 +336,7 @@
         sessionStorage.setItem('auth_session', JSON.stringify(session));
 
         updateAuthUI(session.user);
+        await loadNotices(session);
         await loadNotes(session);
       } catch (error) {
         authError.textContent = `로그인 실패: ${error.message}`;
@@ -333,6 +347,7 @@
     logoutBtn.addEventListener('click', async () => {
       sessionStorage.removeItem('auth_session');
       updateAuthUI(null);
+      await loadNotices(null);
       await loadNotes(null);
     });
 
@@ -343,7 +358,7 @@
     } catch {}
 
     updateAuthUI(savedSession?.user || null);
-    await loadNotices();
+    await loadNotices(savedSession || null);
     await loadNotes(savedSession || null);
   </script>
 </body>
