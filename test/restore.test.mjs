@@ -113,3 +113,118 @@ test('형식이 틀린 요청은 거부됩니다', async () => {
   }
 });
 
+test('쓰기 뒤 다시 읽을 때 사본과 다르면 복원 전 상태로 되돌리고 409를 돌려줍니다', async () => {
+  const { notes, hash } = setup();
+  let writeOccurred = false;
+  const backups = [
+    { id: 'b1', owner_id: B, title: 'B 원본', content: '가상 메모 본문', content_hash: hash },
+  ];
+  const fakeSupabase = {
+    from(name) {
+      if (name === 'notes_backup') {
+        return {
+          select() {
+            return { eq: () => ({ maybeSingle: async () => ({ data: backups[0], error: null }) }) };
+          },
+        };
+      }
+      return {
+        select() {
+          return {
+            eq: () => ({
+              maybeSingle: async () => {
+                if (!writeOccurred) {
+                  const found = notes.find(n => n.id === 'b1');
+                  return { data: found ? { ...found } : null, error: null };
+                }
+                return { data: { id: 'b1', owner_id: B, title: 'B 원본', content: '검증실패내용' }, error: null };
+              },
+            }),
+          };
+        },
+        update(values) {
+          writeOccurred = true;
+          const target = notes.find(n => n.id === 'b1');
+          if (target) Object.assign(target, values);
+          const q = { eq: () => q, select: () => q, maybeSingle: async () => ({ data: { id: 'b1' }, error: null }) };
+          return q;
+        },
+      };
+    },
+  };
+
+  const result = await restoreOne({ supabase: fakeSupabase, userId: B, body: { id: 'b1', contentHash: hash } });
+  assert.equal(result.status, 409);
+  assert.equal(result.json.error, 'RESTORE_MISMATCH');
+  assert.equal(notes.find(n => n.id === 'b1').content, '훼손됨');
+});
+
+test('dryRun: true로 호출하면 notes가 전혀 바뀌지 않고 backupVersion과 changed를 돌려줍니다', async () => {
+  const { supabase, notes, hash } = setup();
+  const result = await restoreOne({ supabase, userId: B, body: { id: 'b1', contentHash: hash, dryRun: true } });
+  assert.equal(result.status, 200);
+  assert.equal(result.json.restored, false);
+  assert.equal(result.json.dryRun, true);
+  assert.equal(result.json.verified, true);
+  assert.equal(result.json.backupVersion, hash);
+  assert.deepEqual(result.json.changed, ['title', 'content']);
+  assert.equal(notes.find(n => n.id === 'b1').content, '훼손됨');
+});
+
+test('dryRun이 boolean이 아니면 400 INVALID_BODY를 돌려줍니다', async () => {
+  const { supabase, hash } = setup();
+  for (const badDryRun of ['true', 'false', 1, 0, null, {}]) {
+    const result = await restoreOne({ supabase, userId: B, body: { id: 'b1', contentHash: hash, dryRun: badDryRun } });
+    assert.equal(result.status, 400);
+    assert.equal(result.json.error, 'INVALID_BODY');
+  }
+});
+
+test('쓰기 뒤 다시 읽을 때 제목이 사본과 다르면 복원 전 상태로 되돌리고 409를 돌려줍니다', async () => {
+  const { notes, hash } = setup();
+  let writeOccurred = false;
+  const backups = [
+    { id: 'b1', owner_id: B, title: 'B 원본', content: '가상 메모 본문', content_hash: hash },
+  ];
+  const fakeSupabase = {
+    from(name) {
+      if (name === 'notes_backup') {
+        return {
+          select() {
+            return { eq: () => ({ maybeSingle: async () => ({ data: backups[0], error: null }) }) };
+          },
+        };
+      }
+      return {
+        select() {
+          return {
+            eq: () => ({
+              maybeSingle: async () => {
+                if (!writeOccurred) {
+                  const found = notes.find(n => n.id === 'b1');
+                  return { data: found ? { ...found } : null, error: null };
+                }
+                return { data: { id: 'b1', owner_id: B, title: '변조된 제목', content: '가상 메모 본문' }, error: null };
+              },
+            }),
+          };
+        },
+        update(values) {
+          writeOccurred = true;
+          const target = notes.find(n => n.id === 'b1');
+          if (target) Object.assign(target, values);
+          const q = { eq: () => q, select: () => q, maybeSingle: async () => ({ data: { id: 'b1' }, error: null }) };
+          return q;
+        },
+      };
+    },
+  };
+
+  const result = await restoreOne({ supabase: fakeSupabase, userId: B, body: { id: 'b1', contentHash: hash } });
+  assert.equal(result.status, 409);
+  assert.equal(result.json.error, 'RESTORE_MISMATCH');
+  assert.equal(notes.find(n => n.id === 'b1').content, '훼손됨');
+});
+
+
+

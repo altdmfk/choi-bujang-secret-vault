@@ -11,7 +11,7 @@ import { createLoginVerifier } from '../src/verify-login.mjs';
 const ID_PATTERN = /^(?:[a-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const ALLOWED_KEYS = new Set([
-  'id', 'contentHash', 'content_hash', 'owner_id',
+  'id', 'contentHash', 'content_hash', 'owner_id', 'dryRun',
 ]);
 
 let loginVerifier = null;
@@ -54,6 +54,17 @@ async function loadVerifiedBackup(supabase, rawId, userId, clientHash) {
   return { backup, hash };
 }
 
+// 복원 뒤 검증이 실패하면 쓰기 전 상태로 되돌립니다. 새로 넣은 행이었으면 지웁니다.
+async function rollbackRestore(supabase, rawId, userId, existing) {
+  const result = existing
+    ? await supabase.from('notes')
+        .update({ title: existing.title, content: existing.content, owner_id: existing.owner_id })
+        .eq('id', rawId).eq('owner_id', userId)
+    : await supabase.from('notes')
+        .delete().eq('id', rawId).eq('owner_id', userId);
+  return !result.error;
+}
+
 // 순수 로직: 검증된 사용자 번호와 요청 본문만 받아 한 건만 복원합니다.
 export async function restoreOne({ supabase, userId, body }) {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
@@ -61,6 +72,9 @@ export async function restoreOne({ supabase, userId, body }) {
   }
   if (Object.keys(body).some(key => !ALLOWED_KEYS.has(key))) {
     return reply(400, 'INVALID_BODY', '허용되지 않은 항목이 포함되어 있습니다.');
+  }
+  if ('dryRun' in body && typeof body.dryRun !== 'boolean') {
+    return reply(400, 'INVALID_BODY', 'dryRun은 true 또는 false여야 합니다.');
   }
 
   // 본문의 소유자는 신뢰하지 않습니다. 있더라도 검증된 사용자와 같아야 합니다.
@@ -96,6 +110,9 @@ export async function restoreOne({ supabase, userId, body }) {
     return reply(403, 'RESTORE_REFUSED', '이 메모는 복원할 수 없습니다.');
   }
 
+  // 복원 실패 시 되돌릴 원래 상태 스냅샷을 보존합니다.
+  const previousSnapshot = existing ? { id: existing.id, title: existing.title, content: existing.content, owner_id: existing.owner_id } : null;
+
   // 3-1. 쓰기 직전에 검증한 사본을 다시 읽어 같은 사본인지 재검증합니다. 달라졌으면 쓰지 않고 멈춥니다.
   const second = await loadVerifiedBackup(supabase, rawId, userId, clientHash);
   if (second.stop) return second.stop;
@@ -109,6 +126,17 @@ export async function restoreOne({ supabase, userId, body }) {
   const changed = [];
   if (!existing || existing.title !== backup.title) changed.push('title');
   if (!existing || sha256Hex(existing.content) !== actualHash) changed.push('content');
+
+  // 실행 전에 버전과 바뀔 항목만 확인하는 미리보기 요청이면 쓰지 않고 멈춥니다.
+  if (body.dryRun === true) {
+    return {
+      status: 200,
+      json: {
+        restored: false, dryRun: true, verified: true,
+        id: rawId, backupVersion: actualHash, changed,
+      },
+    };
+  }
 
   // 4. 재검증한 그 한 건만 복원하고 다른 메모와 감사 기록은 건드리지 않습니다.
   const write = existing
@@ -127,16 +155,23 @@ export async function restoreOne({ supabase, userId, body }) {
     .eq('id', rawId)
     .maybeSingle();
   if (checkError || !restoredRow) {
-    return reply(500, 'RESTORE_CHECK_FAILED', '복원된 메모 확인에 실패했습니다.');
+    const undone = await rollbackRestore(supabase, rawId, userId, previousSnapshot);
+    return reply(500, 'RESTORE_CHECK_FAILED',
+      undone ? '복원된 메모를 확인하지 못해 복원 전 상태로 되돌렸습니다.'
+             : '복원된 메모를 확인하지 못했고 되돌리기도 실패했습니다. 직접 확인이 필요합니다.');
   }
 
   const restoredHash = sha256Hex(restoredRow.content);
   if (
     restoredRow.id !== backup.id ||
     restoredRow.owner_id !== userId ||
+    restoredRow.title !== backup.title ||
     restoredHash !== actualHash
   ) {
-    return reply(409, 'RESTORE_MISMATCH', '되돌린 한 건의 ID·소유자·내용 해시가 사본과 일치하지 않습니다.');
+    const undone = await rollbackRestore(supabase, rawId, userId, previousSnapshot);
+    return reply(409, 'RESTORE_MISMATCH',
+      undone ? '복원 결과가 사본과 달라 복원 전 상태로 되돌렸습니다.'
+             : '복원 결과가 사본과 다르고 되돌리기도 실패했습니다. 직접 확인이 필요합니다.');
   }
 
   return {
