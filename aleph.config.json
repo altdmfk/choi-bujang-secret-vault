@@ -17,8 +17,12 @@
     "PUT /api/notes/:id",
     "DELETE /api/notes/:id",
     "GET /notes/:id",
+    "PUT /notes/:id",
+    "DELETE /notes/:id",
     "GET /api/notices",
-    "GET /api/notices/:id"
+    "GET /api/notices/:id",
+    "GET /notices",
+    "GET /notices/:id"
   ],
   "originalApiUrl": "https://lklooocegqcqbhayaofm.supabase.co/rest/v1/notes",
   "restoreRoute": null,

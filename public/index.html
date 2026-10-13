@@ -78,17 +78,13 @@
       </div>
     </div>
 
-    <div class="notice">로그인 상태에 따라 메모를 추가·수정·삭제할 수 있습니다. 강사 공지는 읽기 전용 구역입니다.</div>
-
-    <div style="margin-top: 24px;">
-      <h2 style="font-size: 18px; color: #8ad8df; margin-bottom: 12px;">강사 공지 (구역: notices)</h2>
-      <ul id="notices" aria-live="polite"><li>강사 공지를 불러오는 중입니다.</li></ul>
+    <div class="notice">
+      <strong>강사 공지</strong>
+      <ul id="notices" aria-live="polite" style="margin-top: 12px;"><li>강사 공지를 불러오는 중입니다.</li></ul>
     </div>
 
-    <div style="margin-top: 28px;">
-      <h2 style="font-size: 18px; color: #8ad8df; margin-bottom: 12px;">내 메모 (구역: notes)</h2>
-      <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
-    </div>
+    <div class="notice">로그인 상태에 따라 메모를 추가·수정·삭제할 수 있습니다.</div>
+    <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
   <script type="module">
     const loggedOutView = document.querySelector('#loggedOutView');
@@ -99,8 +95,8 @@
     const passwordInput = document.querySelector('#passwordInput');
     const authError = document.querySelector('#authError');
     const logoutBtn = document.querySelector('#logoutBtn');
-    const list = document.querySelector('#notes');
     const noticesList = document.querySelector('#notices');
+    const list = document.querySelector('#notes');
 
     const noteForm = document.querySelector('#noteForm');
     const editingNoteId = document.querySelector('#editingNoteId');
@@ -135,23 +131,10 @@
 
     cancelEditBtn.addEventListener('click', resetEditor);
 
-    async function loadNotices(session) {
-      if (!session?.access_token) {
-        noticesList.replaceChildren();
-        const item = document.createElement('li');
-        item.textContent = '로그인 후 강사 공지를 확인할 수 있습니다.';
-        noticesList.replaceChildren(item);
-        return;
-      }
-
+    async function loadNotices() {
       try {
-        const response = await fetch('/api/notices', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          cache: 'no-store'
-        });
-        if (!response.ok) throw new Error('강사 공지 API를 읽을 수 없습니다.');
+        const response = await fetch('/api/notices', { cache: 'no-store' });
+        if (!response.ok) throw new Error('강사 공지를 불러올 수 없습니다.');
         const notices = await response.json();
         if (!Array.isArray(notices) || notices.length === 0) {
           const item = document.createElement('li');
@@ -162,13 +145,18 @@
 
         noticesList.replaceChildren(...notices.map(notice => {
           const item = document.createElement('li');
+          const resId = notice.resourceId || `notice:${notice.id}`;
+          item.dataset.resourceId = resId;
+
           const badge = document.createElement('div');
-          badge.style.cssText = 'font-size: 12px; color: #8ad8df; margin-bottom: 6px; font-weight: 600;';
-          badge.textContent = `[자원 ID: ${notice.resourceId || 'notice:' + notice.id}]`;
+          badge.style.fontSize = '12px';
+          badge.style.color = '#8ad8df';
+          badge.style.marginBottom = '4px';
+          badge.textContent = `[자원 ID: ${resId}]`;
 
           const title = document.createElement('strong');
-          title.textContent = notice.title;
           const content = document.createElement('span');
+          title.textContent = notice.title;
           content.textContent = notice.body || '';
 
           item.append(badge, title, content);
@@ -211,9 +199,14 @@
 
         list.replaceChildren(...notes.map(note => {
           const item = document.createElement('li');
+          const resId = note.resourceId || `note:${note.id}`;
+          item.dataset.resourceId = resId;
+
           const badge = document.createElement('div');
-          badge.style.cssText = 'font-size: 12px; color: #3ecf8e; margin-bottom: 6px; font-weight: 600;';
-          badge.textContent = `[자원 ID: ${note.resourceId || 'note:' + note.id}]`;
+          badge.style.fontSize = '12px';
+          badge.style.color = '#3ecf8e';
+          badge.style.marginBottom = '4px';
+          badge.textContent = `[자원 ID: ${resId}]`;
 
           const title = document.createElement('strong');
           const content = document.createElement('span');
@@ -227,10 +220,10 @@
           editBtn.className = 'btn btn-secondary btn-sm';
           editBtn.textContent = '수정';
           editBtn.addEventListener('click', () => {
-            editingNoteId.value = note.id;
+            editingNoteId.value = resId;
             noteTitleInput.value = note.title;
             noteBodyInput.value = note.body || '';
-            editorTitle.textContent = `메모 수정 (자원 ID: ${note.resourceId || 'note:' + note.id})`;
+            editorTitle.textContent = `메모 수정 (자원 ID: ${resId})`;
             cancelEditBtn.style.display = 'inline-block';
             noteTitleInput.focus();
           });
@@ -241,7 +234,7 @@
           deleteBtn.addEventListener('click', async () => {
             if (!confirm(`'${note.title}' 메모를 삭제하시겠습니까?`)) return;
             try {
-              const res = await fetch(`/api/notes/${note.id}`, {
+              const res = await fetch(`/api/notes/${encodeURIComponent(resId)}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
               });
@@ -274,7 +267,7 @@
       try {
         if (id) {
           // 수정: PUT /api/notes/:id
-          const res = await fetch(`/api/notes/${id}`, {
+          const res = await fetch(`/api/notes/${encodeURIComponent(id)}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -331,7 +324,6 @@
 
         updateAuthUI(session.user);
         await loadNotes(session);
-        await loadNotices(session);
       } catch (error) {
         authError.textContent = `로그인 실패: ${error.message}`;
         authError.style.display = 'block';
@@ -342,7 +334,6 @@
       sessionStorage.removeItem('auth_session');
       updateAuthUI(null);
       await loadNotes(null);
-      await loadNotices(null);
     });
 
     // 초기 세션 확인 (sessionStorage 사용)
@@ -352,8 +343,8 @@
     } catch {}
 
     updateAuthUI(savedSession?.user || null);
+    await loadNotices();
     await loadNotes(savedSession || null);
-    await loadNotices(savedSession || null);
   </script>
 </body>
 </html>
