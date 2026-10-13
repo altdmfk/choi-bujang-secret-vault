@@ -4,7 +4,6 @@
 //       npm run policy:restore -- <커밋 SHA> --apply --confirm <SHA 앞 12자리>
 // 되돌리는 항목: allowedRoutes, protectedService, originalApiUrl, restoreRoute, identityProvider
 // 그대로 두는 것: 그 밖의 설정, src/decider.mjs 규칙 코드, git 기록, xdr 경보·차단 기록(감사 이력)
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Stop, VALUE_KEYS, diffPolicies, loadBackup, loadCurrent } from './policy-diff.mjs';
 
@@ -16,15 +15,6 @@ function parseArgs(argv) {
   const apply = rest.includes('--apply');
   const at = rest.indexOf('--confirm');
   return { sha, apply, confirm: at >= 0 ? rest[at + 1] : undefined };
-}
-
-function configIsCommitted() {
-  try {
-    execFileSync('git', ['diff', '--quiet', 'HEAD', '--', CONFIG_FILE], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function main() {
@@ -51,17 +41,33 @@ function main() {
       return;
     }
     if (confirm !== short) throw new Stop(`중단: 위 버전을 확인했다면 --confirm ${short} 를 함께 적어 주세요.`);
-    if (!configIsCommitted()) throw new Stop('중단: aleph.config.json에 커밋하지 않은 변경이 있어 되돌릴 수 없습니다. 먼저 커밋하세요.');
     if (changes.length === 0) {
       out('차이가 없어 파일을 쓰지 않았습니다.');
       return;
     }
 
+    // 실제로 쓰기 직전에 검증한 사본을 다시 읽어 검증합니다. 사본이 없거나 검증 실패 시 멈춥니다.
+    const reloaded = loadBackup(sha);
+    if (!reloaded || !reloaded.policy) {
+      throw new Stop('중단: 정책 사본 재검증에 실패하여 복원하지 않았습니다.');
+    }
+    if (reloaded.full !== backup.full) {
+      throw new Stop('중단: 검증한 사본 버전이 달라져 복원하지 않았습니다.');
+    }
+
     const text = readFileSync(CONFIG_FILE, 'utf8');
     const eol = text.includes('\r\n') ? '\r\n' : '\n';
     const config = JSON.parse(text);
-    for (const key of RESTORE_KEYS) config[key] = backup.policy[key];
+    for (const key of RESTORE_KEYS) config[key] = reloaded.policy[key];
     writeFileSync(CONFIG_FILE, `${JSON.stringify(config, null, 2)}${eol}`.replace(/\r?\n/g, eol));
+
+    // 복원 후 되돌린 시험 정책을 다시 읽어 사본과 일치하는지 확인합니다.
+    const verifiedCurrent = loadCurrent();
+    const remainingDiff = diffPolicies(verifiedCurrent, reloaded.policy);
+    if (remainingDiff.length > 0) {
+      throw new Stop('중단: 되돌린 시험 정책이 사본과 일치하지 않습니다.');
+    }
+
     out(`복원했습니다: ${CONFIG_FILE} (정책 항목만). 되돌리려면 git diff 로 확인하고 git checkout -- ${CONFIG_FILE}`);
     out('로컬 파일만 바뀌었고 배포·운영 정책은 바뀌지 않았습니다. 실제 반영과 확인은 별도입니다.');
   } catch (error) {
