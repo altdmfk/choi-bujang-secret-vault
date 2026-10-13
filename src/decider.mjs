@@ -5,11 +5,19 @@ export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 
 
 const xdrBlocks = new Map();
 
-// 엔진 계약 픽스처(scripts/fixture-7.mjs)의 검증된 기본 주체·기기·메모 식별자
-const FIXTURE_SUBJECT_ID = 'learner_fixture';
-const FIXTURE_DEVICE_ID = 'aaaaaaaaaaaaaaaa';
-const FIXTURE_NOTE_ID = 'demo';
 const DEVICE_ID_PATTERN = /^[0-9a-f]{16}$/u;
+
+// aleph.config.json의 allowedRoutes 기준 (판정 대상이 아닌 POST /api/login 제외)
+const ALLOWED_ROUTES = new Set([
+  'GET /api/notes',
+  'POST /api/notes',
+  'GET /api/notes/:id',
+  'PUT /api/notes/:id',
+  'DELETE /api/notes/:id',
+  'GET /notes/:id',
+  'GET /api/notices',
+  'GET /api/notices/:id',
+]);
 
 // :id와 같은 깊이에 올 수 없는 기능 경로 키워드
 const FORBIDDEN_FUNCTION_PATHS = new Set([
@@ -18,7 +26,7 @@ const FORBIDDEN_FUNCTION_PATHS = new Set([
 ]);
 
 export function clearNoteOwnership() {
-  // 첫 요청자 자동 등록(vaultOwners) 방식을 제거했으므로 상태를 유지하지 않음
+  // 요청 간 상태(Map)를 저장하지 않는 무상태(stateless) 판정기이므로 초기화할 내부 상태 없음
 }
 
 /**
@@ -107,7 +115,7 @@ export function parseResourcePath(rawPath, service) {
     }
   }
 
-  return { serviceName, resourceId };
+  return { serviceName, resourceId, hasApiPrefix: offset === 1 };
 }
 
 /**
@@ -267,39 +275,31 @@ export async function decide(request) {
     };
   }
 
-  // route 파싱 및 request.method와 route 첫 토큰(메서드) 일치 검증
+  // 1) route가 aleph.config.json의 allowedRoutes(POST /api/login 제외)에 정확히 존재하는지 검증
   const rawRoute = typeof request?.route === 'string' ? request.route.trim() : '';
-  let routeMethod = null;
-  let routePathPattern = null;
+  const routeTokens = rawRoute ? rawRoute.split(/\s+/u) : [];
+  if (routeTokens.length !== 2 || !ALLOWED_ROUTES.has(rawRoute)) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
 
-  if (rawRoute) {
-    const routeTokens = rawRoute.split(/\s+/u);
-    if (routeTokens.length === 2) {
-      routeMethod = routeTokens[0].toUpperCase();
-      routePathPattern = routeTokens[1];
-    } else if (routeTokens.length === 1 && rawRoute.startsWith('/')) {
-      routePathPattern = routeTokens[0];
-    } else {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: safeRequestId,
-        decision: 'deny',
-        reasonCode: 'zone_violation',
-        ruleIds: ['zone_rule'],
-      };
-    }
+  // 2) request.method와 route 첫 토큰(메서드) 엄격 일치 검증
+  const routeMethod = routeTokens[0].toUpperCase();
+  const routePathPattern = routeTokens[1];
 
-    // route의 첫 토큰(routeMethod)이 GET이 아닌데 request.method와 다르거나, 서로 다른 수정 메서드인 경우 거부
-    // (단, normal 픽스처의 기본 route 'GET /notes/:id'를 유지한 채 method만 PUT/DELETE로 바꾼 본인 메모 요청은 허용)
-    if (routeMethod && routeMethod !== method && routeMethod !== 'GET') {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: safeRequestId,
-        decision: 'deny',
-        reasonCode: 'zone_violation',
-        ruleIds: ['zone_rule'],
-      };
-    }
+  if (routeMethod !== method) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
   }
 
   // 디코딩 및 대소문자 정규화 후 공지(notices) 대상 여부 판별
@@ -310,7 +310,7 @@ export async function decide(request) {
   if (
     (request?.service !== undefined && !decodedService.ok)
     || !decodedPath.ok
-    || (rawRoute && !decodedRoute.ok)
+    || !decodedRoute.ok
   ) {
     return {
       schema: 'aleph.decision.v1',
@@ -328,8 +328,8 @@ export async function decide(request) {
     || /(?:^|\/|\s)notices?(?:\/|$|\s|:)/iu.test(decodedRoute.value)
   );
 
-  // 공지 대상인데 GET이 아닌 모든 메서드(PUT, POST, DELETE, PATCH, HEAD, OPTIONS 등)는 즉시 거부
-  if (isNoticeTarget && (method !== 'GET' || (routeMethod && routeMethod !== 'GET'))) {
+  // 공지 대상인데 GET이 아닌 모든 메서드는 즉시 거부
+  if (isNoticeTarget && (method !== 'GET' || routeMethod !== 'GET')) {
     return {
       schema: 'aleph.decision.v1',
       requestId: safeRequestId,
@@ -351,7 +351,7 @@ export async function decide(request) {
     };
   }
 
-  const { serviceName, resourceId } = parsed;
+  const { serviceName, resourceId, hasApiPrefix } = parsed;
 
   if (serviceName !== 'notes' && serviceName !== 'notices') {
     return {
@@ -363,29 +363,15 @@ export async function decide(request) {
     };
   }
 
-  // route 경로 패턴이 있는 경우 정규화 후 서비스 구역 일치 확인
-  if (routePathPattern) {
-    const parsedRoute = parseResourcePath(routePathPattern);
-    if (!parsedRoute || parsedRoute.invalid || parsedRoute.serviceName !== serviceName) {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: safeRequestId,
-        decision: 'deny',
-        reasonCode: 'zone_violation',
-        ruleIds: ['zone_rule'],
-      };
-    }
-  }
-
-  // 등록 기기 ID 검증 (엔진이 확인한 등록 기기와 일치할 때만 허용)
-  const expectedDeviceId = typeof request?.registeredDeviceId === 'string'
-    ? request.registeredDeviceId
-    : FIXTURE_DEVICE_ID;
-
+  // 3) request.path가 route 패턴과 구조가 정확히 같은지 검사 (/api 접두사 여부 포함, :id 자리는 한 세그먼트)
+  const parsedRoute = parseResourcePath(routePathPattern, request?.service);
   if (
-    typeof request.deviceId !== 'string'
-    || !DEVICE_ID_PATTERN.test(request.deviceId)
-    || request.deviceId !== expectedDeviceId
+    !parsedRoute
+    || parsedRoute.invalid
+    || parsedRoute.serviceName !== serviceName
+    || Boolean(parsedRoute.hasApiPrefix) !== Boolean(hasApiPrefix)
+    || Boolean(parsedRoute.resourceId) !== Boolean(resourceId)
+    || (parsedRoute.resourceId && !parsedRoute.resourceId.startsWith(':') && parsedRoute.resourceId !== resourceId)
   ) {
     return {
       schema: 'aleph.decision.v1',
@@ -396,7 +382,23 @@ export async function decide(request) {
     };
   }
 
-  // A. 강사 공지 구역 ('notices'): 일반 학생은 GET만 허용, 그 외 모든 메서드 거부
+  // 기기 ID 및 주체 ID 형식 검증
+  if (
+    typeof request.deviceId !== 'string'
+    || !DEVICE_ID_PATTERN.test(request.deviceId)
+    || typeof request.subjectId !== 'string'
+    || !request.subjectId.trim()
+  ) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: safeRequestId,
+      decision: 'deny',
+      reasonCode: 'zone_violation',
+      ruleIds: ['zone_rule'],
+    };
+  }
+
+  // 5) 강사 공지 구역 ('notices'): GET 경로만 allow, 나머지 deny
   if (serviceName === 'notices') {
     if (method !== 'GET') {
       return {
@@ -417,57 +419,9 @@ export async function decide(request) {
     };
   }
 
-  // B. 메모 구역 ('notes'): 자기 등록 없이 엔진이 확인한 소유자·기기·경로와 일치할 때만 허용
+  // 4) 메모 구역 ('notes'): allowedRoutes에 있고 구조·메서드가 일치하면 allow
   if (serviceName === 'notes') {
-    if (!resourceId) {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: safeRequestId,
-        decision: 'deny',
-        reasonCode: 'zone_violation',
-        ruleIds: ['zone_rule'],
-      };
-    }
-
-    // 자료 소유자 필드 확인 (명시적 소유자 필드가 있으면 그 필드와만 비교, 없으면 엔진 픽스처 소유자·메모와 비교)
-    const hasExplicitOwnerField = (
-      Object.prototype.hasOwnProperty.call(request, 'ownerId')
-      || Object.prototype.hasOwnProperty.call(request, 'noteOwnerId')
-      || Object.prototype.hasOwnProperty.call(request, 'resourceOwnerId')
-      || (request.resource !== null && typeof request.resource === 'object'
-          && Object.prototype.hasOwnProperty.call(request.resource, 'ownerId'))
-    );
-
-    if (hasExplicitOwnerField) {
-      const explicitOwner = request.ownerId
-        ?? request.noteOwnerId
-        ?? request.resourceOwnerId
-        ?? request.resource?.ownerId;
-
-      if (typeof explicitOwner !== 'string' || !explicitOwner.trim() || explicitOwner !== request.subjectId) {
-        return {
-          schema: 'aleph.decision.v1',
-          requestId: safeRequestId,
-          decision: 'deny',
-          reasonCode: 'zone_violation',
-          ruleIds: ['zone_rule'],
-        };
-      }
-    } else {
-      // 명시적 소유자 필드가 없는 표준 18개 필드 요청: 검증된 픽스처 소유자(learner_fixture)와 본인 메모(demo)만 허용
-      if (request.subjectId !== FIXTURE_SUBJECT_ID || resourceId !== FIXTURE_NOTE_ID) {
-        return {
-          schema: 'aleph.decision.v1',
-          requestId: safeRequestId,
-          decision: 'deny',
-          reasonCode: 'zone_violation',
-          ruleIds: ['zone_rule'],
-        };
-      }
-    }
-
-    // 본인 소유 메모에 대한 허용 메서드: GET(조회), PUT/POST/PATCH(수정), DELETE(삭제)
-    const allowedMethods = ['GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
+    const allowedMethods = ['GET', 'PUT', 'POST', 'DELETE'];
     if (!allowedMethods.includes(method)) {
       return {
         schema: 'aleph.decision.v1',
