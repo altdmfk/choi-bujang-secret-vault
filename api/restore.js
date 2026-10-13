@@ -10,7 +10,9 @@ import { createLoginVerifier } from '../src/verify-login.mjs';
 
 const ID_PATTERN = /^(?:[a-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
-const ALLOWED_KEYS = new Set(['id', 'resourceId', 'noteId', 'contentHash', 'content_hash', 'owner_id', 'ownerId']);
+const ALLOWED_KEYS = new Set([
+  'id', 'contentHash', 'content_hash', 'owner_id',
+]);
 
 let loginVerifier = null;
 
@@ -36,7 +38,7 @@ async function loadVerifiedBackup(supabase, rawId, userId, clientHash) {
     return { stop: reply(403, 'RESTORE_REFUSED', '이 메모는 복원할 수 없습니다.') };
   }
 
-  // 사본의 content_hash가 없거나 형식이 틀리거나 내용이 없으면 검증할 수 없으므로 멈춥니다.
+  // 사본 자체의 내용 해시와 사본에 기록된 content_hash가 일치하는지 검증합니다.
   const backupHash = typeof backup.content_hash === 'string' ? backup.content_hash.trim().toLowerCase() : '';
   if (!backupHash || !HASH_PATTERN.test(backupHash) || typeof backup.content !== 'string') {
     return { stop: reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 올바르지 않아 복원하지 않았습니다.') };
@@ -45,7 +47,8 @@ async function loadVerifiedBackup(supabase, rawId, userId, clientHash) {
   if (hash !== backupHash) {
     return { stop: reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 일치하지 않아 복원하지 않았습니다.') };
   }
-  if (clientHash && clientHash.trim().toLowerCase() !== hash) {
+  // 요청 본문의 내용 해시와 사본의 실제 내용 해시를 대조합니다.
+  if (clientHash.trim().toLowerCase() !== hash) {
     return { stop: reply(409, 'HASH_MISMATCH', '사본의 내용 해시가 요청과 일치하지 않아 복원하지 않았습니다.') };
   }
   return { backup, hash };
@@ -61,23 +64,21 @@ export async function restoreOne({ supabase, userId, body }) {
   }
 
   // 본문의 소유자는 신뢰하지 않습니다. 있더라도 검증된 사용자와 같아야 합니다.
-  const reqOwner = body.owner_id ?? body.ownerId;
+  const reqOwner = body.owner_id ?? body.ownerId ?? body.user_id ?? body.userId;
   if (reqOwner !== undefined && reqOwner !== userId) {
     return reply(403, 'FORBIDDEN_NOT_OWNER', '다른 사용자의 메모는 복원할 수 없습니다.');
   }
 
-  const rawInput = body.id ?? body.resourceId ?? body.noteId;
+  const rawInput = body.id ?? body.resourceId ?? body.noteId ?? body.note_id;
   const rawId = typeof rawInput === 'string' ? rawInput.trim().replace(/^notes?:/iu, '') : '';
   if (!rawId || /^notices?[:_-]/iu.test(rawId) || !ID_PATTERN.test(rawId)) {
     return reply(400, 'INVALID_RESOURCE_ID', '유효한 메모 ID 한 건이 필요합니다.');
   }
 
-  // 클라이언트가 내용 해시를 제공한 경우 형식 검증 (선택 항목)
+  // 클라이언트가 제공한 내용 해시 형식 검증 (필수)
   const clientHash = body.contentHash ?? body.content_hash;
-  if (clientHash !== undefined && clientHash !== null) {
-    if (typeof clientHash !== 'string' || !HASH_PATTERN.test(clientHash)) {
-      return reply(400, 'INVALID_CONTENT_HASH', '내용 해시(sha256 16진수 64자리)가 필요합니다.');
-    }
+  if (!clientHash || typeof clientHash !== 'string' || !HASH_PATTERN.test(clientHash.trim().toLowerCase())) {
+    return reply(400, 'INVALID_CONTENT_HASH', '내용 해시(sha256 16진수 64자리)가 필요합니다.');
   }
 
   // 1~2. 사본(notes_backup)을 읽고 소유자·ID·내용 해시를 검증합니다. 실패하면 아무것도 쓰지 않고 멈춥니다.
@@ -87,7 +88,7 @@ export async function restoreOne({ supabase, userId, body }) {
   // 3. 현재 메모 테이블의 상태를 확인합니다. 타인 소유의 메모가 이미 있다면 건드리지 않고 멈춥니다.
   const { data: existing, error: existingError } = await supabase
     .from('notes')
-    .select('id, owner_id')
+    .select('id, owner_id, title, content')
     .eq('id', rawId)
     .maybeSingle();
   if (existingError) return reply(500, 'DATABASE_QUERY_FAILED', '현재 메모 조회에 실패했습니다.');
@@ -139,10 +140,8 @@ export async function restoreOne({ supabase, userId, body }) {
       restored: true,
       id: rawId,
       resourceId: `note:${rawId}`,
-      owner_id: userId,
       ownerMatched: true,
       contentHash: actualHash,
-      content_hash: actualHash,
     },
   };
 }

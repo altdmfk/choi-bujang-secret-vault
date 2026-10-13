@@ -103,35 +103,41 @@ test('해시가 다르거나 사본이 변조되었으면 거부되고 아무것
   assert.equal(notes.some(n => n.id === 'b3'), false);
 });
 
-test('B가 내용 해시 없이 ID만 보내도 사본을 다시 읽어 무결성을 검증하고 정상 복원합니다', async () => {
-  const { supabase, notes, hash } = setup();
-  const result = await restoreOne({ supabase, userId: B, body: { id: 'b1' } });
-  assert.equal(result.status, 200);
-  assert.equal(result.json.restored, true);
-  assert.equal(result.json.contentHash, hash);
-  assert.equal(notes.find(n => n.id === 'b1').content, '가상 메모 본문');
-});
-
-test('해시 없이 요청해도 사본이 변조되었으면 검증 실패로 거부되고 아무것도 쓰지 않습니다', async () => {
-  const { supabase, notes } = setup();
-  const result = await restoreOne({ supabase, userId: B, body: { id: 'b3' } });
-  assert.equal(result.status, 409);
-  assert.equal(notes.some(n => n.id === 'b3'), false);
-});
-
-test('사본에 content_hash가 누락되어 검증할 수 없는 사본은 거부되고 복원하지 않습니다', async () => {
-  const { supabase, notes } = setup();
-  const result = await restoreOne({ supabase, userId: B, body: { id: 'b4' } });
-  assert.equal(result.status, 409);
-  assert.equal(notes.some(n => n.id === 'b4'), false);
-});
-
 test('형식이 틀린 요청은 거부됩니다', async () => {
   const { supabase } = setup();
   const hash = sha256Hex('x');
-  for (const body of [null, [], {}, { id: '' }, { contentHash: hash }, { id: 'b1', contentHash: 'abc' },
-    { id: 'notice:1' }, { id: '../x' }, { id: 'b1', role: 'teacher' }]) {
+  for (const body of [null, [], {}, { id: '' }, { id: 'b1' }, { contentHash: hash }, { id: 'b1', contentHash: 'abc' },
+    { id: 'notice:1', contentHash: hash }, { id: '../x', contentHash: hash }, { id: 'b1', contentHash: hash, role: 'teacher' }]) {
     const result = await restoreOne({ supabase, userId: B, body });
     assert.equal(result.status, 400);
   }
+});
+
+test('수정·삭제 직전 사본은 마지막으로 바뀌기 직전 상태로 갱신되고 타인 사본은 건드리지 않습니다', async () => {
+  const { saveBackup } = await import('../src/backup.mjs');
+  const rows = [{ id: 'x1', owner_id: B, title: '처음', content: '처음 본문', content_hash: sha256Hex('처음 본문') }];
+  const fake = {
+    from() {
+      return {
+        select() {
+          const f = [];
+          const q = { eq(k, v) { f.push([k, v]); return q; }, maybeSingle: async () => ({ data: rows.find(r => f.every(([k, v]) => r[k] === v)) ?? null, error: null }) };
+          return q;
+        },
+        insert: async v => { rows.push({ ...v }); return { error: null }; },
+        update(v) {
+          const f = [];
+          const q = { eq(k, val) { f.push([k, val]); return q; }, then: res => { rows.filter(r => f.every(([k, val]) => r[k] === val)).forEach(r => Object.assign(r, v)); res({ error: null }); } };
+          return q;
+        },
+      };
+    },
+  };
+  await saveBackup(fake, { id: 'x1', owner_id: B, title: '수정 직전', content: '수정 직전 본문' });
+  assert.equal(rows[0].content, '수정 직전 본문');
+  assert.equal(rows[0].content_hash, sha256Hex('수정 직전 본문'));
+  await saveBackup(fake, { id: 'x1', owner_id: A, title: '타인', content: '타인 본문' });
+  assert.equal(rows[0].content, '수정 직전 본문');
+  await saveBackup(fake, { id: 'x2', owner_id: B, title: '새 메모', content: '새 본문' });
+  assert.equal(rows.length, 2);
 });
