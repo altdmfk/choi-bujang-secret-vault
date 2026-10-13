@@ -41,10 +41,21 @@ const INSTRUCTOR_NOTICES = [
   },
 ];
 
+function extractAuthToken(request) {
+  const auth = request.headers.authorization;
+  if (auth) return auth;
+  const cookieHeader = request.headers.cookie;
+  if (cookieHeader) {
+    const match = /(?:^|;\s*)sb_token=([^;]+)/.exec(cookieHeader);
+    if (match) return `Bearer ${match[1]}`;
+  }
+  return null;
+}
+
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
-  const authorization = request.headers.authorization;
+  const authorization = extractAuthToken(request);
   if (!authorization) {
     return response.status(401).json({
       error: 'UNAUTHORIZED',

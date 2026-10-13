@@ -35,8 +35,11 @@ export default async function handler(request, response) {
       return response.status(401).json({ error: error.message });
     }
 
+    const token = data.session.access_token;
+    response.setHeader('Set-Cookie', `sb_token=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
+
     return response.status(200).json({
-      access_token: data.session.access_token,
+      access_token: token,
       user: {
         id: data.user.id,
         email: data.user.email,

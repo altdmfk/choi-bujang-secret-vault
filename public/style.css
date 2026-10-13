@@ -1,0 +1,34 @@
+﻿:root { color-scheme: dark; font-family: system-ui, sans-serif; }
+body { margin: 0; min-height: 100vh; background: #101a28; color: #ecf4ff; }
+main { max-width: 760px; margin: 0 auto; padding: 44px 22px 64px; }
+.eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.2; }
+p { font-size: 17px; line-height: 1.7; color: #bfd0e5; }
+.offline-banner { display: none; padding: 14px 18px; margin-bottom: 22px; background: #4a191e; border: 1px solid #d07384; border-radius: 12px; color: #ffe3e8; font-size: 14px; line-height: 1.6; }
+.device-status-card { margin: 20px 0; padding: 18px 20px; border: 1px solid #3d5675; border-radius: 14px; background: #132235; }
+.device-status-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.device-status-header h2 { margin: 0; font-size: 18px; }
+.device-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #253e5b; color: #8ad8df; }
+.device-badge.pwa { background: #1e453e; color: #3ecf8e; }
+.device-caution { margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: #1c2a3d; border-left: 3px solid #e5a54b; color: #e2c199; font-size: 13px; line-height: 1.6; }
+.notice { margin: 26px 0; padding: 18px; border: 1px solid #3d5675; border-radius: 14px; color: #dfeaff; background: #1a2a3d; }
+ul { list-style: none; display: grid; gap: 12px; padding: 0; }
+li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
+strong { display: block; font-size: 18px; margin-bottom: 5px; }
+li span { color: #bfd0e5; }
+.auth-box { margin: 24px 0; padding: 20px; border: 1px solid #3d5675; border-radius: 14px; background: #132235; }
+.auth-box h2 { margin: 0 0 14px; font-size: 18px; }
+.form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.form-group input, .form-group textarea { padding: 10px 14px; border-radius: 8px; border: 1px solid #51667c; background: #1a2a3d; color: #ecf4ff; font-size: 15px; }
+.form-group textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+.btn-row { display: flex; gap: 10px; }
+.btn { padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; font-size: 14px; }
+.btn-primary { background: #3ecf8e; color: #101a28; }
+.btn-secondary { background: #51667c; color: #ecf4ff; }
+.btn-danger { background: #d07384; color: #ffe3e8; }
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+.auth-error { margin-top: 10px; color: #ff8b9e; font-size: 14px; display: none; }
+.user-info { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.action-row { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
+.editor-section { margin: 20px 0; padding: 18px; border: 1px solid #3ecf8e55; border-radius: 12px; background: #15293d; }
+.editor-section h3 { margin: 0 0 12px; font-size: 16px; color: #8ad8df; }
