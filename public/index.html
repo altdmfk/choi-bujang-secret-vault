@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BYTE BACK | 자료실</title>
+  <meta name="theme-color" content="#101a28">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
     body { margin: 0; min-height: 100vh; background: #101a28; color: #ecf4ff; }
@@ -11,6 +14,13 @@
     .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
     h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.2; }
     p { font-size: 17px; line-height: 1.7; color: #bfd0e5; }
+    .offline-banner { display: none; padding: 14px 18px; margin-bottom: 22px; background: #4a191e; border: 1px solid #d07384; border-radius: 12px; color: #ffe3e8; font-size: 14px; line-height: 1.6; }
+    .device-status-card { margin: 20px 0; padding: 18px 20px; border: 1px solid #3d5675; border-radius: 14px; background: #132235; }
+    .device-status-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .device-status-header h2 { margin: 0; font-size: 18px; }
+    .device-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #253e5b; color: #8ad8df; }
+    .device-badge.pwa { background: #1e453e; color: #3ecf8e; }
+    .device-caution { margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: #1c2a3d; border-left: 3px solid #e5a54b; color: #e2c199; font-size: 13px; line-height: 1.6; }
     .notice { margin: 26px 0; padding: 18px; border: 1px solid #3d5675; border-radius: 14px; color: #dfeaff; background: #1a2a3d; }
     ul { list-style: none; display: grid; gap: 12px; padding: 0; }
     li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
@@ -36,9 +46,30 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 3단계 신원 확인</div>
-    <h1>자료실</h1>
-    <p>지금은 Supabase Auth 기반 사용자 로그인이 연동된 상태입니다.</p>
+    <div id="offlineBanner" class="offline-banner" role="alert">
+      <strong>⚠️ 오프라인 안내:</strong> 현재 인터넷 연결이 끊어졌습니다. 오프라인 상태에서는 실시간 보안 정책 및 서버 ZTNA 기기 인증을 수행할 수 없어 자료 조회가 제한됩니다.
+    </div>
+
+    <div class="eyebrow">BYTE BACK · 11단계 나만의 접속 앱</div>
+    <h1>BYTE BACK 자료실</h1>
+    <p>설치형 웹앱(PWA) 메타데이터와 오프라인 안내 및 기기 승인 상태가 구성된 자료실입니다.</p>
+
+    <div class="device-status-card" id="deviceStatusSection">
+      <div class="device-status-header">
+        <h2>기기 승인 상태</h2>
+        <span id="pwaStatusBadge" class="device-badge">접속 방식: 브라우저</span>
+      </div>
+      <p style="margin: 6px 0; font-size: 14px; color: #dfeaff;">
+        현재 환경: <strong id="appDisplayMode" style="display:inline; font-size: 14px; color: #8ad8df;">웹 브라우저</strong> ·
+        네트워크: <strong id="networkStatusText" style="display:inline; font-size: 14px; color: #3ecf8e;">온라인</strong>
+      </p>
+      <div id="installAppRow" style="margin-top: 10px; display: none;">
+        <button type="button" class="btn btn-secondary btn-sm" id="installPwaBtn">📲 앱으로 설치</button>
+      </div>
+      <div class="device-caution">
+        <strong>※ 보안 안내:</strong> 설치형 웹앱(PWA) 바로가기나 앱 설치 표시만으로 기기 확인 및 승인이 끝난 것이 아닙니다. 실제 자료 접근 및 권한은 서버 ZTNA 판정기(<code>device_registered</code> 규칙)의 기기 등록부 및 서명 검증을 통과해야만 정상 승인됩니다.
+      </div>
+    </div>
     
     <div class="auth-box" id="authSection">
       <div id="loggedOutView">
@@ -61,30 +92,51 @@
           <button type="button" class="btn btn-secondary" id="logoutBtn">로그아웃</button>
         </div>
 
-        <div class="editor-section">
-          <h3 id="editorTitle">새 가상 메모 추가</h3>
-          <form id="noteForm">
-            <input type="hidden" id="editingNoteId" value="" />
-            <div class="form-group">
-              <input type="text" id="noteTitleInput" placeholder="메모 제목" required />
-              <textarea id="noteBodyInput" placeholder="메모 내용"></textarea>
-            </div>
-            <div class="btn-row">
-              <button type="submit" class="btn btn-primary" id="saveNoteBtn">저장</button>
-              <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display: none;">취소</button>
-            </div>
-          </form>
+        <!-- 기기 승인 요청 및 결과 표시 섹션 -->
+        <div class="device-status-card" id="deviceApprovalSection" style="border-color: #e5a54b; margin: 16px 0;">
+          <div class="device-status-header">
+            <h2 style="font-size: 16px; color: #f6c878;">기기 승인 확인</h2>
+            <span id="deviceServerStatusBadge" class="device-badge" style="background: #4a341b; color: #f6c878;">미승인 기기</span>
+          </div>
+          <p id="deviceStatusDesc" style="font-size: 14px; margin: 8px 0 12px; color: #dfeaff;">
+            현재 기기는 서버에 등록되지 않았습니다. 서버가 이 기기를 등록 기기로 확인하기 전에는 보호 자료실이 차단됩니다.
+          </p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-primary btn-sm" id="requestApprovalBtn">기기 승인 요청</button>
+          </div>
+          <div id="approvalResultBox" style="margin-top: 12px; padding: 12px; border-radius: 8px; background: #1a2a3d; border: 1px solid #3d5675; font-size: 13px; line-height: 1.5; display: none;">
+            <strong id="approvalResultTitle" style="font-size: 13px; margin-bottom: 4px; display: block;">승인 결과</strong>
+            <span id="approvalResultText" style="color: #bfd0e5;"></span>
+          </div>
+        </div>
+
+        <!-- 서버 등록 기기 확인 후 열리는 보호 자료실 영역 -->
+        <div id="vaultContent" style="display: none;">
+          <div class="editor-section" id="editorSection">
+            <h3 id="editorTitle">새 가상 메모 추가</h3>
+            <form id="noteForm">
+              <input type="hidden" id="editingNoteId" value="" />
+              <div class="form-group">
+                <input type="text" id="noteTitleInput" placeholder="메모 제목" required />
+                <textarea id="noteBodyInput" placeholder="메모 내용"></textarea>
+              </div>
+              <div class="btn-row">
+                <button type="submit" class="btn btn-primary" id="saveNoteBtn">저장</button>
+                <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display: none;">취소</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="notice">
+            <strong>강사 공지</strong>
+            <ul id="notices" aria-live="polite" style="margin-top: 12px;"><li>강사 공지를 불러오는 중입니다.</li></ul>
+          </div>
+
+          <div class="notice">로그인 상태에 따라 메모를 추가·수정·삭제할 수 있습니다.</div>
+          <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
         </div>
       </div>
     </div>
-
-    <div class="notice">
-      <strong>강사 공지</strong>
-      <ul id="notices" aria-live="polite" style="margin-top: 12px;"><li>강사 공지를 불러오는 중입니다.</li></ul>
-    </div>
-
-    <div class="notice">로그인 상태에 따라 메모를 추가·수정·삭제할 수 있습니다.</div>
-    <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
   <script type="module">
     const loggedOutView = document.querySelector('#loggedOutView');
@@ -97,6 +149,15 @@
     const logoutBtn = document.querySelector('#logoutBtn');
     const noticesList = document.querySelector('#notices');
     const list = document.querySelector('#notes');
+
+    const deviceApprovalSection = document.querySelector('#deviceApprovalSection');
+    const deviceServerStatusBadge = document.querySelector('#deviceServerStatusBadge');
+    const deviceStatusDesc = document.querySelector('#deviceStatusDesc');
+    const requestApprovalBtn = document.querySelector('#requestApprovalBtn');
+    const approvalResultBox = document.querySelector('#approvalResultBox');
+    const approvalResultTitle = document.querySelector('#approvalResultTitle');
+    const approvalResultText = document.querySelector('#approvalResultText');
+    const vaultContent = document.querySelector('#vaultContent');
 
     const noteForm = document.querySelector('#noteForm');
     const editingNoteId = document.querySelector('#editingNoteId');
@@ -117,7 +178,86 @@
         loggedOutView.style.display = 'block';
         loggedInView.style.display = 'none';
         userEmailSpan.textContent = '';
+        if (deviceApprovalSection) deviceApprovalSection.style.display = 'none';
+        if (vaultContent) vaultContent.style.display = 'none';
+        noticesList.replaceChildren();
+        list.replaceChildren();
         resetEditor();
+      }
+    }
+
+    function showApprovedVault(data) {
+      if (deviceApprovalSection) deviceApprovalSection.style.display = 'block';
+      if (deviceServerStatusBadge) {
+        deviceServerStatusBadge.textContent = '✅ 등록 기기 승인됨';
+        deviceServerStatusBadge.style.background = '#1e453e';
+        deviceServerStatusBadge.style.color = '#3ecf8e';
+      }
+      if (deviceStatusDesc) {
+        deviceStatusDesc.textContent = `서버 확인 완료: ${data.message || '등록 기기 승인됨'} (기기 ID: ${data.deviceId || '확인됨'})`;
+      }
+      if (requestApprovalBtn) requestApprovalBtn.style.display = 'none';
+      if (approvalResultBox) approvalResultBox.style.display = 'block';
+      if (approvalResultTitle) {
+        approvalResultTitle.textContent = '✅ 서버 등록 기기 확인 완료';
+        approvalResultTitle.style.color = '#3ecf8e';
+      }
+      if (approvalResultText) {
+        approvalResultText.textContent = `서버 ZTNA 정책에 따라 이 기기의 자료실 접근이 정상 승인되었습니다. (기기 ID: ${data.deviceId})`;
+      }
+      if (vaultContent) vaultContent.style.display = 'block';
+    }
+
+    function showUnapprovedDevice(data) {
+      if (deviceApprovalSection) deviceApprovalSection.style.display = 'block';
+      if (deviceServerStatusBadge) {
+        deviceServerStatusBadge.textContent = '⚠️ 미승인 기기';
+        deviceServerStatusBadge.style.background = '#4a341b';
+        deviceServerStatusBadge.style.color = '#f6c878';
+      }
+      if (deviceStatusDesc) {
+        deviceStatusDesc.textContent = data.message || '현재 기기는 서버에 등록되지 않았습니다. 보호 자료실이 차단되어 있습니다.';
+      }
+      if (requestApprovalBtn) {
+        requestApprovalBtn.style.display = 'inline-block';
+        requestApprovalBtn.disabled = false;
+        requestApprovalBtn.textContent = '기기 승인 요청';
+      }
+      if (vaultContent) vaultContent.style.display = 'none';
+      noticesList.replaceChildren();
+      list.replaceChildren();
+    }
+
+    async function checkDeviceApproval(session) {
+      if (!session?.access_token) {
+        if (deviceApprovalSection) deviceApprovalSection.style.display = 'none';
+        if (vaultContent) vaultContent.style.display = 'none';
+        return false;
+      }
+
+      try {
+        const res = await fetch('/api/device', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          cache: 'no-store'
+        });
+
+        if (!res.ok) {
+          throw new Error('서버 기기 상태 조회 실패 (' + res.status + ')');
+        }
+
+        const data = await res.json();
+        if (data.registered && data.status === 'approved') {
+          showApprovedVault(data);
+          return true;
+        } else {
+          showUnapprovedDevice(data);
+          return false;
+        }
+      } catch (err) {
+        showUnapprovedDevice({ message: `기기 확인 중 오류: ${err.message}` });
+        return false;
       }
     }
 
@@ -336,19 +476,72 @@
         sessionStorage.setItem('auth_session', JSON.stringify(session));
 
         updateAuthUI(session.user);
-        await loadNotices(session);
-        await loadNotes(session);
+        currentSession = session;
+
+        // 로그인 직후 서버에 등록 기기 승인 상태 확인 (승인 전에는 보호 자료 로드 차단)
+        const isApproved = await checkDeviceApproval(session);
+        if (isApproved) {
+          await loadNotices(session);
+          await loadNotes(session);
+        }
       } catch (error) {
         authError.textContent = `로그인 실패: ${error.message}`;
         authError.style.display = 'block';
       }
     });
 
+    // 기기 승인 요청 버튼 이벤트 (클라이언트 자체 승인이 아닌 서버 POST 요청으로 확인)
+    requestApprovalBtn?.addEventListener('click', async () => {
+      if (!currentSession?.access_token) return;
+
+      requestApprovalBtn.disabled = true;
+      requestApprovalBtn.textContent = '서버 승인 확인 중...';
+      approvalResultBox.style.display = 'block';
+      approvalResultTitle.textContent = '기기 승인 처리 중';
+      approvalResultTitle.style.color = '#f6c878';
+      approvalResultText.textContent = '서버에 기기 승인을 요청하고 등록 기기 여부를 확인하는 중입니다...';
+
+      try {
+        const res = await fetch('/api/device', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.access_token}`,
+          },
+          body: JSON.stringify({ action: 'request_approval' }),
+          cache: 'no-store',
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.registered || data.status !== 'approved') {
+          throw new Error(data.message || data.reason || '서버가 이 기기의 승인을 거부했습니다.');
+        }
+
+        // 서버가 등록 기기로 확인한 뒤에만 기존 자료실 오픈 및 자료 로드
+        showApprovedVault(data);
+        await loadNotices(currentSession);
+        await loadNotes(currentSession);
+      } catch (err) {
+        if (approvalResultTitle) {
+          approvalResultTitle.textContent = '❌ 기기 승인 거부';
+          approvalResultTitle.style.color = '#ff8b9e';
+        }
+        if (approvalResultText) {
+          approvalResultText.textContent = err.message;
+        }
+        if (vaultContent) vaultContent.style.display = 'none';
+        noticesList.replaceChildren();
+        list.replaceChildren();
+      } finally {
+        requestApprovalBtn.disabled = false;
+        requestApprovalBtn.textContent = '기기 승인 요청';
+      }
+    });
+
     logoutBtn.addEventListener('click', async () => {
       sessionStorage.removeItem('auth_session');
+      currentSession = null;
       updateAuthUI(null);
-      await loadNotices(null);
-      await loadNotes(null);
     });
 
     // 초기 세션 확인 (sessionStorage 사용)
@@ -358,8 +551,75 @@
     } catch {}
 
     updateAuthUI(savedSession?.user || null);
-    await loadNotices(savedSession || null);
-    await loadNotes(savedSession || null);
+    currentSession = savedSession || null;
+    if (savedSession) {
+      const isApproved = await checkDeviceApproval(savedSession);
+      if (isApproved) {
+        await loadNotices(savedSession);
+        await loadNotes(savedSession);
+      }
+    }
+
+    // 네트워크 상태(온라인/오프라인) 및 오프라인 배너 연동
+    const offlineBanner = document.querySelector('#offlineBanner');
+    const networkStatusText = document.querySelector('#networkStatusText');
+    const appDisplayMode = document.querySelector('#appDisplayMode');
+    const pwaStatusBadge = document.querySelector('#pwaStatusBadge');
+    const installAppRow = document.querySelector('#installAppRow');
+    const installPwaBtn = document.querySelector('#installPwaBtn');
+
+    function updateNetworkStatus() {
+      const isOnline = navigator.onLine;
+      if (isOnline) {
+        offlineBanner.style.display = 'none';
+        if (networkStatusText) {
+          networkStatusText.textContent = '온라인';
+          networkStatusText.style.color = '#3ecf8e';
+        }
+      } else {
+        offlineBanner.style.display = 'block';
+        if (networkStatusText) {
+          networkStatusText.textContent = '오프라인';
+          networkStatusText.style.color = '#ff8b9e';
+        }
+      }
+    }
+
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    updateNetworkStatus();
+
+    // 웹앱 실행 환경(PWA Standalone 여부) 확인
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) {
+      if (appDisplayMode) appDisplayMode.textContent = '설치형 웹앱 (Standalone)';
+      if (pwaStatusBadge) {
+        pwaStatusBadge.textContent = '접속 방식: PWA 웹앱';
+        pwaStatusBadge.className = 'device-badge pwa';
+      }
+    } else {
+      if (appDisplayMode) appDisplayMode.textContent = '웹 브라우저';
+      if (pwaStatusBadge) {
+        pwaStatusBadge.textContent = '접속 방식: 브라우저';
+        pwaStatusBadge.className = 'device-badge';
+      }
+    }
+
+    // PWA 설치 프롬프트 연동
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installAppRow) installAppRow.style.display = 'block';
+    });
+
+    installPwaBtn?.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (installAppRow) installAppRow.style.display = 'none';
+    });
   </script>
 </body>
 </html>
