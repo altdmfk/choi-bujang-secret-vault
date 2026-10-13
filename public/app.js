@@ -55,21 +55,21 @@ let auditRecords = [
     attackId: 'cross_subject_note_read',
     category: '타인 메모 조회',
     target: 'GET /api/notes/other_note_1',
-    expected: '타인 소유 메모 요청 시 401 또는 403 거부',
-    observed: '타인 메모 요청에서 HTTP 401로 정상 차단됨',
-    status: 'verified',
-    statusText: '확인됨 (HTTP 401 차단)',
-    badgeClass: 'badge-success'
+    expected: '로그인 및 타인 메모 식별자 필요 점검 (미실행)',
+    observed: 'not_run',
+    status: 'unexecuted',
+    statusText: '미실행 (not_run)',
+    badgeClass: 'badge-warn'
   },
   {
     attackId: 'unapproved_device_read',
     category: '미인증 기기 상태 조회',
     target: 'GET /api/device',
-    expected: '비인증 상태에서 /api/device 요청 시 401 거부',
-    observed: '비인증 기기 요청이 401 Unauthorized로 정상 차단됨',
-    status: 'verified',
-    statusText: '확인됨 (HTTP 401 차단)',
-    badgeClass: 'badge-success'
+    expected: '로그인 신원 및 미승인 기기 토큰 필요 점검 (미실행)',
+    observed: 'not_run',
+    status: 'unexecuted',
+    statusText: '미실행 (not_run)',
+    badgeClass: 'badge-warn'
   },
   {
     attackId: 'query_parameter_forbidden',
@@ -85,7 +85,7 @@ let auditRecords = [
     attackId: 'anonymous_restore',
     category: '복원 쓰기 점검',
     target: 'POST /api/restore',
-    expected: '비로그인 상태에서 POST /api/restore 요청 시 401 거부',
+    expected: '비로그인 상태에서 복원 쓰기 요청 (격리 환경 미실행)',
     observed: 'not_run',
     status: 'unexecuted',
     statusText: '미실행 (not_run)',
@@ -145,9 +145,10 @@ function updateWarRoomAudit(apiStatusUpdate = null) {
   }
 }
 
-// 화면 로드 시 브라우저에서 실제 API 응답을 실측하여 auditRecords 갱신
+// 화면 로드 시 브라우저에서 확인 대상 2건(GET)만 실제 fetch로 시험하고, 미실행 3건은 전송하지 않음
 async function verifyLiveAuditRecords() {
   try {
+    // 1) anonymous_api_read (GET /api/notes)
     const res1 = await fetch('/api/notes', { cache: 'no-store' });
     const blocked1 = res1.status === 401;
     const rec1 = auditRecords.find(r => r.attackId === 'anonymous_api_read');
@@ -158,26 +159,25 @@ async function verifyLiveAuditRecords() {
       rec1.badgeClass = blocked1 ? 'badge-success' : 'badge-warn';
     }
 
-    const res2 = await fetch('/api/notes/other_note_1', { cache: 'no-store' });
-    const blocked2 = res2.status === 401 || res2.status === 403 || res2.status === 404;
+    // 2) cross_subject_note_read - 미실행 (fetch 미전송)
     const rec2 = auditRecords.find(r => r.attackId === 'cross_subject_note_read');
     if (rec2) {
-      rec2.status = blocked2 ? 'verified' : 'unexecuted';
-      rec2.observed = blocked2 ? `타인 메모 요청에서 HTTP ${res2.status}로 정상 차단됨` : `타인 메모 요청이 차단되지 않음 (HTTP ${res2.status})`;
-      rec2.statusText = blocked2 ? `확인됨 (HTTP ${res2.status} 차단)` : `실패 (HTTP ${res2.status})`;
-      rec2.badgeClass = blocked2 ? 'badge-success' : 'badge-warn';
+      rec2.status = 'unexecuted';
+      rec2.observed = 'not_run';
+      rec2.statusText = '미실행 (not_run)';
+      rec2.badgeClass = 'badge-warn';
     }
 
-    const res3 = await fetch('/api/device', { cache: 'no-store' });
-    const blocked3 = res3.status === 401;
+    // 3) unapproved_device_read - 미실행 (fetch 미전송)
     const rec3 = auditRecords.find(r => r.attackId === 'unapproved_device_read');
     if (rec3) {
-      rec3.status = blocked3 ? 'verified' : 'unexecuted';
-      rec3.observed = blocked3 ? '비인증 기기 요청이 401 Unauthorized로 정상 차단됨' : `기기 요청이 차단되지 않음 (HTTP ${res3.status})`;
-      rec3.statusText = blocked3 ? '확인됨 (HTTP 401 차단)' : `실패 (HTTP ${res3.status})`;
-      rec3.badgeClass = blocked3 ? 'badge-success' : 'badge-warn';
+      rec3.status = 'unexecuted';
+      rec3.observed = 'not_run';
+      rec3.statusText = '미실행 (not_run)';
+      rec3.badgeClass = 'badge-warn';
     }
 
+    // 4) query_parameter_forbidden (GET /api/notes?select=*)
     const res4 = await fetch('/api/notes?select=*', { cache: 'no-store' });
     const blocked4 = res4.status === 401 || res4.status === 403;
     const rec4 = auditRecords.find(r => r.attackId === 'query_parameter_forbidden');
@@ -188,7 +188,7 @@ async function verifyLiveAuditRecords() {
       rec4.badgeClass = blocked4 ? 'badge-success' : 'badge-warn';
     }
 
-    // 5. anonymous_restore는 쓰기 요청이므로 실제 요청을 보내지 않고 not_run 유지
+    // 5) anonymous_restore - 미실행 (fetch 미전송)
     const rec5 = auditRecords.find(r => r.attackId === 'anonymous_restore');
     if (rec5) {
       rec5.status = 'unexecuted';
