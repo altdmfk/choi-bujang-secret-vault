@@ -36,21 +36,31 @@ export async function runAttackChecks(config) {
   }
 
   // 1) 무인증 조회 (GET) - 실제 시험 가능
+  const anonReqId = `req-anon-${Date.now().toString(36)}`;
   const anonNotes = await fetch(new URL('/api/notes', app), {
+    headers: {
+      'x-attack-id': 'anonymous_api_read',
+      'x-request-id': anonReqId
+    },
     redirect: 'error', signal: AbortSignal.timeout(10000),
   });
-  const anonBlocked = anonNotes.status === 401;
+  const anonRequestId = anonNotes.headers.get('x-request-id') || anonReqId;
 
   // 2) 쿼리 파라미터 금지 조회 (GET) - 실제 시험 가능
+  const queryReqId = `req-query-${Date.now().toString(36)}`;
   const queryRes = await fetch(new URL('/api/notes?select=*', app), {
+    headers: {
+      'x-attack-id': 'query_parameter_forbidden',
+      'x-request-id': queryReqId
+    },
     redirect: 'error', signal: AbortSignal.timeout(10000),
   });
-  const queryBlocked = queryRes.status === 401 || queryRes.status === 403;
+  const queryRequestId = queryRes.headers.get('x-request-id') || queryReqId;
 
   return [{
     attackId: 'anonymous_api_read',
     expected: '비로그인 상태에서 /api/notes 요청 시 401 거부',
-    observed: anonBlocked ? '비로그인 요청에서 401 Unauthorized로 정상 차단됨' : `비로그인 요청이 차단되지 않음 (HTTP ${anonNotes.status})`
+    observed: `HTTP ${anonNotes.status} (${anonRequestId})`
   }, {
     attackId: 'cross_subject_note_read',
     expected: '로그인 및 타인 메모 식별자 필요 점검 (미실행)',
@@ -62,7 +72,7 @@ export async function runAttackChecks(config) {
   }, {
     attackId: 'query_parameter_forbidden',
     expected: '쿼리 파라미터 포함 요청 시 401 또는 403 거부',
-    observed: queryBlocked ? `쿼리 파라미터 요청이 HTTP ${queryRes.status}로 정상 차단됨` : `쿼리 요청이 차단되지 않음 (HTTP ${queryRes.status})`
+    observed: `HTTP ${queryRes.status} (${queryRequestId})`
   }, {
     attackId: 'anonymous_restore',
     expected: '비로그인 상태에서 복원 쓰기 요청 (격리 환경 미실행)',

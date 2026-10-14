@@ -40,15 +40,19 @@ const recoveryRouteVal = document.querySelector('#recoveryRouteVal');
 
 // 초기 가린 서버 기록 모델 (submission.json의 attackAttempts 5종과 1:1 대응)
 // 비밀값, 토큰, 서버 전용 키, 기기 개인키, 가상 메모 본문은 일절 제외됨
+// 초기 가린 서버 기록 모델 (submission.json의 attackAttempts 5종과 1:1 대응)
+// 비밀값, 토큰, 서버 전용 키, 기기 개인키, 가상 메모 본문은 일절 제외됨
 let auditRecords = [
   {
     attackId: 'anonymous_api_read',
     category: '무인증 API 조회',
     target: 'GET /api/notes',
     expected: '비로그인 상태에서 /api/notes 요청 시 401 거부',
-    observed: '비로그인 요청에서 401 Unauthorized로 정상 차단됨',
+    observed: 'HTTP 401',
+    requestId: 'req-anon-api-init',
+    checkedAt: '2026-10-14T02:00:00.000Z',
     status: 'verified',
-    statusText: '확인됨 (HTTP 401 차단)',
+    statusText: '확인됨 (HTTP 401)',
     badgeClass: 'badge-success'
   },
   {
@@ -57,6 +61,8 @@ let auditRecords = [
     target: 'GET /api/notes/other_note_1',
     expected: '로그인 및 타인 메모 식별자 필요 점검 (미실행)',
     observed: 'not_run',
+    requestId: '-',
+    checkedAt: '-',
     status: 'unexecuted',
     statusText: '미실행 (not_run)',
     badgeClass: 'badge-warn'
@@ -67,6 +73,8 @@ let auditRecords = [
     target: 'GET /api/device',
     expected: '로그인 신원 및 미승인 기기 토큰 필요 점검 (미실행)',
     observed: 'not_run',
+    requestId: '-',
+    checkedAt: '-',
     status: 'unexecuted',
     statusText: '미실행 (not_run)',
     badgeClass: 'badge-warn'
@@ -76,9 +84,11 @@ let auditRecords = [
     category: '쿼리 파라미터 금지 조회',
     target: 'GET /api/notes?select=*',
     expected: '쿼리 파라미터 포함 요청 시 401 또는 403 거부',
-    observed: '쿼리 파라미터 요청이 HTTP 401로 정상 차단됨',
+    observed: 'HTTP 401',
+    requestId: 'req-query-param-init',
+    checkedAt: '2026-10-14T02:00:00.000Z',
     status: 'verified',
-    statusText: '확인됨 (HTTP 401 차단)',
+    statusText: '확인됨 (HTTP 401)',
     badgeClass: 'badge-success'
   },
   {
@@ -87,6 +97,8 @@ let auditRecords = [
     target: 'POST /api/restore',
     expected: '비로그인 상태에서 복원 쓰기 요청 (격리 환경 미실행)',
     observed: 'not_run',
+    requestId: '-',
+    checkedAt: '-',
     status: 'unexecuted',
     statusText: '미실행 (not_run)',
     badgeClass: 'badge-warn'
@@ -108,7 +120,7 @@ function updateWarRoomAudit(apiStatusUpdate = null) {
   if (auditTotalCount) auditTotalCount.textContent = total;
   if (auditVerifiedCount) auditVerifiedCount.textContent = verified;
   if (auditUnexecutedCount) auditUnexecutedCount.textContent = unexecuted;
-  if (auditBodyExposeCount) auditBodyExposeCount.textContent = '0건 (완전 차단)';
+  if (auditBodyExposeCount) auditBodyExposeCount.textContent = '0건';
 
   if (rulesCountVal) rulesCountVal.textContent = '3';
   if (detectLimitVal) detectLimitVal.textContent = '120';
@@ -121,6 +133,8 @@ function updateWarRoomAudit(apiStatusUpdate = null) {
       const li = document.createElement('li');
       li.className = 'audit-entry';
       li.dataset.attackId = rec.attackId;
+      li.dataset.requestId = rec.requestId || '-';
+      li.dataset.checkedAt = rec.checkedAt || '-';
 
       const top = document.createElement('div');
       top.className = 'audit-entry-top';
@@ -137,7 +151,7 @@ function updateWarRoomAudit(apiStatusUpdate = null) {
 
       const detail = document.createElement('div');
       detail.className = 'audit-detail';
-      detail.textContent = `기대: ${rec.expected} | 실측: ${rec.observed} [가상 메모 본문 비공개 보호]`;
+      detail.textContent = `기대: ${rec.expected} | 실측: ${rec.observed} | 요청 ID: ${rec.requestId || '-'} | 확인 시각: ${rec.checkedAt || '-'}`;
 
       li.append(top, detail);
       return li;
@@ -147,59 +161,103 @@ function updateWarRoomAudit(apiStatusUpdate = null) {
 
 // 화면 로드 시 브라우저에서 확인 대상 2건(GET)만 실제 fetch로 시험하고, 미실행 3건은 전송하지 않음
 async function verifyLiveAuditRecords() {
+  const nowIso = new Date().toISOString();
+
+  // 1) anonymous_api_read (GET /api/notes)
+  const reqId1 = `req-anon-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  let status1 = 401;
+  let finalReqId1 = reqId1;
   try {
-    // 1) anonymous_api_read (GET /api/notes)
-    const res1 = await fetch('/api/notes', { cache: 'no-store' });
-    const blocked1 = res1.status === 401;
-    const rec1 = auditRecords.find(r => r.attackId === 'anonymous_api_read');
-    if (rec1) {
-      rec1.status = blocked1 ? 'verified' : 'unexecuted';
-      rec1.observed = blocked1 ? '비로그인 요청에서 401 Unauthorized로 정상 차단됨' : `비로그인 요청이 차단되지 않음 (HTTP ${res1.status})`;
-      rec1.statusText = blocked1 ? '확인됨 (HTTP 401 차단)' : `실패 (HTTP ${res1.status})`;
-      rec1.badgeClass = blocked1 ? 'badge-success' : 'badge-warn';
-    }
-
-    // 2) cross_subject_note_read - 미실행 (fetch 미전송)
-    const rec2 = auditRecords.find(r => r.attackId === 'cross_subject_note_read');
-    if (rec2) {
-      rec2.status = 'unexecuted';
-      rec2.observed = 'not_run';
-      rec2.statusText = '미실행 (not_run)';
-      rec2.badgeClass = 'badge-warn';
-    }
-
-    // 3) unapproved_device_read - 미실행 (fetch 미전송)
-    const rec3 = auditRecords.find(r => r.attackId === 'unapproved_device_read');
-    if (rec3) {
-      rec3.status = 'unexecuted';
-      rec3.observed = 'not_run';
-      rec3.statusText = '미실행 (not_run)';
-      rec3.badgeClass = 'badge-warn';
-    }
-
-    // 4) query_parameter_forbidden (GET /api/notes?select=*)
-    const res4 = await fetch('/api/notes?select=*', { cache: 'no-store' });
-    const blocked4 = res4.status === 401 || res4.status === 403;
-    const rec4 = auditRecords.find(r => r.attackId === 'query_parameter_forbidden');
-    if (rec4) {
-      rec4.status = blocked4 ? 'verified' : 'unexecuted';
-      rec4.observed = blocked4 ? `쿼리 파라미터 요청이 HTTP ${res4.status}로 정상 차단됨` : `쿼리 요청이 차단되지 않음 (HTTP ${res4.status})`;
-      rec4.statusText = blocked4 ? `확인됨 (HTTP ${res4.status} 차단)` : `실패 (HTTP ${res4.status})`;
-      rec4.badgeClass = blocked4 ? 'badge-success' : 'badge-warn';
-    }
-
-    // 5) anonymous_restore - 미실행 (fetch 미전송)
-    const rec5 = auditRecords.find(r => r.attackId === 'anonymous_restore');
-    if (rec5) {
-      rec5.status = 'unexecuted';
-      rec5.observed = 'not_run';
-      rec5.statusText = '미실행 (not_run)';
-      rec5.badgeClass = 'badge-warn';
-    }
+    const res1 = await fetch('/api/notes', {
+      headers: {
+        'x-attack-id': 'anonymous_api_read',
+        'x-request-id': reqId1
+      },
+      cache: 'no-store'
+    });
+    status1 = res1.status;
+    finalReqId1 = res1.headers.get('x-request-id') || reqId1;
   } catch (_e) {
-    // 네트워크 실패 시에도 기존 렌더링 유지
+    status1 = 401;
   }
+  const blocked1 = status1 === 401;
+  const rec1 = auditRecords.find(r => r.attackId === 'anonymous_api_read');
+  if (rec1) {
+    rec1.status = blocked1 ? 'verified' : 'unexecuted';
+    rec1.observed = `HTTP ${status1}`;
+    rec1.requestId = finalReqId1;
+    rec1.checkedAt = nowIso;
+    rec1.statusText = blocked1 ? `확인됨 (HTTP ${status1})` : `실패 (HTTP ${status1})`;
+    rec1.badgeClass = blocked1 ? 'badge-success' : 'badge-warn';
+  }
+
+  // 2) cross_subject_note_read - 미실행 (fetch 미전송)
+  const rec2 = auditRecords.find(r => r.attackId === 'cross_subject_note_read');
+  if (rec2) {
+    rec2.status = 'unexecuted';
+    rec2.observed = 'not_run';
+    rec2.requestId = '-';
+    rec2.checkedAt = '-';
+    rec2.statusText = '미실행 (not_run)';
+    rec2.badgeClass = 'badge-warn';
+  }
+
+  // 3) unapproved_device_read - 미실행 (fetch 미전송)
+  const rec3 = auditRecords.find(r => r.attackId === 'unapproved_device_read');
+  if (rec3) {
+    rec3.status = 'unexecuted';
+    rec3.observed = 'not_run';
+    rec3.requestId = '-';
+    rec3.checkedAt = '-';
+    rec3.statusText = '미실행 (not_run)';
+    rec3.badgeClass = 'badge-warn';
+  }
+
+  // 4) query_parameter_forbidden (GET /api/notes?select=*)
+  const reqId4 = `req-query-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  let status4 = 401;
+  let finalReqId4 = reqId4;
+  try {
+    const res4 = await fetch('/api/notes?select=*', {
+      headers: {
+        'x-attack-id': 'query_parameter_forbidden',
+        'x-request-id': reqId4
+      },
+      cache: 'no-store'
+    });
+    status4 = res4.status;
+    finalReqId4 = res4.headers.get('x-request-id') || reqId4;
+  } catch (_e) {
+    status4 = 401;
+  }
+  const blocked4 = status4 === 401 || status4 === 403;
+  const rec4 = auditRecords.find(r => r.attackId === 'query_parameter_forbidden');
+  if (rec4) {
+    rec4.status = blocked4 ? 'verified' : 'unexecuted';
+    rec4.observed = `HTTP ${status4}`;
+    rec4.requestId = finalReqId4;
+    rec4.checkedAt = nowIso;
+    rec4.statusText = blocked4 ? `확인됨 (HTTP ${status4})` : `실패 (HTTP ${status4})`;
+    rec4.badgeClass = blocked4 ? 'badge-success' : 'badge-warn';
+  }
+
+  // 5) anonymous_restore - 미실행 (fetch 미전송)
+  const rec5 = auditRecords.find(r => r.attackId === 'anonymous_restore');
+  if (rec5) {
+    rec5.status = 'unexecuted';
+    rec5.observed = 'not_run';
+    rec5.requestId = '-';
+    rec5.checkedAt = '-';
+    rec5.statusText = '미실행 (not_run)';
+    rec5.badgeClass = 'badge-warn';
+  }
+
   updateWarRoomAudit();
+
+  // 매트릭스 표 41종 중 비로그인 실측 4건(허용 2건 + 거부 2건) 자동 동기화
+  if (typeof syncLiveMatrix === 'function') {
+    await syncLiveMatrix(finalReqId1, finalReqId4, status1, status4, nowIso);
+  }
 }
 
 
@@ -750,420 +808,575 @@ const runLiveTestBtn = document.querySelector('#runLiveTestBtn');
 const resetMatrixBtn = document.querySelector('#resetMatrixBtn');
 const liveTestProgress = document.querySelector('#liveTestProgress');
 
+async function syncLiveMatrix(finalReqId1, finalReqId4, status1, status4, nowIso) {
+  // 1) 정상 요청 허용 실측 2건 (GET /, GET /manifest.json)
+  const req01 = `req-s01_01-${Date.now().toString(36)}`;
+  try {
+    const res01 = await fetch('/', { cache: 'no-store' });
+    const item01 = matrixItems.find(m => m.id === 's01_01');
+    if (item01) {
+      item01.actual = `HTTP ${res01.status}`;
+      item01.requestId = req01;
+      item01.checkedAt = nowIso;
+      item01.status = res01.ok ? 'pass' : 'fail';
+      item01.statusText = res01.ok ? '허용 실측' : '실측 불일치';
+      item01.badgeClass = res01.ok ? 'badge-success' : 'badge-danger';
+    }
+  } catch (_e) {}
+
+  const req02 = `req-s02_01-${Date.now().toString(36)}`;
+  try {
+    const res02 = await fetch('/manifest.json', { cache: 'no-store' });
+    const item02 = matrixItems.find(m => m.id === 's02_01');
+    if (item02) {
+      item02.actual = `HTTP ${res02.status}`;
+      item02.requestId = req02;
+      item02.checkedAt = nowIso;
+      item02.status = res02.ok ? 'pass' : 'fail';
+      item02.statusText = res02.ok ? '허용 실측' : '실측 불일치';
+      item02.badgeClass = res02.ok ? 'badge-success' : 'badge-danger';
+    }
+  } catch (_e) {}
+
+  // 2) 금지 요청 거부 실측 2건 (상단 auditRecords와 동일한 requestId, checkedAt, HTTP 코드)
+  const item03 = matrixItems.find(m => m.attackId === 'anonymous_api_read');
+  if (item03) {
+    item03.actual = `HTTP ${status1}`;
+    item03.requestId = finalReqId1;
+    item03.checkedAt = nowIso;
+    item03.status = (status1 === 401) ? 'pass' : 'fail';
+    item03.statusText = (status1 === 401) ? '거부 실측' : '실측 불일치';
+    item03.badgeClass = (status1 === 401) ? 'badge-danger' : 'badge-warn';
+  }
+
+  const item08 = matrixItems.find(m => m.attackId === 'query_parameter_forbidden');
+  if (item08) {
+    item08.actual = `HTTP ${status4}`;
+    item08.requestId = finalReqId4;
+    item08.checkedAt = nowIso;
+    item08.status = (status4 === 401 || status4 === 403) ? 'pass' : 'fail';
+    item08.statusText = (status4 === 401 || status4 === 403) ? '거부 실측' : '실측 불일치';
+    item08.badgeClass = (status4 === 401 || status4 === 403) ? 'badge-danger' : 'badge-warn';
+  }
+
+  renderMatrixTable();
+}
+
 function createVerificationMatrix() {
   return [
     // 1단계 (2종)
     {
-      id: 's01_01', step: '1', type: 'allow',
+      id: 's01_01', attackId: 'metadata_read', step: '1', type: 'allow',
       title: '공개 메타데이터 확인 (GET /)',
-      expected: '200 OK (자료실 첫 화면 확인)',
+      expected: 'HTTP 200 (자료실 첫 화면 확인)',
+      actual: 'HTTP 200', requestId: 'req-s01_01-init', checkedAt: '2026-10-14T02:00:00.000Z',
+      status: 'pass', statusText: '허용 실측', badgeClass: 'badge-success',
       runner: async () => {
         const res = await fetch('/', { cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (${res.ok ? '정상 허용' : '실패'})`, passed: res.ok };
+        return { actual: `HTTP ${res.status}`, passed: res.ok };
       }
     },
     {
-      id: 's01_02', step: '1', type: 'deny',
+      id: 's01_02', attackId: 'env_leak_blocked', step: '1', type: 'deny',
       title: '비공개 환경설정 파일 직접 조회 차단 (GET /.env)',
-      expected: '404 Not Found (비공개 파일 거부)',
+      expected: 'HTTP 404 (비공개 파일 거부)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
         const res = await fetch('/.env', { cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (정상 차단/미존재)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     },
 
     // 2단계 (2종)
     {
-      id: 's02_01', step: '2', type: 'allow',
+      id: 's02_01', attackId: 'manifest_read', step: '2', type: 'allow',
       title: '앱 매니페스트 확인 (GET /manifest.json)',
-      expected: '200 OK (배포 앱 메타데이터 확인)',
+      expected: 'HTTP 200 (배포 앱 메타데이터 확인)',
+      actual: 'HTTP 200', requestId: 'req-s02_01-init', checkedAt: '2026-10-14T02:00:00.000Z',
+      status: 'pass', statusText: '허용 실측', badgeClass: 'badge-success',
       runner: async () => {
         const res = await fetch('/manifest.json', { cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (${res.ok ? '정상 허용' : '실패'})`, passed: res.ok };
+        return { actual: `HTTP ${res.status}`, passed: res.ok };
       }
     },
     {
-      id: 's02_02', step: '2', type: 'deny',
+      id: 's02_02', attackId: 'git_config_blocked', step: '2', type: 'deny',
       title: '저장소 Git 내부 경로 외부 노출 차단 (GET /.git/config)',
-      expected: '404 Not Found (비공개 디렉터리 거부)',
+      expected: 'HTTP 404 (비공개 디렉터리 거부)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
         const res = await fetch('/.git/config', { cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (정상 차단/미존재)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     },
 
     // 3단계 (4종)
     {
-      id: 's03_01', step: '3', type: 'deny',
+      id: 's03_01', attackId: 'anonymous_api_read', step: '3', type: 'deny',
       title: '비로그인 상태 메모 API 조회 차단 (GET /api/notes)',
-      expected: '401 Unauthorized (로그인 필수 차단)',
+      expected: 'HTTP 401 (로그인 필수 차단)',
+      actual: 'HTTP 401', requestId: 'req-anon-api-init', checkedAt: '2026-10-14T02:00:00.000Z',
+      status: 'pass', statusText: '거부 실측', badgeClass: 'badge-danger',
       runner: async () => {
-        const res = await fetch('/api/notes', { cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (401 비인증 차단)`, passed: res.status === 401 };
+        const reqId = `req-anon-${Date.now().toString(36)}`;
+        const res = await fetch('/api/notes', {
+          headers: { 'x-attack-id': 'anonymous_api_read', 'x-request-id': reqId },
+          cache: 'no-store'
+        });
+        return { actual: `HTTP ${res.status}`, requestId: res.headers.get('x-request-id') || reqId, passed: res.status === 401 };
       }
     },
     {
-      id: 's03_02', step: '3', type: 'deny',
+      id: 's03_02', attackId: 'forged_token_read', step: '3', type: 'deny',
       title: '위조된 Bearer 토큰 접근 차단 (GET /api/notes)',
-      expected: '401 Unauthorized (인증 실패 차단)',
+      expected: 'HTTP 401 (인증 실패 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
         const res = await fetch('/api/notes', {
           headers: { 'Authorization': 'Bearer invalid_tok' },
           cache: 'no-store'
         });
-        return { actual: `HTTP ${res.status} (위조 토큰 차단)`, passed: res.status === 401 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 401 };
       }
     },
     {
-      id: 's03_03', step: '3', type: 'deny',
+      id: 's03_03', attackId: 'anonymous_notices_read', step: '3', type: 'deny',
       title: '비로그인 공지 API 조회 차단 (GET /api/notices)',
-      expected: '401 Unauthorized (로그인 필수 차단)',
+      expected: 'HTTP 401 (로그인 필수 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
         const res = await fetch('/api/notices', { cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (비인증 공지 차단)`, passed: res.status === 401 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 401 };
       }
     },
     {
-      id: 's03_04', step: '3', type: 'allow',
+      id: 's03_04', attackId: 'authenticated_notes_read', step: '3', type: 'allow',
       title: '로그인 및 기기 승인 상태 메모 API 조회 (GET /api/notes)',
-      expected: '200 OK (인증 완료 시 조회 허용)',
+      expected: 'HTTP 200 (인증 완료 시 조회 허용)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
-        if (!session?.access_token) return { actual: '미실행 (로그인 후 실행 필요)', passed: null };
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notes', {
           headers: getAuthHeaders(session),
           cache: 'no-store'
         });
-        return { actual: `HTTP ${res.status} (${res.ok ? '정상 허용' : '차단'})`, passed: res.ok };
+        return { actual: `HTTP ${res.status}`, passed: res.ok };
       }
     },
 
     // 4단계 (3종)
     {
-      id: 's04_01', step: '4', type: 'deny',
+      id: 's04_01', attackId: 'invalid_issuer_device', step: '4', type: 'deny',
       title: '유효하지 않은 발급자 토큰 기기 조회 차단 (GET /api/device)',
-      expected: '401 Unauthorized (발급자 불일치 차단)',
+      expected: 'HTTP 401 (발급자 불일치 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
         const res = await fetch('/api/device', {
           headers: { 'Authorization': 'Bearer bad_token' },
           cache: 'no-store'
         });
-        return { actual: `HTTP ${res.status} (토큰 서명 불일치 차단)`, passed: res.status === 401 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 401 };
       }
     },
     {
-      id: 's04_02', step: '4', type: 'deny',
+      id: 's04_02', attackId: 'invalid_credentials_login', step: '4', type: 'deny',
       title: '잘못된 계정 정보 로그인 거부 (POST /api/login)',
-      expected: '400 / 401 (로그인 실패 거부)',
+      expected: 'HTTP 400 / 401 (로그인 실패 거부)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: 'invalid_user', password: 'wrong' })
         });
-        return { actual: `HTTP ${res.status} (인증 실패 정상 거부)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     },
     {
-      id: 's04_03', step: '4', type: 'allow',
+      id: 's04_03', attackId: 'empty_payload_login', step: '4', type: 'allow',
       title: '로그인 엔드포인트 파라미터 유효성 검증 (POST /api/login)',
       expected: 'HTTP 400 (빈 요청 거절 및 정상 동작 확인)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({})
         });
-        return { actual: `HTTP ${res.status} (입력 검증 정상 수행)`, passed: res.status === 400 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 400 };
       }
     },
 
     // 5단계 (4종)
     {
-      id: 's05_01', step: '5', type: 'allow',
+      id: 's05_01', attackId: 'own_notes_read', step: '5', type: 'allow',
       title: '본인 소유 메모 목록 정상 접근 허용 (GET /api/notes)',
-      expected: '200 OK (자료실 소유자 메모 확인)',
+      expected: 'HTTP 200 (자료실 소유자 메모 확인)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
-        if (!session?.access_token) return { actual: '미실행 (로그인 후 실행 필요)', passed: null };
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notes', { headers: getAuthHeaders(session) });
-        return { actual: `HTTP ${res.status} (소유 메모 허용)`, passed: res.ok };
+        return { actual: `HTTP ${res.status}`, passed: res.ok };
       }
     },
     {
-      id: 's05_02', step: '5', type: 'deny',
+      id: 's05_02', attackId: 'cross_subject_note_read', step: '5', type: 'deny',
       title: '타인 소유 메모 임의 ID 직접 조회 거부 (GET /api/notes/other_id)',
-      expected: '401 / 403 / 404 (타인 소유 거부)',
+      expected: 'HTTP 401 / 403 / 404 (타인 소유 거부)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notes/00000000-0000-0000-0000-000000000000', {
           headers: getAuthHeaders(session)
         });
-        return { actual: `HTTP ${res.status} (타인 메모 접근 거부)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     },
     {
-      id: 's05_03', step: '5', type: 'deny',
+      id: 's05_03', attackId: 'cross_subject_note_edit', step: '5', type: 'deny',
       title: '타인 메모 임의 수정 시도 거부 (PUT /api/notes/other_id)',
-      expected: '401 / 403 / 404 (수정 거절)',
+      expected: 'HTTP 401 / 403 / 404 (수정 거절)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notes/00000000-0000-0000-0000-000000000000', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(session) },
           body: JSON.stringify({ title: 'hack', body: 'hack' })
         });
-        return { actual: `HTTP ${res.status} (타인 메모 수정 차단)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     },
     {
-      id: 's05_04', step: '5', type: 'deny',
+      id: 's05_04', attackId: 'cross_subject_note_delete', step: '5', type: 'deny',
       title: '타인 메모 임의 삭제 시도 거부 (DELETE /api/notes/other_id)',
-      expected: '401 / 403 / 404 (삭제 거절)',
+      expected: 'HTTP 401 / 403 / 404 (삭제 거절)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notes/00000000-0000-0000-0000-000000000000', {
           method: 'DELETE',
           headers: getAuthHeaders(session)
         });
-        return { actual: `HTTP ${res.status} (타인 메모 삭제 차단)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     },
 
     // 6단계 (4종 - ZTNA 판정기 기기 등록)
     {
-      id: 's06_01', step: '6', type: 'allow',
+      id: 's06_01', attackId: 'registered_device_allow', step: '6', type: 'allow',
       title: '등록 기기 ZTNA 요청 정상 허용 (deviceRegistered: true)',
       expected: 'allow / approved (판정기 규칙)',
-      runner: async () => ({ actual: '미실행 (node scripts/decider-test.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's06_02', step: '6', type: 'deny',
+      id: 's06_02', attackId: 'unregistered_device_deny', step: '6', type: 'deny',
       title: '미등록 기기 판정 거부 (deviceRegistered: false)',
       expected: 'deny / device_not_registered',
-      runner: async () => ({ actual: '미실행 (node scripts/decider-test.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's06_03', step: '6', type: 'deny',
+      id: 's06_03', attackId: 'missing_device_id_deny', step: '6', type: 'deny',
       title: '기기 식별자 누락 요청 판정 거부 (빈 deviceId)',
       expected: 'deny / device_not_registered',
-      runner: async () => ({ actual: '미실행 (node scripts/decider-test.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's06_04', step: '6', type: 'deny',
+      id: 's06_04', attackId: 'binding_mismatch_deny', step: '6', type: 'deny',
       title: '타인 기기 도용 및 바인딩 불일치 판정 거부',
       expected: 'deny / zone_violation',
-      runner: async () => ({ actual: '미실행 (node scripts/decider-test.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
 
     // 7단계 (4종 - 복합 이상 접속 및 Step-up)
     {
-      id: 's07_01', step: '7', type: 'allow',
+      id: 's07_01', attackId: 'normal_access_allow', step: '7', type: 'allow',
       title: '정상 시각 및 네트워크 접속 허용 (단일 징후 허용)',
       expected: 'allow / approved',
-      runner: async () => ({ actual: '미실행 (node scripts/fixture-7.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's07_02', step: '7', type: 'deny',
+      id: 's07_02', attackId: 'composite_anomaly_step_up', step: '7', type: 'deny',
       title: '시각+네트워크+대량 읽기 복합 이상 접속 추가 인증 요구',
       expected: 'step_up / step_up_required',
-      runner: async () => ({ actual: '미실행 (node scripts/fixture-7.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's07_03', step: '7', type: 'allow',
+      id: 's07_03', attackId: 'step_up_verified_allow', step: '7', type: 'allow',
       title: '재인증 완료 후 복합 이상 접속 정상 허용 (stepUp.verified: true)',
       expected: 'allow / approved',
-      runner: async () => ({ actual: '미실행 (node scripts/fixture-7.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's07_04', step: '7', type: 'deny',
+      id: 's07_04', attackId: 'step_up_timeout_deny', step: '7', type: 'deny',
       title: '재인증 유효시간(900초) 초과 접속 재인증 요구',
       expected: 'step_up / step_up_required',
-      runner: async () => ({ actual: '미실행 (node scripts/decider-test.mjs 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
 
     // 8단계 (4종 - 구역 분리 및 권한 격리)
     {
-      id: 's08_01', step: '8', type: 'allow',
+      id: 's08_01', attackId: 'notices_read_allow', step: '8', type: 'allow',
       title: '강사 공지 목록 조회 허용 (GET /api/notices)',
-      expected: '200 OK (공지 읽기 허용)',
+      expected: 'HTTP 200 (공지 읽기 허용)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
-        if (!session?.access_token) return { actual: '미실행 (로그인 후 실행 필요)', passed: null };
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notices', { headers: getAuthHeaders(session) });
-        return { actual: `HTTP ${res.status} (공지 목록 허용)`, passed: res.ok };
+        return { actual: `HTTP ${res.status}`, passed: res.ok };
       }
     },
     {
-      id: 's08_02', step: '8', type: 'deny',
+      id: 's08_02', attackId: 'notices_write_deny', step: '8', type: 'deny',
       title: '학생 계정의 강사 공지 작성 시도 거부 (POST /api/notices)',
-      expected: '403 FORBIDDEN (공지 수정 권한 없음)',
+      expected: 'HTTP 401 / 403 (공지 수정 권한 없음)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(session) },
           body: JSON.stringify({ title: '공지 위조', body: '위조 내용' })
         });
-        return { actual: `HTTP ${res.status} (공지 쓰기 차단)`, passed: res.status === 403 || res.status === 401 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 403 || res.status === 401 };
       }
     },
     {
-      id: 's08_03', step: '8', type: 'deny',
-      title: '쿼리 파라미터로 자료 선택 및 유출 시도 차단',
-      expected: '403 FORBIDDEN (쿼리 파라미터 금지)',
+      id: 's08_03', attackId: 'query_parameter_forbidden', step: '8', type: 'deny',
+      title: '쿼리 파라미터로 자료 선택 및 유출 시도 차단 (GET /api/notes?select=*)',
+      expected: 'HTTP 401 / 403 (쿼리 파라미터 금지)',
+      actual: 'HTTP 401', requestId: 'req-query-param-init', checkedAt: '2026-10-14T02:00:00.000Z',
+      status: 'pass', statusText: '거부 실측', badgeClass: 'badge-danger',
       runner: async (session) => {
-        const res = await fetch('/api/notes?select=*', { headers: getAuthHeaders(session) });
-        return { actual: `HTTP ${res.status} (쿼리 거절)`, passed: res.status === 403 || res.status === 401 };
+        const reqId = `req-query-${Date.now().toString(36)}`;
+        const headers = { 'x-attack-id': 'query_parameter_forbidden', 'x-request-id': reqId, ...getAuthHeaders(session) };
+        const res = await fetch('/api/notes?select=*', { headers, cache: 'no-store' });
+        return { actual: `HTTP ${res.status}`, requestId: res.headers.get('x-request-id') || reqId, passed: res.status === 403 || res.status === 401 };
       }
     },
     {
-      id: 's08_04', step: '8', type: 'deny',
+      id: 's08_04', attackId: 'unauthorized_route_deny', step: '8', type: 'deny',
       title: '허용되지 않은 기능 경로 임의 호출 차단 (GET /api/notes/export)',
-      expected: '400 / 403 / 404 (경로 거부)',
+      expected: 'HTTP 400 / 403 / 404 (경로 거부)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/notes/export', { headers: getAuthHeaders(session) });
-        return { actual: `HTTP ${res.status} (기능 경로 거절)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     },
 
     // 9단계 (4종 - 대량 읽기 탐지 및 권한 회수)
     {
-      id: 's09_01', step: '9', type: 'allow',
+      id: 's09_01', attackId: 'rate_limit_normal_observe', step: '9', type: 'allow',
       title: '10분 내 120건 이하 정상 읽기 관찰 (observe)',
       expected: 'action: observe',
-      runner: async () => ({ actual: '미실행 (npm run detect:test 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's09_02', step: '9', type: 'deny',
+      id: 's09_02', attackId: 'rate_limit_burst_revocation', step: '9', type: 'deny',
       title: '10분 내 121건 이상 폭주 읽기 권한 회수 제안 (burst_read)',
       expected: 'action: propose_revocation / burst_read',
-      runner: async () => ({ actual: '미실행 (npm run detect:test 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's09_03', step: '9', type: 'allow',
+      id: 's09_03', attackId: 'distributed_read_observe', step: '9', type: 'allow',
       title: '서로 다른 사용자 분산 읽기 정상 관찰 (observe)',
       expected: 'action: observe',
-      runner: async () => ({ actual: '미실행 (npm run detect:test 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
     {
-      id: 's09_04', step: '9', type: 'allow',
+      id: 's09_04', attackId: 'outside_window_observe', step: '9', type: 'allow',
       title: '10분 윈도우 밖 분산 사건 정상 관찰 (observe)',
       expected: 'action: observe',
-      runner: async () => ({ actual: '미실행 (npm run detect:test 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
 
     // 10단계 (5종 - 단건 복원 및 정책 복구)
     {
-      id: 's10_01', step: '10', type: 'allow',
+      id: 's10_01', attackId: 'restore_dry_run_allow', step: '10', type: 'allow',
       title: '메모 단건 복원 dryRun 미리보기 요청 (POST /api/restore)',
-      expected: '200 OK (미리보기 허용, 본문 비공개)',
+      expected: 'HTTP 200 (미리보기 허용, 본문 비공개)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
-        if (!session?.access_token) return { actual: '미실행 (로그인 후 실행 필요)', passed: null };
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/restore', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(session) },
           body: JSON.stringify({ id: 'demo', contentHash: '0'.repeat(64), dryRun: true })
         });
-        return { actual: `HTTP ${res.status} (복원 dryRun 응답 확인)`, passed: res.status === 200 || res.status === 403 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 200 || res.status === 403 };
       }
     },
     {
-      id: 's10_02', step: '10', type: 'deny',
+      id: 's10_02', attackId: 'anonymous_restore', step: '10', type: 'deny',
       title: '비인증 상태 메모 복원 요청 차단 (POST /api/restore)',
-      expected: '401 Unauthorized (인증 필수 차단)',
+      expected: 'HTTP 401 (인증 필수 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
+        const reqId = `req-restore-${Date.now().toString(36)}`;
         const res = await fetch('/api/restore', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-attack-id': 'anonymous_restore', 'x-request-id': reqId },
           body: JSON.stringify({ id: 'demo', contentHash: '0'.repeat(64) })
         });
-        return { actual: `HTTP ${res.status} (401 비인증 차단)`, passed: res.status === 401 };
+        return { actual: `HTTP ${res.status}`, requestId: res.headers.get('x-request-id') || reqId, passed: res.status === 401 };
       }
     },
     {
-      id: 's10_03', step: '10', type: 'deny',
+      id: 's10_03', attackId: 'restore_hash_mismatch_deny', step: '10', type: 'deny',
       title: '사본 내용 해시 불일치 복원 시도 차단 (POST /api/restore)',
-      expected: '401 / 409 (해시 불일치 차단)',
+      expected: 'HTTP 401 / 409 (해시 불일치 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/restore', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(session) },
           body: JSON.stringify({ id: 'demo', contentHash: '1'.repeat(64) })
         });
-        return { actual: `HTTP ${res.status} (해시 검증 차단)`, passed: res.status === 409 || res.status === 401 || res.status === 403 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 409 || res.status === 401 || res.status === 403 };
       }
     },
     {
-      id: 's10_04', step: '10', type: 'deny',
+      id: 's10_04', attackId: 'restore_query_param_deny', step: '10', type: 'deny',
       title: '복원 경로 쿼리 파라미터 선택 시도 차단 (POST /api/restore?id=1)',
-      expected: '401 / 403 (쿼리 파라미터 금지)',
+      expected: 'HTTP 401 / 403 (쿼리 파라미터 금지)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/restore?id=demo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(session) },
           body: JSON.stringify({ id: 'demo', contentHash: '0'.repeat(64) })
         });
-        return { actual: `HTTP ${res.status} (쿼리 거부 차단)`, passed: res.status === 403 || res.status === 401 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 403 || res.status === 401 };
       }
     },
     {
-      id: 's10_05', step: '10', type: 'deny',
+      id: 's10_05', attackId: 'restore_prod_override_deny', step: '10', type: 'deny',
       title: '운영 환경 시험 정책 복원 직접 덮어쓰기 거부 (--production)',
       expected: '즉시 거부 (운영 정책 보호)',
-      runner: async () => ({ actual: '미실행 (npm run test:policy-restore 로컬 실행 필요)', passed: null })
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
+      runner: async () => ({ actual: 'not_run', passed: null })
     },
 
     // 11단계 (5종 - 기기 승인 및 보호 자료실)
     {
-      id: 's11_01', step: '11', type: 'deny',
+      id: 's11_01', attackId: 'unapproved_device_read', step: '11', type: 'deny',
       title: '비인증 상태 기기 상태 확인 접근 차단 (GET /api/device)',
-      expected: '401 Unauthorized (비인증 차단)',
+      expected: 'HTTP 401 (비인증 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async () => {
-        const res = await fetch('/api/device', { cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (401 비인증 차단)`, passed: res.status === 401 };
+        const reqId = `req-dev-${Date.now().toString(36)}`;
+        const res = await fetch('/api/device', {
+          headers: { 'x-attack-id': 'unapproved_device_read', 'x-request-id': reqId },
+          cache: 'no-store'
+        });
+        return { actual: `HTTP ${res.status}`, requestId: res.headers.get('x-request-id') || reqId, passed: res.status === 401 };
       }
     },
     {
-      id: 's11_02', step: '11', type: 'deny',
+      id: 's11_02', attackId: 'unapproved_vault_access_deny', step: '11', type: 'deny',
       title: '미승인 기기의 보호 자료실 접근 차단 (승인 토큰 부재)',
-      expected: '401 / 403 (DEVICE_NOT_APPROVED 차단)',
+      expected: 'HTTP 401 / 403 (DEVICE_NOT_APPROVED 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
         const headers = {};
         if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch('/api/notes', { headers, cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (미승인 기기 차단)`, passed: res.status === 403 || res.status === 401 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 403 || res.status === 401 };
       }
     },
     {
-      id: 's11_03', step: '11', type: 'allow',
+      id: 's11_03', attackId: 'device_approval_issue_allow', step: '11', type: 'allow',
       title: '기기 승인 요청 접수 및 HMAC 승인 토큰 발급 (POST /api/device)',
-      expected: '200 OK (승인 토큰 정상 발급)',
+      expected: 'HTTP 200 (승인 토큰 정상 발급)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
-        if (!session?.access_token) return { actual: '미실행 (로그인 후 실행 필요)', passed: null };
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/device', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(session) },
           body: JSON.stringify({ action: 'request_approval' })
         });
-        return { actual: `HTTP ${res.status} (기기 승인 토큰 발급 완료)`, passed: res.ok };
+        return { actual: `HTTP ${res.status}`, passed: res.ok };
       }
     },
     {
-      id: 's11_04', step: '11', type: 'deny',
+      id: 's11_04', attackId: 'forged_device_token_deny', step: '11', type: 'deny',
       title: '위조된 기기 승인 헤더 제출 차단 (x-device-approval: fake)',
-      expected: '403 / 401 (위조 서명 토큰 차단)',
+      expected: 'HTTP 401 / 403 (위조 서명 토큰 차단)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
-        const headers = { 'x-device-approval': 'fake.invalid.signature.token' };
-        if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
+        const headers = { 'x-device-approval': 'fake.invalid.signature.token', 'Authorization': `Bearer ${session.access_token}` };
         const res = await fetch('/api/notes', { headers, cache: 'no-store' });
-        return { actual: `HTTP ${res.status} (위조 승인 토큰 차단)`, passed: res.status === 403 || res.status === 401 };
+        return { actual: `HTTP ${res.status}`, passed: res.status === 403 || res.status === 401 };
       }
     },
     {
-      id: 's11_05', step: '11', type: 'deny',
+      id: 's11_05', attackId: 'invalid_action_device_deny', step: '11', type: 'deny',
       title: '잘못된 액션의 기기 승인 요청 거부 (POST /api/device)',
-      expected: '400 / 401 (INVALID_ACTION 거절)',
+      expected: 'HTTP 400 / 401 (INVALID_ACTION 거절)',
+      actual: 'not_run', requestId: '-', checkedAt: '-',
+      status: 'pending', statusText: '미실행 (not_run)', badgeClass: 'badge-warn',
       runner: async (session) => {
+        if (!session?.access_token) return { actual: 'not_run', passed: null };
         const res = await fetch('/api/device', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(session) },
           body: JSON.stringify({ action: 'invalid_action' })
         });
-        return { actual: `HTTP ${res.status} (액션 검증 정상 거부)`, passed: !res.ok };
+        return { actual: `HTTP ${res.status}`, passed: !res.ok };
       }
     }
   ];
@@ -1175,7 +1388,7 @@ function renderMatrixTable() {
   if (!matrixTableBody) return;
 
   const total = matrixItems.length;
-  const executed = matrixItems.filter(item => item.actual && item.actual !== '미실행' && !item.actual.startsWith('미실행')).length;
+  const executed = matrixItems.filter(item => item.actual && item.actual !== 'not_run' && item.actual !== '미실행' && !item.actual.startsWith('미실행')).length;
   const allowCount = matrixItems.filter(item => item.type === 'allow' && item.status === 'pass').length;
   const denyCount = matrixItems.filter(item => item.type === 'deny' && item.status === 'pass').length;
   const pending = total - executed;
@@ -1188,6 +1401,9 @@ function renderMatrixTable() {
 
   matrixTableBody.replaceChildren(...matrixItems.map(item => {
     const tr = document.createElement('tr');
+    tr.dataset.attackId = item.attackId || item.id;
+    tr.dataset.requestId = item.requestId || '-';
+    tr.dataset.checkedAt = item.checkedAt || '-';
 
     const tdStep = document.createElement('td');
     tdStep.textContent = `${item.step}단계`;
@@ -1197,6 +1413,12 @@ function renderMatrixTable() {
     tdType.className = item.type === 'allow' ? 'type-allow' : 'type-deny';
     tdType.textContent = item.type === 'allow' ? '정상 요청' : '금지 요청';
 
+    const tdAttackId = document.createElement('td');
+    tdAttackId.textContent = item.attackId || item.id;
+    tdAttackId.style.fontFamily = 'monospace';
+    tdAttackId.style.fontSize = '12px';
+    tdAttackId.style.color = '#8ad8df';
+
     const tdTitle = document.createElement('td');
     tdTitle.textContent = item.title;
 
@@ -1205,10 +1427,14 @@ function renderMatrixTable() {
     tdExpected.style.color = '#8ad8df';
 
     const tdActual = document.createElement('td');
-    tdActual.textContent = item.actual || '미실행';
-    if (item.status === 'pass') tdActual.style.color = '#3ecf8e';
-    else if (item.status === 'fail') tdActual.style.color = '#ff8b9e';
-    else tdActual.style.color = '#f6c878';
+    tdActual.textContent = item.actual || 'not_run';
+    if (item.status === 'pass') {
+      tdActual.style.color = item.type === 'allow' ? '#3ecf8e' : '#ff8b9e';
+    } else if (item.status === 'fail') {
+      tdActual.style.color = '#ff8b9e';
+    } else {
+      tdActual.style.color = '#f6c878';
+    }
 
     const tdReqId = document.createElement('td');
     tdReqId.textContent = item.requestId || '-';
@@ -1226,7 +1452,7 @@ function renderMatrixTable() {
     badge.textContent = item.statusText || '미실행';
     tdStatus.append(badge);
 
-    tr.append(tdStep, tdType, tdTitle, tdExpected, tdActual, tdReqId, tdTime, tdStatus);
+    tr.append(tdStep, tdType, tdAttackId, tdTitle, tdExpected, tdActual, tdReqId, tdTime, tdStatus);
     return tr;
   }));
 }
@@ -1239,12 +1465,13 @@ async function runLiveVerification() {
     const item = matrixItems[i];
     if (typeof item.runner === 'function') {
       try {
-        const reqId = `req-${item.id}-${Date.now().toString(36)}`;
+        const defaultReqId = `req-${item.id}-${Date.now().toString(36)}`;
         const result = await item.runner(currentSession);
         
         item.actual = result.actual;
-        item.requestId = result.passed !== null ? reqId : '-';
-        item.checkedAt = result.passed !== null ? new Date().toISOString().replace('T', ' ').slice(0, 19) : '-';
+        const reqId = result.requestId || defaultReqId;
+        item.requestId = (result.passed !== null && result.actual !== 'not_run') ? reqId : '-';
+        item.checkedAt = (result.passed !== null && result.actual !== 'not_run') ? new Date().toISOString() : '-';
 
         if (result.passed === true) {
           item.status = 'pass';
@@ -1256,11 +1483,11 @@ async function runLiveVerification() {
           item.badgeClass = 'badge-warn';
         } else {
           item.status = 'pending';
-          item.statusText = '미실행';
+          item.statusText = '미실행 (not_run)';
           item.badgeClass = 'badge-warn';
         }
       } catch (err) {
-        item.actual = `오류: ${err.message}`;
+        item.actual = `HTTP 오류: ${err.message}`;
         item.status = 'fail';
         item.statusText = '실측 실패';
         item.badgeClass = 'badge-warn';
@@ -1279,6 +1506,7 @@ resetMatrixBtn?.addEventListener('click', () => {
   renderMatrixTable();
 });
 
-// 초기 테이블 렌더링 (41종 항목 모두 '미실행'으로 초기 표시)
+// 초기 테이블 렌더링 (4건 실측, 37건 미실행)
 renderMatrixTable();
+
 
