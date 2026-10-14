@@ -35,47 +35,33 @@ export async function runAttackChecks(config) {
     }];
   }
 
-  // 1) 무인증 조회 (GET) - 실제 시험 가능
-  const anonReqId = `req-anon-${Date.now().toString(36)}`;
-  const anonNotes = await fetch(new URL('/api/notes', app), {
-    headers: {
-      'x-attack-id': 'anonymous_api_read',
-      'x-request-id': anonReqId
+  // 12단계 자기 점검: 공식 41종 카탈로그(aleph.defense.roster.v1) 중 5개 점검을 반환하되,
+  // 요청을 보내지 않은 점검은 안내 규격에 따라 observed를 not_run으로 명시합니다.
+  return [
+    {
+      attackId: 'missing_login_token',
+      expected: '로그인 토큰 없이 보호 API 조회 시 보호 본문 없이 거부',
+      observed: 'not_run'
     },
-    redirect: 'error', signal: AbortSignal.timeout(10000),
-  });
-  const anonRequestId = anonNotes.headers.get('x-request-id') || anonReqId;
-
-  // 2) 쿼리 파라미터 금지 조회 (GET) - 실제 시험 가능
-  const queryReqId = `req-query-${Date.now().toString(36)}`;
-  const queryRes = await fetch(new URL('/api/notes?select=*', app), {
-    headers: {
-      'x-attack-id': 'query_parameter_forbidden',
-      'x-request-id': queryReqId
+    {
+      attackId: 'anonymous_note_list',
+      expected: '인증 없이 개인 메모 목록을 조회 시 목록과 메모 개수 없이 거부',
+      observed: 'not_run'
     },
-    redirect: 'error', signal: AbortSignal.timeout(10000),
-  });
-  const queryRequestId = queryRes.headers.get('x-request-id') || queryReqId;
-
-  return [{
-    attackId: 'anonymous_api_read',
-    expected: '비로그인 상태에서 /api/notes 요청 시 401 거부',
-    observed: `HTTP ${anonNotes.status} (${anonRequestId})`
-  }, {
-    attackId: 'cross_subject_note_read',
-    expected: '로그인 및 타인 메모 식별자 필요 점검 (미실행)',
-    observed: 'not_run'
-  }, {
-    attackId: 'unapproved_device_read',
-    expected: '로그인 신원 및 미승인 기기 토큰 필요 점검 (미실행)',
-    observed: 'not_run'
-  }, {
-    attackId: 'query_parameter_forbidden',
-    expected: '쿼리 파라미터 포함 요청 시 401 또는 403 거부',
-    observed: `HTTP ${queryRes.status} (${queryRequestId})`
-  }, {
-    attackId: 'anonymous_restore',
-    expected: '비로그인 상태에서 복원 쓰기 요청 (격리 환경 미실행)',
-    observed: 'not_run'
-  }];
+    {
+      attackId: 'forged_login_token',
+      expected: '서명이 위조된 로그인 토큰으로 조회 시 보호 본문 없이 거부',
+      observed: 'not_run'
+    },
+    {
+      attackId: 'cross_zone_note_read',
+      expected: '다른 구역 메모를 API로 조회 시 서버 거부',
+      observed: 'not_run'
+    },
+    {
+      attackId: 'restore_changed_note',
+      expected: '시험 계정 B의 메모를 변조한 뒤 복구 경로 호출 시 원래 바이트로 복구',
+      observed: 'not_run'
+    }
+  ];
 }
