@@ -1,44 +1,23 @@
 import { randomBytes } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { createLoginVerifier } from '../src/verify-login.mjs';
 import { createDeviceApprovalToken, verifyDeviceApproval } from '../src/device-verifier.mjs';
-
-let loginVerifier = null;
-
-async function getVerifier(supabaseSecretKey) {
-  if (!loginVerifier) {
-    const configPath = resolve(process.cwd(), 'aleph.config.json');
-    const config = JSON.parse(await readFile(configPath, 'utf8'));
-    loginVerifier = createLoginVerifier({
-      config,
-      supabaseSecretKey,
-    });
-  }
-  return loginVerifier;
-}
-
-function extractAuthToken(request) {
-  const auth = request.headers.authorization;
-  if (auth) return auth;
-  const cookieHeader = request.headers.cookie;
-  if (cookieHeader) {
-    const match = /(?:^|;\s*)sb_token=([^;]+)/.exec(cookieHeader);
-    if (match) return `Bearer ${match[1]}`;
-  }
-  return null;
-}
+import {
+  extractAuthToken,
+  getVerifier,
+  parseRequestBody,
+  sendError,
+} from '../src/api-helpers.mjs';
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
   const authorization = extractAuthToken(request);
   if (!authorization) {
-    return response.status(401).json({
-      error: 'UNAUTHORIZED',
-      reason: '로그인 없이는 기기 상태를 확인하거나 승인을 요청할 수 없습니다.',
-      message: '로그인 없이는 기기 상태를 확인하거나 승인을 요청할 수 없습니다.',
-    });
+    return sendError(
+      response,
+      401,
+      'UNAUTHORIZED',
+      '로그인 없이는 기기 상태를 확인하거나 승인을 요청할 수 없습니다.'
+    );
   }
 
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || '';
@@ -47,18 +26,20 @@ export default async function handler(request, response) {
     const verifyLogin = await getVerifier(supabaseSecretKey);
     verifiedUser = await verifyLogin(authorization);
     if (!verifiedUser || !verifiedUser.userId) {
-      return response.status(401).json({
-        error: 'UNAUTHORIZED',
-        reason: '유효한 로그인 신원을 확인할 수 없습니다.',
-        message: '유효한 로그인 신원을 확인할 수 없습니다.',
-      });
+      return sendError(
+        response,
+        401,
+        'UNAUTHORIZED',
+        '유효한 로그인 신원을 확인할 수 없습니다.'
+      );
     }
   } catch (_err) {
-    return response.status(401).json({
-      error: 'UNAUTHORIZED',
-      reason: '유효하지 않은 인증 토큰입니다.',
-      message: '유효하지 않은 인증 토큰입니다.',
-    });
+    return sendError(
+      response,
+      401,
+      'UNAUTHORIZED',
+      '유효하지 않은 인증 토큰입니다.'
+    );
   }
 
   const method = (request.method || '').toUpperCase();
@@ -90,11 +71,7 @@ export default async function handler(request, response) {
 
   // 2. POST: 기기 승인 요청 접수 및 서명된 승인 토큰 발급
   if (method === 'POST') {
-    let body = request.body;
-    if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch { body = {}; }
-    }
-
+    const body = parseRequestBody(request);
     const action = body?.action;
     if (action !== 'request_approval') {
       return response.status(400).json({
@@ -107,7 +84,7 @@ export default async function handler(request, response) {
     }
 
     // 서버가 기기 식별자를 확인 (16자리 소문자 16진수 규격, 개인키 아님)
-    let deviceId = typeof body?.deviceId === 'string' && /^[0-9a-f]{16}$/iu.test(body.deviceId.trim())
+    const deviceId = typeof body?.deviceId === 'string' && /^[0-9a-f]{16}$/iu.test(body.deviceId.trim())
       ? body.deviceId.trim().toLowerCase()
       : randomBytes(8).toString('hex');
 

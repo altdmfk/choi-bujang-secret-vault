@@ -1,8 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { createClient } from '@supabase/supabase-js';
-import { createLoginVerifier } from '../src/verify-login.mjs';
+import { getSupabaseServerClient, getVerifier, safeAuditLog } from '../src/api-helpers.mjs';
 
 // 비공개 가상 메모 사본(notes_backup)에서 지정한 메모 한 건만 notes로 복원합니다.
 // 사본: notes_backup(id, owner_id, title, content, content_hash) — 서버 전용 키로만 읽고, 공개 저장소에는 두지 않습니다.
@@ -13,8 +10,6 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const ALLOWED_KEYS = new Set([
   'id', 'contentHash', 'content_hash', 'owner_id', 'dryRun',
 ]);
-
-let loginVerifier = null;
 
 function reply(status, error, reason) {
   return { status, json: { error, reason, message: reason } };
@@ -189,29 +184,25 @@ export async function restoreOne({ supabase, userId, body }) {
   };
 }
 
-async function getVerifier(supabaseSecretKey) {
-  if (!loginVerifier) {
-    const config = JSON.parse(await readFile(resolve(process.cwd(), 'aleph.config.json'), 'utf8'));
-    loginVerifier = createLoginVerifier({ config, supabaseSecretKey });
-  }
-  return loginVerifier;
-}
-
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
   // 진단용: 요청 본문의 항목 이름(값 제외)과 응답 상태·오류 코드만 기록합니다. 토큰·본문 값·메모 내용은 기록하지 않습니다.
   let bodyKeys = [];
   const send = ({ status, json }) => {
-    console.log(`[restore] method=${request.method} status=${status} code=${json?.error ?? 'OK'} bodyKeys=${JSON.stringify(bodyKeys)}`);
+    safeAuditLog('restore', {
+      method: request.method,
+      status,
+      code: json?.error ?? 'OK',
+      extra: { bodyKeys },
+    });
     return response.status(status).json(json);
   };
 
   if ((request.method || '').toUpperCase() !== 'POST') {
     return send(reply(405, 'METHOD_NOT_ALLOWED', '허용되지 않은 HTTP 메서드입니다.'));
   }
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
-  if (!supabaseUrl || !supabaseSecretKey) {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
     return send(reply(500, 'DATABASE_CONFIG_MISSING', '데이터베이스 설정이 누락되었습니다.'));
   }
   if (!request.headers.authorization) {
@@ -222,8 +213,10 @@ export default async function handler(request, response) {
   }
 
   let verifiedUser = null;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || '';
   try {
-    verifiedUser = await (await getVerifier(supabaseSecretKey))(request.headers.authorization);
+    const verifier = await getVerifier(supabaseSecretKey);
+    verifiedUser = await verifier(request.headers.authorization);
   } catch {
     return send(reply(401, 'UNAUTHORIZED', '유효하지 않은 인증 토큰입니다.'));
   }
@@ -238,7 +231,7 @@ export default async function handler(request, response) {
   if (body && typeof body === 'object' && !Array.isArray(body)) bodyKeys = Object.keys(body).slice(0, 20);
   try {
     return send(await restoreOne({
-      supabase: createClient(supabaseUrl, supabaseSecretKey),
+      supabase,
       userId: verifiedUser.userId,
       body,
     }));

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient, parseRequestBody } from '../src/api-helpers.mjs';
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
@@ -7,25 +7,17 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
-
-  if (!supabaseUrl || !supabaseSecretKey) {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
     return response.status(500).json({ error: 'DATABASE_CONFIG_MISSING' });
   }
 
-  let body = request.body;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch { body = {}; }
-  }
-
-  const { email, password } = body || {};
+  const { email, password } = parseRequestBody(request);
   if (!email || !password) {
     return response.status(400).json({ error: 'EMAIL_AND_PASSWORD_REQUIRED' });
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseSecretKey);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -45,7 +37,7 @@ export default async function handler(request, response) {
         email: data.user.email,
       },
     });
-  } catch (err) {
+  } catch (_err) {
     return response.status(500).json({ error: 'INTERNAL_SERVER_ERROR' });
   }
 }
