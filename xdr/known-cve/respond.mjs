@@ -5,10 +5,8 @@ export async function respond(alert) {
   try {
     const result = await decide(alert);
     const ip = alert?.data?.srcip;
-    const isNormalUser = Boolean(alert?.data?.srcuser);
-
-    // 차단 후보(block)만 ZTNA 판정기의 거부 규칙(1시간 만료 시각 + 근거 경보 번호)으로 등록하고 정상 사용자는 제외
-    if (result.action === 'block' && ip && !isNormalUser) {
+    // 차단 후보(block)만 ZTNA 판정기의 거부 규칙(1시간 만료 시각 + 근거 경보 번호)으로 등록하고 정상/알림 이벤트는 제외
+    if (result.action === 'block' && ip) {
       addXdrBlock(ip, alert.id);
     }
 

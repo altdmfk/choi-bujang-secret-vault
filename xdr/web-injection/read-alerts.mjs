@@ -1,23 +1,33 @@
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
+export async function readAlerts() {
+  const { readFile } = await import('node:fs/promises');
+  const { dirname, resolve } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const fixturePath = resolve(__dirname, '../fixtures/web-injection.json');
+  const raw = await readFile(fixturePath, 'utf8');
+  const { alerts = [] } = JSON.parse(raw);
 
-// Read the web-injection fixture file
-const fixturePath = resolve(__dirname, '../fixtures/web-injection.json');
-const content = readFileSync(fixturePath, 'utf8');
-const { alerts } = JSON.parse(content);
+  // 원본 경보를 수정하지 않고 시각·출발 주소·계정·규칙 수준·설명만 추출 (url, 쿼리 파라미터 등 민감값 제외)
+  return alerts.map((alert) => ({
+    timestamp: alert.timestamp || 'N/A',
+    srcip: alert.data?.srcip || 'N/A',
+    srcuser: alert.data?.srcuser || 'N/A',
+    level: alert.rule?.level ?? 'N/A',
+    description: alert.rule?.description || 'N/A',
+  }));
+}
 
-// Extract exactly: time, source IP, account, rule level, and description per alert.
-// Secrets or other unnecessary fields (e.g., urls) are intentionally excluded.
-alerts.forEach(alert => {
-  const time = alert.timestamp || 'N/A';
-  const srcIp = alert.data?.srcip || 'N/A';
-  const account = alert.data?.srcuser || 'N/A';
-  const level = alert.rule?.level || 'N/A';
-  const description = alert.rule?.description || 'N/A';
-  
-  console.log(`시각: ${time} | 출발 주소: ${srcIp} | 계정: ${account} | 규칙 수준: ${level} | 설명: ${description}`);
-});
+if (typeof process !== 'undefined' && process.argv && process.argv[1]) {
+  const { resolve } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  if (resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+    const extracted = await readAlerts();
+    for (const item of extracted) {
+      console.log(
+        `시각: ${item.timestamp} | 출발 주소: ${item.srcip} | 계정: ${item.srcuser} | 규칙 수준: ${item.level} | 설명: ${item.description}`
+      );
+    }
+  }
+}

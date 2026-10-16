@@ -30,8 +30,7 @@
   - 로컬 환경: `.env.local`에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 작성한 뒤 `npx vercel dev`로 실행합니다.
   - 가상 사건 연습: `node scripts/fixture-7.mjs` 명령으로 정상 사건(`allow`)과 복합 이상 사건(`step_up`) 판정을 비교합니다.
   - 판정기 종합 연습: `node scripts/decider-test.mjs` 명령으로 6~8단계 규칙(`device_registered`, `step_up_required`, `zone_rule`) 통과를 확인합니다.
-  - 배포 환경: GitHub 푸시 시 Vercel에서 자동 배포되며 `https://choi-bujang-secret-vault-neon.vercel.app`에서 확인할 수 있습니다.
-  - XDR 실행: `npm run xdr:run -- exfiltration` 명령으로 경보 판정(`xdr/exfiltration/result.json`) 및 `node xdr/exfiltration/respond.mjs`로 ZTNA 차단 연동 확인.
+  - XDR 실행: 프로젝트 루트에서 `node scripts/xdr-run.mjs <moduleKey>` (또는 `npm run xdr:run -- <moduleKey>`) 명령으로 경보 판정(`xdr/<moduleKey>/result.json`) 및 `node xdr/<moduleKey>/respond.mjs`로 ZTNA 차단 연동 확인. (대상 모듈: brute-force, web-injection, known-cve, persistence, privilege, exfiltration)
 
 ## 9단계 현재 작동하는 기능 및 다시 실행하는 방법
 
