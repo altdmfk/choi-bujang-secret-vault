@@ -3,6 +3,7 @@
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
 export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 'zone_rule']);
 
+// --- 1. 내부 상태 저장소 및 상수 정의 ---
 const xdrBlocks = new Map();
 const deviceBindings = new Map();
 const noteOwnership = new Map();
@@ -24,6 +25,22 @@ const ALLOWED_NOTICE_ROUTE_PATTERNS = new Set([
   '/api/notices/:id',
 ]);
 
+// --- 2. 규격화된 판정 응답 생성 헬퍼 ---
+function makeDecision(requestId, decision, reasonCode, ruleIds) {
+  return {
+    schema: 'aleph.decision.v1',
+    requestId,
+    decision,
+    reasonCode,
+    ruleIds,
+  };
+}
+
+function denyZone(requestId) {
+  return makeDecision(requestId, 'deny', 'zone_violation', ['zone_rule']);
+}
+
+// --- 3. 경로 및 식별자 유효성 검사 헬퍼 ---
 function isValidNoteResourceId(resourceId) {
   if (typeof resourceId !== 'string') return false;
   return /^(?:note:[a-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d+|demo)$/iu.test(
@@ -34,59 +51,6 @@ function isValidNoteResourceId(resourceId) {
 function isValidNoticeResourceId(resourceId) {
   if (typeof resourceId !== 'string') return false;
   return /^(?:notice:)?\d+$/iu.test(resourceId.trim());
-}
-
-/**
- * 엔진이 검증해 넘긴 가상 접속 정보의 출처 및 유효성을 검사합니다.
- * - 지역·시각·네트워크·행동이 없거나 출처가 불명확하면 임의의 정상값으로 채우지 않습니다.
- * - 위조된 클라이언트 헤더(request.geo, request.device, request.role 등)를 신뢰 정보로 승격하지 않습니다.
- */
-export function validateConnectionContext(request) {
-  const signals = request?.signals;
-  const isEngineVerified = Boolean(
-    signals && typeof signals === 'object' && signals.source === 'judge_fixture'
-  );
-
-  // 출처가 엔진 검증(judge_fixture)이 아닌 경우 임의의 정상값('local', 'usual' 등)으로 채우지 않고 불신뢰 처리
-  if (!isEngineVerified) {
-    return {
-      trusted: false,
-      source: typeof signals?.source === 'string' ? signals.source : 'none',
-      region: null,
-      network: null,
-      hour: null,
-      recentEvents: Array.isArray(request?.recentEvents) ? request.recentEvents : [],
-    };
-  }
-
-  // 엔진 검증 출처인 경우 전달된 신호 값을 담되, 누락된 필드를 임의의 정상값으로 채우지 않음
-  return {
-    trusted: true,
-    source: signals.source,
-    region: typeof signals.region === 'string' ? signals.region : null,
-    network: typeof signals.network === 'string' ? signals.network : null,
-    hour: Number.isInteger(signals.hour) ? signals.hour : null,
-    recentEvents: Array.isArray(request?.recentEvents) ? request.recentEvents : [],
-  };
-}
-
-export function addXdrBlock(ip, alertId) {
-  if (ip) {
-    xdrBlocks.set(ip, {
-      alertId,
-      expiresAt: Date.now() + 3600 * 1000 // 1시간 만료 시각
-    });
-  }
-}
-
-function denyZone(requestId) {
-  return {
-    schema: 'aleph.decision.v1',
-    requestId,
-    decision: 'deny',
-    reasonCode: 'zone_violation',
-    ruleIds: ['zone_rule'],
-  };
 }
 
 function parseZonePath(rawPath) {
@@ -209,48 +173,79 @@ function isCrossSubjectResource(subjectId, canonicalNoteId) {
   return false;
 }
 
-export async function decide(request) {
-  const safeRequestId = request?.requestId || 'unknown-request-id';
+// --- 4. 접속 환경 검증 및 외부(XDR) 모듈 연동 ---
+/**
+ * 엔진이 검증해 넘긴 가상 접속 정보의 출처 및 유효성을 검사합니다.
+ * - 지역·시각·네트워크·행동이 없거나 출처가 불명확하면 임의의 정상값으로 채우지 않습니다.
+ * - 위조된 클라이언트 헤더(request.geo, request.device, request.role 등)를 신뢰 정보로 승격하지 않습니다.
+ */
+export function validateConnectionContext(request) {
+  const signals = request?.signals;
+  const isEngineVerified = Boolean(
+    signals && typeof signals === 'object' && signals.source === 'judge_fixture'
+  );
 
-  // 1. 기존 XDR 블록 규칙 보존
+  // 출처가 엔진 검증(judge_fixture)이 아닌 경우 임의의 정상값('local', 'usual' 등)으로 채우지 않고 불신뢰 처리
+  if (!isEngineVerified) {
+    return {
+      trusted: false,
+      source: typeof signals?.source === 'string' ? signals.source : 'none',
+      region: null,
+      network: null,
+      hour: null,
+      recentEvents: Array.isArray(request?.recentEvents) ? request.recentEvents : [],
+    };
+  }
+
+  // 엔진 검증 출처인 경우 전달된 신호 값을 담되, 누락된 필드를 임의의 정상값으로 채우지 않음
+  return {
+    trusted: true,
+    source: signals.source,
+    region: typeof signals.region === 'string' ? signals.region : null,
+    network: typeof signals.network === 'string' ? signals.network : null,
+    hour: Number.isInteger(signals.hour) ? signals.hour : null,
+    recentEvents: Array.isArray(request?.recentEvents) ? request.recentEvents : [],
+  };
+}
+
+export function addXdrBlock(ip, alertId) {
+  if (ip) {
+    xdrBlocks.set(ip, {
+      alertId,
+      expiresAt: Date.now() + 3600 * 1000 // 1시간 만료 시각
+    });
+  }
+}
+
+// --- 5. 규칙 모듈: XDR 차단 검사 ---
+function evaluateXdrBlock(request, safeRequestId) {
   try {
     const ip = request?.signals?.source;
     if (ip && xdrBlocks.has(ip)) {
       const rule = xdrBlocks.get(ip);
       if (Date.now() < rule.expiresAt) {
-        return {
-          schema: 'aleph.decision.v1',
-          requestId: safeRequestId,
-          decision: 'deny',
-          reasonCode: 'starter_not_ready',
-          ruleIds: [`xdr.alert.${rule.alertId}`]
-        };
-      } else {
-        xdrBlocks.delete(ip);
+        return makeDecision(safeRequestId, 'deny', 'starter_not_ready', [`xdr.alert.${rule.alertId}`]);
       }
+      xdrBlocks.delete(ip);
     }
   } catch (_err) {
     // 에러 발생 시 원래 로직으로
   }
+  return null;
+}
 
-  // 2. 가상 접속 정보 입력 검사 (출처 구분 및 위조 헤더 승격 방지)
-  const context = validateConnectionContext(request);
-
-  // 3. 엔진이 확인한 기기 등록 상태 및 신원 검증 (미등록 또는 확인 실패 시 거부)
+// --- 6. 규칙 모듈: 6단계 기기 등록 검증 (device_registered) ---
+function evaluateDeviceRegistration(request, safeRequestId) {
   const hasValidDevice = typeof request?.deviceId === 'string' && request.deviceId.trim().length > 0;
   const hasValidSubject = typeof request?.subjectId === 'string' && request.subjectId.trim().length > 0;
   if (!request?.deviceRegistered || !hasValidDevice || !hasValidSubject) {
-    return {
-      schema: 'aleph.decision.v1',
-      requestId: safeRequestId,
-      decision: 'deny',
-      reasonCode: 'device_not_registered',
-      ruleIds: ['device_registered'],
-    };
+    return makeDecision(safeRequestId, 'deny', 'device_not_registered', ['device_registered']);
   }
+  return null;
+}
 
-  // 4. 7단계 복합 이상 접속 검사 (평소와 다른 시각 + 낯선 네트워크 + 대량 읽기 행동)
-  // 지역(region) 하나만으로 영구 차단하지 않으며, 복합 이상 접속 시 추가 확인(step_up) 요청
+// --- 7. 규칙 모듈: 7단계 복합 이상 접속 및 재인증 (step_up_required) ---
+function evaluateCompositeAnomaly(request, context, safeRequestId) {
   const isUnusualNetwork = context.network === 'unusual';
   const isUnusualHour = context.hour !== null && (context.hour < 9 || context.hour > 18);
   const hasBurstReads = Array.isArray(context.recentEvents) && context.recentEvents.some(
@@ -258,30 +253,30 @@ export async function decide(request) {
   );
 
   const isCompositeAnomaly = context.trusted && isUnusualNetwork && isUnusualHour && hasBurstReads;
-  let stepUpPassed = false;
-
-  if (isCompositeAnomaly) {
-    const isStepUpVerified = Boolean(
-      request.stepUp?.verified
-      && typeof request.stepUp?.authAgeSeconds === 'number'
-      && request.stepUp.authAgeSeconds >= 0
-      && request.stepUp.authAgeSeconds <= 900
-    );
-
-    if (!isStepUpVerified) {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: safeRequestId,
-        decision: 'step_up',
-        reasonCode: 'step_up_required',
-        ruleIds: ['step_up_required'],
-      };
-    }
-    // 재인증 통과 시 즉시 반환하지 않고 8단계 구역 규칙(zone_rule)까지 계속 검사
-    stepUpPassed = true;
+  if (!isCompositeAnomaly) {
+    return { stepUpPassed: false, decision: null };
   }
 
-  // 5. 8단계 구역 규칙 (zone_rule): 쿼리 금지, 정확한 경로·메서드 검증, 자기 메모 허용 및 타인 메모·공지 수정 거부
+  const isStepUpVerified = Boolean(
+    request.stepUp?.verified
+    && typeof request.stepUp?.authAgeSeconds === 'number'
+    && request.stepUp.authAgeSeconds >= 0
+    && request.stepUp.authAgeSeconds <= 900
+  );
+
+  if (!isStepUpVerified) {
+    return {
+      stepUpPassed: false,
+      decision: makeDecision(safeRequestId, 'step_up', 'step_up_required', ['step_up_required']),
+    };
+  }
+
+  // 재인증 통과 시 구역 규칙 검사로 진행
+  return { stepUpPassed: true, decision: null };
+}
+
+// --- 8. 규칙 모듈: 8단계 구역 규칙 (zone_rule) ---
+function evaluateZonePolicy(request, safeRequestId, stepUpPassed) {
   if (typeof request.classId !== 'string' || !request.classId.trim()
       || typeof request.projectId !== 'string' || !request.projectId.trim()) {
     return denyZone(safeRequestId);
@@ -311,6 +306,7 @@ export async function decide(request) {
 
   const { serviceName, resourceId, routePattern } = parsedPath;
   const lowerResId = resourceId ? resourceId.toLowerCase() : '';
+  const activeRuleIds = stepUpPassed ? ['step_up_required', 'zone_rule'] : ['device_registered', 'zone_rule'];
 
   // 강사 공지(notices) 구역 또는 notice:* 자원 접근 검사
   const isNoticeResource = resourceId !== null && /^notices?(?:[:_-]|$)/iu.test(resourceId);
@@ -341,13 +337,7 @@ export async function decide(request) {
       }
     }
 
-    return {
-      schema: 'aleph.decision.v1',
-      requestId: safeRequestId,
-      decision: 'allow',
-      reasonCode: 'approved',
-      ruleIds: stepUpPassed ? ['step_up_required', 'zone_rule'] : ['device_registered', 'zone_rule'],
-    };
+    return makeDecision(safeRequestId, 'allow', 'approved', activeRuleIds);
   }
 
   // 메모(notes) 구역 검사
@@ -413,11 +403,34 @@ export async function decide(request) {
     noteOwnership.set(globalNoteKey, ownerRecord);
   }
 
-  return {
-    schema: 'aleph.decision.v1',
-    requestId: safeRequestId,
-    decision: 'allow',
-    reasonCode: 'approved',
-    ruleIds: stepUpPassed ? ['step_up_required', 'zone_rule'] : ['device_registered', 'zone_rule'],
-  };
+  return makeDecision(safeRequestId, 'allow', 'approved', activeRuleIds);
+}
+
+// --- 9. 주 판정 진입점 (decide pipeline) ---
+export async function decide(request) {
+  const safeRequestId = request?.requestId || 'unknown-request-id';
+
+  // 1. XDR 블록 규칙 평가
+  const xdrDecision = evaluateXdrBlock(request, safeRequestId);
+  if (xdrDecision) {
+    return xdrDecision;
+  }
+
+  // 2. 가상 접속 정보 입력 검사 (출처 구분 및 위조 헤더 승격 방지)
+  const context = validateConnectionContext(request);
+
+  // 3. 엔진이 확인한 기기 등록 상태 및 신원 검증 (미등록 또는 확인 실패 시 거부)
+  const deviceDecision = evaluateDeviceRegistration(request, safeRequestId);
+  if (deviceDecision) {
+    return deviceDecision;
+  }
+
+  // 4. 7단계 복합 이상 접속 검사 (평소와 다른 시각 + 낯선 네트워크 + 대량 읽기 행동)
+  const { stepUpPassed, decision: stepUpDecision } = evaluateCompositeAnomaly(request, context, safeRequestId);
+  if (stepUpDecision) {
+    return stepUpDecision;
+  }
+
+  // 5. 8단계 구역 규칙 (zone_rule): 쿼리 금지, 경로·메서드 검증, 자기 메모 허용 및 타인 메모·공지 수정 거부
+  return evaluateZonePolicy(request, safeRequestId, stepUpPassed);
 }
