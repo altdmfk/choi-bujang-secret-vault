@@ -60,7 +60,7 @@
 
 ## 11단계 나만의 접속 앱 (설치형 웹앱 및 기기 승인)
 
-- **설치형 웹앱 설정 및 화면 묶음 경량화**: PWA 매니페스트(`public/manifest.json`), 앱 아이콘(`public/icon.svg`), 테마 색상 및 실시간 오프라인 상태 감지 경고 배너를 구성했습니다. 인라인 스타일과 스크립트를 `public/style.css`, `public/app.js`로 분리하여 화면 묶음을 경량화했습니다.
+- **설치형 웹앱 설정 및 화면 묶음 경량화**: PWA 매니페스트(`public/manifest.json`), 앱 아이콘(`public/icon.svg`), 테마 색상 및 실시간 오프라인 상태 감지 경고 배너를 구성했습니다. 인라인 스타일과 스크립트를 `public/style.css`, `public/app.js` 및 `public/modules/` ES 모듈(`dom.js`, `api-client.js`, `auth-device.js`, `vault-ui.js`, `ops-room.js`, `pwa-network.js`)로 체계적으로 분리하여 화면 묶음의 가독성과 유지보수성을 극대화했습니다.
 - **기기 승인 확인 엔드포인트 및 서버리스 서명 검증**: `api/device.js`에서 로그인 세션을 검증하고, 기기 승인 요청(`POST`) 시 HMAC-SHA256 기반 기기 승인 토큰(`src/device-verifier.mjs`)을 발급합니다. 비인증 요청은 `401`로 거부됩니다.
 - **보호 자료실 접근 통제 및 API 레벨 차단**: 자료 API(`api/notes.js`, `api/notices.js`)에서도 기기 승인 토큰을 검증하여, 승인되지 않은 기기의 직접 접근을 `403 DEVICE_NOT_APPROVED`로 차단합니다. 화면에서도 기기 승인 전에는 강사 공지, 메모 목록, 메모 작성기를 완전히 숨깁니다.
 - **브라우저 저장소 배제 및 쿠키·메모리 세션 연동**: 기기 키나 토큰은 브라우저 저장소(Storage)에 일절 저장하지 않습니다. 세션은 HttpOnly 쿠키(`sb_token`) 및 JS 메모리 변수로 관리되며, 화면과 API 응답 어디에도 기기 식별자 텍스트를 노출하지 않습니다.
