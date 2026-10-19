@@ -93,6 +93,40 @@ function appendInlineModeBadge(target, mode) {
   }
 }
 
+function mapDecision(decision) {
+  switch (decision) {
+    case 'allow':
+      return {
+        code: 'allow',
+        text: '접근 허용 (allow)',
+        note: '서버 정책에 따라 이 업무 앱 접근이 허용되었습니다. (실제 앱 접속 성공을 보장하지는 않습니다.)',
+        className: 'decision decision-allow',
+      };
+    case 'deny':
+      return {
+        code: 'deny',
+        text: '접근 거부 (deny)',
+        note: '보안 정책에 따라 이 업무 앱 접근이 거부되었습니다.',
+        className: 'decision decision-deny',
+      };
+    case 'challenge':
+      return {
+        code: 'challenge',
+        text: '추가 확인 필요 (challenge)',
+        note: '추가 인증 또는 확인이 필요합니다. 본 앱이 추가 인증 절차를 대신 수행하지 않습니다.',
+        className: 'decision decision-challenge',
+      };
+    case 'unknown':
+    default:
+      return {
+        code: 'unknown',
+        text: '확인 불가 (unknown)',
+        note: '판정을 확인할 수 없습니다. 허용되지 않음 (접근 허용 또는 정상으로 간주할 수 없습니다).',
+        className: 'decision decision-unknown',
+      };
+  }
+}
+
 export function createStudentView(context = {}) {
   return {
     renderIdentity({ me, devices, sessions } = {}) {
@@ -263,7 +297,150 @@ export function createStudentView(context = {}) {
       container.appendChild(dl);
       return container;
     },
-    renderDecision() { return '학생 구현 대기: 서버의 판정과 이유를 연결하세요.'; },
+    renderDecision({ status, mode, data, error, appId } = {}) {
+      const container = document.createElement('div');
+      container.className = 'student-decision-view';
+
+      const modeBadge = createModeBadge(mode);
+      if (modeBadge) {
+        const modeWrap = document.createElement('div');
+        modeWrap.className = 'mode-badges';
+        modeWrap.style.marginBottom = '8px';
+        modeWrap.appendChild(modeBadge);
+        container.appendChild(modeWrap);
+      }
+
+      // 1. 요청 전 (idle)
+      if (status === 'idle' || !status) {
+        container.setAttribute('data-student-decision', 'idle');
+        const p = document.createElement('p');
+        p.className = 'state state-empty';
+        p.textContent = '앱을 골라 접속을 요청하세요. (아직 요청한 업무 앱이 없습니다)';
+        container.appendChild(p);
+        return container;
+      }
+
+      // 2. 요청 중 (loading)
+      if (status === 'loading') {
+        container.setAttribute('data-student-decision', 'loading');
+        const p = document.createElement('p');
+        p.className = 'state state-loading';
+        const targetApp = data?.appId || appId || '업무 앱';
+        p.textContent = `${targetApp} 접속 판정 확인 중…`;
+        container.appendChild(p);
+        return container;
+      }
+
+      // 3. 요청 실패 (error) - 거부(deny) 판정과 명확히 구분
+      if (status === 'error') {
+        container.setAttribute('data-student-decision', 'error');
+        const errorBox = document.createElement('div');
+        errorBox.className = 'decision decision-failed';
+
+        const headP = document.createElement('p');
+        const rawMsg = typeof error === 'string' ? error : (error?.message || error?.code || '서버에 접속 판정을 요청하지 못했습니다.');
+        const errMsg = rawMsg.startsWith('요청 실패') ? rawMsg : `요청 실패: ${rawMsg}`;
+        headP.textContent = errMsg;
+        errorBox.appendChild(headP);
+
+        const noteP = document.createElement('p');
+        noteP.className = 'muted';
+        noteP.textContent = '이 결과는 접근 거부(차단/deny) 판정이 아니며 요청 처리 실패입니다. 허용되지 않음 (접근 허용으로 간주할 수 없습니다).';
+        errorBox.appendChild(noteP);
+
+        container.appendChild(errorBox);
+        return container;
+      }
+
+      // 4. 판정 수신 (ok)
+      if (status === 'ok') {
+        const decisionVal = data?.decision;
+        const info = mapDecision(decisionVal);
+        container.setAttribute('data-student-decision', info.code);
+
+        const banner = document.createElement('div');
+        banner.className = info.className;
+
+        const titleP = document.createElement('p');
+        const targetApp = data?.appId || appId || '지정되지 않음';
+        titleP.textContent = `${targetApp} · ${info.text}`;
+        banner.appendChild(titleP);
+
+        const noteP = document.createElement('p');
+        noteP.className = 'muted';
+        noteP.textContent = info.note;
+        banner.appendChild(noteP);
+
+        container.appendChild(banner);
+
+        const dl = document.createElement('dl');
+        dl.className = 'kv';
+
+        const dtApp = document.createElement('dt');
+        dtApp.textContent = '업무 앱';
+        const ddApp = document.createElement('dd');
+        ddApp.setAttribute('data-student-decision-app', '');
+        ddApp.textContent = targetApp;
+        dl.appendChild(dtApp);
+        dl.appendChild(ddApp);
+
+        const dtDec = document.createElement('dt');
+        dtDec.textContent = '판정';
+        const ddDec = document.createElement('dd');
+        ddDec.setAttribute('data-student-decision-result', info.code);
+        ddDec.textContent = info.text;
+        dl.appendChild(dtDec);
+        dl.appendChild(ddDec);
+
+        const dtReason = document.createElement('dt');
+        dtReason.textContent = '판정 이유';
+        const ddReason = document.createElement('dd');
+        ddReason.setAttribute('data-student-decision-reason', '');
+        ddReason.textContent = data?.reason || '이유 정보 없음';
+        dl.appendChild(dtReason);
+        dl.appendChild(ddReason);
+
+        const dtTime = document.createElement('dt');
+        dtTime.textContent = '판정 시각';
+        const ddTime = document.createElement('dd');
+        ddTime.setAttribute('data-student-decision-time', '');
+        ddTime.textContent = data?.checkedAt ? String(data.checkedAt) : '시각 정보 없음';
+        dl.appendChild(dtTime);
+        dl.appendChild(ddTime);
+
+        if (mode) {
+          const dtMode = document.createElement('dt');
+          dtMode.textContent = '데이터 상태';
+          const ddMode = document.createElement('dd');
+          switch (mode) {
+            case 'demo':
+              ddMode.textContent = '예제 자료 (demo)';
+              break;
+            case 'disconnected':
+              ddMode.textContent = '연결 없음 (disconnected)';
+              break;
+            case 'unknown':
+              ddMode.textContent = '확인 불가 (unknown)';
+              break;
+            default:
+              ddMode.textContent = `${mode} (정상 연결)`;
+              break;
+          }
+          dl.appendChild(dtMode);
+          dl.appendChild(ddMode);
+        }
+
+        container.appendChild(dl);
+        return container;
+      }
+
+      // 기타 예외 상태
+      const fallbackP = document.createElement('p');
+      fallbackP.className = 'state state-empty';
+      fallbackP.textContent = '확인 불가: 알 수 없는 상태입니다. 허용되지 않음.';
+      container.appendChild(fallbackP);
+      return container;
+    },
     renderEvents() { return '학생 구현 대기: 본인 접속·XDR 기록을 연결하세요.'; },
     renderStatus() { return '학생 구현 대기: 기기·세션·알림과 연결 점검 상태를 구분하세요.'; },
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
