@@ -203,8 +203,12 @@ export function createStudentView(context = {}) {
         ddDevice.textContent = '불러오는 중';
         appendInlineModeBadge(ddDevice, devices.mode);
       } else {
-        // devices 가 ok 이거나 명시적 오류/로딩이 아닐 때 기기 정보 선택
-        const device = (Array.isArray(devices?.data) && devices.data.length > 0 ? devices.data[0] : null) || me?.data?.device;
+        // 현재 로그인 기기: me.data.device 를 우선 사용하며, devices.data 목록이 전달되면 해당 ID 와 일치하는 항목만 연결
+        const currentDeviceId = me?.data?.device?.id;
+        const matchedDevice = Array.isArray(devices?.data) && currentDeviceId
+          ? devices.data.find((d) => d.id === currentDeviceId)
+          : null;
+        const device = matchedDevice ? { ...me.data.device, ...matchedDevice } : me?.data?.device;
         if (device) {
           const devLabel = device.label || '';
           const devId = device.id || '';
@@ -236,8 +240,12 @@ export function createStudentView(context = {}) {
         ddSession.textContent = '불러오는 중';
         appendInlineModeBadge(ddSession, sessions.mode);
       } else {
-        // sessions 가 ok 이거나 명시적 오류/로딩이 아닐 때 세션 정보 선택
-        const session = (Array.isArray(sessions?.data) && sessions.data.length > 0 ? sessions.data[0] : null) || me?.data?.session;
+        // 현재 로그인 세션: me.data.session 을 우선 사용하며, sessions.data 목록이 전달되면 해당 ID 와 일치하는 항목만 연결
+        const currentSessionId = me?.data?.session?.id;
+        const matchedSession = Array.isArray(sessions?.data) && currentSessionId
+          ? sessions.data.find((s) => s.id === currentSessionId)
+          : null;
+        const session = matchedSession ? { ...me.data.session, ...matchedSession } : me?.data?.session;
         if (session) {
           const sessId = session.id || '세션';
           const sessStatus = session.status || 'unknown';
