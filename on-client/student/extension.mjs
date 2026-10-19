@@ -51,68 +51,129 @@ function createModeBadge(mode) {
   return badge;
 }
 
+function formatErrorMessage(error, defaultMsg = '확인 불가') {
+  if (!error) return `연결 실패: ${defaultMsg}`;
+  const msg = typeof error === 'string' ? error : (error.message || error.code || defaultMsg);
+  if (msg.startsWith('연결 실패') || msg.startsWith('확인 불가')) {
+    return msg;
+  }
+  return `연결 실패: ${msg}`;
+}
+
+function renderModeBadges(target, resources = []) {
+  const modesToShow = [];
+  for (const res of resources) {
+    if (res?.mode && res.mode !== 'connected' && !modesToShow.includes(res.mode)) {
+      modesToShow.push(res.mode);
+    }
+  }
+  if (modesToShow.length === 0) return null;
+
+  const modeWrap = document.createElement('div');
+  modeWrap.className = 'mode-badges';
+  modeWrap.style.marginBottom = '8px';
+  modeWrap.style.display = 'flex';
+  modeWrap.style.gap = '6px';
+  modeWrap.style.flexWrap = 'wrap';
+
+  for (const m of modesToShow) {
+    const badge = createModeBadge(m);
+    if (badge) modeWrap.appendChild(badge);
+  }
+  target.appendChild(modeWrap);
+  return modeWrap;
+}
+
+function appendInlineModeBadge(target, mode) {
+  if (!mode || mode === 'connected') return;
+  const badge = createModeBadge(mode);
+  if (badge) {
+    target.appendChild(document.createTextNode(' '));
+    target.appendChild(badge);
+  }
+}
+
 export function createStudentView(context = {}) {
   return {
     renderIdentity({ me, devices, sessions } = {}) {
       const container = document.createElement('div');
       container.className = 'student-identity-view';
 
-      const mode = me?.mode || devices?.mode || sessions?.mode || null;
-      const modeBadge = createModeBadge(mode);
-
-      // 1. 에러 상태 (me 또는 관련 자원의 error)
-      const isError = me?.status === 'error' || (!me?.status && (devices?.status === 'error' || sessions?.status === 'error'));
-      if (isError) {
-        const errorObj = me?.error || devices?.error || sessions?.error;
-        const msg = errorObj?.message || '서버에 연결하지 못했습니다.';
+      // 1. me 가 에러인 경우: 사용자 정보를 일체 노출하지 않고 오류 문구 표시
+      if (me?.status === 'error') {
+        const msg = formatErrorMessage(me.error, '서버에 연결하지 못했습니다.');
 
         const errorP = document.createElement('p');
         errorP.className = 'state state-error';
         errorP.setAttribute('data-student-status', 'error');
-        errorP.textContent = `연결 실패: ${msg}`;
+        errorP.textContent = msg;
         container.appendChild(errorP);
 
-        if (modeBadge) {
-          container.appendChild(modeBadge);
+        if (devices?.status === 'error' && devices.error?.message && devices.error.message !== me.error?.message) {
+          const devErrP = document.createElement('p');
+          devErrP.className = 'state state-error';
+          devErrP.textContent = formatErrorMessage(devices.error, '기기 정보 조회 실패');
+          container.appendChild(devErrP);
         }
+        if (sessions?.status === 'error' && sessions.error?.message && sessions.error.message !== me.error?.message) {
+          const sessErrP = document.createElement('p');
+          sessErrP.className = 'state state-error';
+          sessErrP.textContent = formatErrorMessage(sessions.error, '세션 정보 조회 실패');
+          container.appendChild(sessErrP);
+        }
+
+        renderModeBadges(container, [me, devices, sessions]);
         return container;
       }
 
-      // 2. 로딩 상태
-      const isLoading = me?.status === 'loading' || (!me?.status && (devices?.status === 'loading' || sessions?.status === 'loading'));
-      if (isLoading) {
+      // 2. 전체가 로딩 중이거나 오류 없이 초기 로딩 상태인 경우
+      const anyError = devices?.status === 'error' || sessions?.status === 'error';
+      const anyOk = me?.status === 'ok' || devices?.status === 'ok' || sessions?.status === 'ok';
+
+      if (!anyError && !anyOk && (me?.status === 'loading' || devices?.status === 'loading' || sessions?.status === 'loading')) {
         const loadingP = document.createElement('p');
         loadingP.className = 'state state-loading';
         loadingP.setAttribute('data-student-status', 'loading');
         loadingP.textContent = '불러오는 중';
         container.appendChild(loadingP);
 
-        if (modeBadge) {
-          container.appendChild(modeBadge);
-        }
+        renderModeBadges(container, [me, devices, sessions]);
         return container;
       }
 
-      // 3. 정상(ok) 상태
-      if (me?.status === 'ok' || devices?.status === 'ok' || sessions?.status === 'ok') {
-        container.setAttribute('data-student-status', 'ok');
+      // 3. me 가 ok 이거나 개별 자원의 로딩/오류/데이터가 존재하는 경우
+      // 상단 모드 안내 (me, devices, sessions 의 모드 안내가 가려지지 않음)
+      renderModeBadges(container, [me, devices, sessions]);
 
-        if (modeBadge) {
-          const modeWrap = document.createElement('div');
-          modeWrap.style.marginBottom = '8px';
-          modeWrap.appendChild(modeBadge);
-          container.appendChild(modeWrap);
-        }
+      // 개별 자원 오류가 있으면 상단 오류 메시지 표시
+      if (devices?.status === 'error') {
+        const devErrP = document.createElement('p');
+        devErrP.className = 'state state-error';
+        devErrP.setAttribute('data-student-device-error', '');
+        devErrP.textContent = formatErrorMessage(devices.error, '기기 정보를 불러오지 못했습니다.');
+        container.appendChild(devErrP);
+      }
+      if (sessions?.status === 'error') {
+        const sessErrP = document.createElement('p');
+        sessErrP.className = 'state state-error';
+        sessErrP.setAttribute('data-student-session-error', '');
+        sessErrP.textContent = formatErrorMessage(sessions.error, '세션 정보를 불러오지 못했습니다.');
+        container.appendChild(sessErrP);
+      }
 
-        const dl = document.createElement('dl');
-        dl.className = 'identity';
+      const dl = document.createElement('dl');
+      dl.className = 'identity';
 
-        // 사용자
-        const user = me?.data?.user;
-        const dtUser = document.createElement('dt');
-        dtUser.textContent = '사용자';
-        const ddUser = document.createElement('dd');
-        ddUser.setAttribute('data-student-user', '');
+      // (1) 사용자 (me 기준)
+      const dtUser = document.createElement('dt');
+      dtUser.textContent = '사용자';
+      const ddUser = document.createElement('dd');
+      ddUser.setAttribute('data-student-user', '');
+
+      if (me?.status === 'loading') {
+        ddUser.textContent = '불러오는 중';
+      } else if (me?.status === 'ok') {
+        const user = me.data?.user;
         const userLabel = user?.label || '';
         const userId = user?.id || '';
         if (userLabel && userId && userLabel !== userId) {
@@ -120,15 +181,30 @@ export function createStudentView(context = {}) {
         } else {
           ddUser.textContent = userLabel || userId || '확인 불가';
         }
-        dl.appendChild(dtUser);
-        dl.appendChild(ddUser);
+        appendInlineModeBadge(ddUser, me.mode);
+      } else {
+        ddUser.textContent = '확인 불가';
+      }
+      dl.appendChild(dtUser);
+      dl.appendChild(ddUser);
 
-        // 기기
-        const device = me?.data?.device || (Array.isArray(devices?.data) ? devices.data[0] : null);
-        const dtDevice = document.createElement('dt');
-        dtDevice.textContent = '기기';
-        const ddDevice = document.createElement('dd');
-        ddDevice.setAttribute('data-student-device', '');
+      // (2) 기기 (devices 오류/로딩을 me.data.device 보다 먼저 처리)
+      const dtDevice = document.createElement('dt');
+      dtDevice.textContent = '기기';
+      const ddDevice = document.createElement('dd');
+      ddDevice.setAttribute('data-student-device', '');
+
+      if (devices?.status === 'error') {
+        ddDevice.setAttribute('data-status', 'error');
+        ddDevice.textContent = formatErrorMessage(devices.error, '기기 확인 불가');
+        appendInlineModeBadge(ddDevice, devices.mode);
+      } else if (devices?.status === 'loading') {
+        ddDevice.setAttribute('data-status', 'loading');
+        ddDevice.textContent = '불러오는 중';
+        appendInlineModeBadge(ddDevice, devices.mode);
+      } else {
+        // devices 가 ok 이거나 명시적 오류/로딩이 아닐 때 기기 정보 선택
+        const device = (Array.isArray(devices?.data) && devices.data.length > 0 ? devices.data[0] : null) || me?.data?.device;
         if (device) {
           const devLabel = device.label || '';
           const devId = device.id || '';
@@ -137,50 +213,46 @@ export function createStudentView(context = {}) {
           ddDevice.setAttribute('data-status', devStatus);
           const devStatusKorean = mapDeviceStatus(devStatus);
           ddDevice.textContent = `${devName} · ${devStatusKorean} (${devStatus})`;
-        } else if (devices?.status === 'loading') {
-          ddDevice.textContent = '불러오는 중';
-        } else if (devices?.status === 'error') {
-          ddDevice.textContent = `연결 실패: ${devices.error?.message || '확인 불가'}`;
         } else {
           ddDevice.textContent = '확인 불가';
         }
-        dl.appendChild(dtDevice);
-        dl.appendChild(ddDevice);
+        appendInlineModeBadge(ddDevice, devices?.mode || me?.mode);
+      }
+      dl.appendChild(dtDevice);
+      dl.appendChild(ddDevice);
 
-        // 세션
-        const session = me?.data?.session || (Array.isArray(sessions?.data) ? sessions.data[0] : null);
-        const dtSession = document.createElement('dt');
-        dtSession.textContent = '세션';
-        const ddSession = document.createElement('dd');
-        ddSession.setAttribute('data-student-session', '');
+      // (3) 세션 (sessions 오류/로딩을 me.data.session 보다 먼저 처리)
+      const dtSession = document.createElement('dt');
+      dtSession.textContent = '세션';
+      const ddSession = document.createElement('dd');
+      ddSession.setAttribute('data-student-session', '');
+
+      if (sessions?.status === 'error') {
+        ddSession.setAttribute('data-status', 'error');
+        ddSession.textContent = formatErrorMessage(sessions.error, '세션 확인 불가');
+        appendInlineModeBadge(ddSession, sessions.mode);
+      } else if (sessions?.status === 'loading') {
+        ddSession.setAttribute('data-status', 'loading');
+        ddSession.textContent = '불러오는 중';
+        appendInlineModeBadge(ddSession, sessions.mode);
+      } else {
+        // sessions 가 ok 이거나 명시적 오류/로딩이 아닐 때 세션 정보 선택
+        const session = (Array.isArray(sessions?.data) && sessions.data.length > 0 ? sessions.data[0] : null) || me?.data?.session;
         if (session) {
           const sessId = session.id || '세션';
           const sessStatus = session.status || 'unknown';
           ddSession.setAttribute('data-status', sessStatus);
           const sessStatusKorean = mapSessionStatus(sessStatus);
           ddSession.textContent = `${sessId} · ${sessStatusKorean} (${sessStatus})`;
-        } else if (sessions?.status === 'loading') {
-          ddSession.textContent = '불러오는 중';
-        } else if (sessions?.status === 'error') {
-          ddSession.textContent = `연결 실패: ${sessions.error?.message || '확인 불가'}`;
         } else {
           ddSession.textContent = '확인 불가';
         }
-        dl.appendChild(dtSession);
-        dl.appendChild(ddSession);
-
-        container.appendChild(dl);
-        return container;
+        appendInlineModeBadge(ddSession, sessions?.mode || me?.mode);
       }
+      dl.appendChild(dtSession);
+      dl.appendChild(ddSession);
 
-      // 4. 예외/초기 fallback
-      const fallbackP = document.createElement('p');
-      fallbackP.className = 'state state-empty';
-      fallbackP.textContent = '확인 불가: 표시할 사용자·기기·세션 정보가 없습니다.';
-      container.appendChild(fallbackP);
-      if (modeBadge) {
-        container.appendChild(modeBadge);
-      }
+      container.appendChild(dl);
       return container;
     },
     renderDecision() { return '학생 구현 대기: 서버의 판정과 이유를 연결하세요.'; },
