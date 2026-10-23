@@ -2,10 +2,11 @@ artifacts/
 bundle-notes.json
 .env
 .env.*
+.env*
+!.env.example
+!on-client/.env.example
 node_modules/
 public/aleph.json
-
 .vercel
-.env*
 *.log
 xdr/blocklist.json
