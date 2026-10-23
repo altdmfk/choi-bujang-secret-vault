@@ -248,26 +248,26 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   > 22단계 통과는 원문 검토 기준의 수료 판정이며, 실제 운영 인증이나 v1.0 자동 인증이 아닙니다. 19단계 실제 원격 조치 집행기 연동과 21·22단계 공식 접수 서명 연결이 완료되기 전까지는 정식 `v1.0`으로 표기하지 않고 검증 중인 버전으로 유지합니다.
 
 #### 8.1.1 고정 재현 커밋(`3e9beee`)과 현재 제출본 간 파일별 차분(Diff) 및 실행 코드 일치 검증
-- **실행 코드 및 런타임 스크립트 일치 여부**: **완전 동일 (Diff 0건)**
+- **실행 코드 및 런타임 스크립트 일치 여부**: **변경 없음 (0 diff)**
   - 대조 명령: `git diff 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD -- on-client/src on-client/student on-client/public on-client/tools`
-  - 결과: 변경 사항 없음 (`0 diff`). 비즈니스 로직, 에이전트 확장 모듈, 서버 라우팅, 프론트엔드 스크립트, 실행 도구(`start-alekov.ps1`)는 재현 대상 커밋과 완전히 동일합니다.
-- **의존성 명세 및 락파일 일치 여부**: **완전 동일 (Diff 0건)**
+  - 결과: 변경 사항 없음 (`0 diff`). 비즈니스 로직, 에이전트 확장 모듈, 서버 라우팅, 프론트엔드 스크립트, 실행 도구(`start-alekov.ps1`)는 재현 대상 커밋과 차분이 없습니다.
+- **의존성 명세 및 락파일 일치 여부**: **변경 없음 (0 diff)**
   - 대조 명령: `git diff 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD -- package.json package-lock.json on-client/package.json`
-  - 결과: 변경 사항 없음 (`0 diff`). `on-client`는 외부 npm 의존성이 없어 `on-client/package-lock.json`이 존재하지 않으며 루트의 `package-lock.json`이 락파일 역할을 수행합니다. 의존성 버전 및 설치 무결성은 재현 대상 커밋과 완전히 동일합니다.
+  - 결과: 변경 사항 없음 (`0 diff`). `on-client`는 외부 npm 의존성이 없어 `on-client/package-lock.json`이 존재하지 않으며 루트의 `package-lock.json`이 락파일 역할을 수행합니다. 의존성 버전 및 설치 무결성은 재현 대상 커밋과 동일하게 유지됩니다.
 - **핵심 실행 코드 및 의존성 파일 해시 대조 (두 커밋 간 무결성 증명)**:
-  - 심사관 환경에서 이전 커밋(`3e9beee`)의 Git 트리를 직접 조회할 수 없는 경우에도, 현재 제출본의 파일 해시와 아래 표를 대조하여 실행 코드·스크립트·락파일이 단 1바이트도 변경되지 않았음을 검증할 수 있습니다.
-  - Git Blob 해시는 형상 관리 객체 식별자이며, SHA-256은 표준 파일 무결성 해시입니다. 두 커밋(`3e9beee` 및 `HEAD`)의 해시는 완전히 동일합니다.
+  - 심사관 환경에서 이전 커밋(`3e9beee`)의 Git 트리를 직접 조회할 수 없는 경우에도, 현재 제출본의 파일 해시와 아래 표를 대조하여 실행 코드·스크립트·락파일에 변경이 없음을 확인할 수 있습니다.
+  - Git Blob 해시는 형상 관리 객체 식별자이며, SHA-256은 표준 파일 무결성 해시입니다. 두 커밋(`3e9beee` 및 `HEAD`)에서 산출된 해시값이 일치함을 확인하였습니다.
 
-| 파일 경로 | Git Blob 해시 (3e9beee / HEAD 동일) | 파일 SHA-256 해시 | 일치 검증 |
+| 파일 경로 | Git Blob 해시 (3e9beee / HEAD) | 파일 SHA-256 해시 | 대조 결과 |
 |---|---|---|---|
-| `on-client/src/server.mjs` | `42774051fa29614e28f4f823db41fe33942166ed` | `b7a151f05ba990f1ad52f4a96fb0ff2a53250f0564b2fc844937cdae70ff2794` | **동일 (일치)** |
-| `on-client/src/engine.mjs` | `6ceb3560da2ecd3cd4b29789204b4432f6073c69` | `67a4f794eccbe7c5ba922b030cacb92c1473e2f9ef6ab1a69f8619a3292c58df` | **동일 (일치)** |
-| `on-client/student/extension.mjs` | `5c6ee174bf67954b26c395484bf5428536fb9056` | `d6133b9e08d7d3db79aad87965e7c0ade3468543fefa51743f0eb1b49d2d6978` | **동일 (일치)** |
-| `on-client/public/app.js` | `002bfdf421f0005c14bb98dcbf3d0163f4be091d` | `e4330a92e5a5bdceed3489088eef5a566dac24341955259feada845473debf7a` | **동일 (일치)** |
-| `on-client/tools/start-alekov.ps1` | `809bccc4cbc9a5fc2f89f1a20e276d7c0c265f30` | `273c0b54337155d04d97f133a960e969a6a846b4863edddb647d755067ed18b9` | **동일 (일치)** |
-| `package.json` | `52bcdd986d9b048cbbac4e88b5c3ef02955e58d9` | `b69708cbfb2fa14b3133a7437c4c92a6384465439cc5453a9d5a9c3a30f8c960` | **동일 (일치)** |
-| `package-lock.json` | `92791113c9680fb69cb531de7847b84ecb3f4553` | `7f7274c94193a44840a4cb1fd4a1dc8eccf51414de0dbb8de46eb344367b55d0` | **동일 (일치)** |
-| `on-client/package.json` | `1a4bd0c7c9f4e2ae335bea28f28926ac015f225f` | `1e111473de7526fd674a6a5fab7167921e2f3c7ccc8a45019712585e0965a419` | **동일 (일치)** |
+| `on-client/src/server.mjs` | `42774051fa29614e28f4f823db41fe33942166ed` | `b7a151f05ba990f1ad52f4a96fb0ff2a53250f0564b2fc844937cdae70ff2794` | **일치** |
+| `on-client/src/engine.mjs` | `6ceb3560da2ecd3cd4b29789204b4432f6073c69` | `67a4f794eccbe7c5ba922b030cacb92c1473e2f9ef6ab1a69f8619a3292c58df` | **일치** |
+| `on-client/student/extension.mjs` | `5c6ee174bf67954b26c395484bf5428536fb9056` | `d6133b9e08d7d3db79aad87965e7c0ade3468543fefa51743f0eb1b49d2d6978` | **일치** |
+| `on-client/public/app.js` | `002bfdf421f0005c14bb98dcbf3d0163f4be091d` | `e4330a92e5a5bdceed3489088eef5a566dac24341955259feada845473debf7a` | **일치** |
+| `on-client/tools/start-alekov.ps1` | `809bccc4cbc9a5fc2f89f1a20e276d7c0c265f30` | `273c0b54337155d04d97f133a960e969a6a846b4863edddb647d755067ed18b9` | **일치** |
+| `package.json` | `52bcdd986d9b048cbbac4e88b5c3ef02955e58d9` | `b69708cbfb2fa14b3133a7437c4c92a6384465439cc5453a9d5a9c3a30f8c960` | **일치** |
+| `package-lock.json` | `92791113c9680fb69cb531de7847b84ecb3f4553` | `7f7274c94193a44840a4cb1fd4a1dc8eccf51414de0dbb8de46eb344367b55d0` | **일치** |
+| `on-client/package.json` | `1a4bd0c7c9f4e2ae335bea28f28926ac015f225f` | `1e111473de7526fd674a6a5fab7167921e2f3c7ccc8a45019712585e0965a419` | **일치** |
 
 - **파일별 차분 내역 (`git diff --stat 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD`)**:
   - `.env.example`: 이동용 환경 템플릿에 Node.js 24 내장 `--env-file` 및 PowerShell 직접 주입 실행 절차 설명 보완
@@ -473,7 +473,7 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   - PowerShell 기반 네이티브 호스트 레지스트리 (`native-host-registry.ps1`)
   - `native-context.mjs`의 Native 계정 연결 모듈 (`process.platform !== 'win32'` 시 `DISABLED` 거부)
 - **비-Windows OS (macOS, Linux) 지원 범위 및 미검증 명시**:
-  - 기본 대시보드 웹 서빙, 데모 모드, 문법 검사는 완전 지원됩니다.
+  - 기본 대시보드 웹 서빙, 데모 모드, 문법 검사는 정상 지원됩니다.
   - 외부 SDP mTLS 릴레이 연결은 플랫폼 독립 코드로 구현되어 있으나, 실제 비-Windows 실물 머신에서의 mTLS 핸드셰이크 실측 시험을 수행하지 않은 **「미검증 지원 범위」** 로 명시합니다. Native 계정 연결 및 DPAPI 자격 보관함은 Windows 전용이므로 비-Windows에서는 지원되지 않습니다.
 
 #### 8.6.3 정식 v1.0 미발행 사유 및 미확인(UNV) 스펙

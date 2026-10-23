@@ -283,9 +283,9 @@ flowchart LR
 - **릴리스 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
   - 18단계 AI 설명 보고서 표시 미확인, 19단계 실제 원격 조치 집행기 미연결(`ACTION_UNSUPPORTED`), 21·22단계 공식 접수 서명 미연결 상태이므로 정식 `v1.0` 대신 검증 중인 버전으로 표기합니다.
 - **고정 재현 커밋(`3e9beee`)과의 파일별 차분 및 코드 일치 검증**:
-  - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `on-client/tools/**`): **완전 동일 (`0 diff`)**
-  - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package.json`): **완전 동일 (`0 diff`, `on-client`는 외부 의존성이 없어 루트 `package-lock.json` 사용)**
-  - 핵심 파일 8종 Git Blob 및 SHA-256 해시 대조: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md) 8.1.1 표 수록 (두 커밋 간 100% 동일)
+  - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `on-client/tools/**`): **변경 없음 (`0 diff`)**
+  - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package.json`): **변경 없음 (`0 diff`, `on-client`는 외부 의존성이 없어 루트 `package-lock.json` 사용)**
+  - 핵심 파일 8종 Git Blob 및 SHA-256 해시 대조: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md) 8.1.1 표 수록 (두 커밋의 산출 해시 일치 확인)
   - 파일별 차분 대상: `docs/STUDENT_RUNBOOK.md`, `README.md`, `.env.example`, `on-client/.env.example` (문서 및 환경 템플릿 보완 전용)
 - **현재 제출본 기준 재확인 항목**:
   - 확장 모듈 단일 파일 문법 검사(`npm --prefix on-client run check` - `student/extension.mjs` 대상 `node --check`), 기본 HTTP 기동(`npm start`) 및 `/api/diagnostics` 응답, 취약점 `idle` 대기 및 버튼 클릭 분기(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`), 데모 모드(`npm run demo`) 사건 1건 및 인가 배지 3종 렌더링, 데이터 복원 테스트(`npm run test:restore` 9건 통과)
@@ -350,7 +350,7 @@ flowchart LR
 - **OS 지원 범위 분리**:
   - 플랫폼 독립 공통 구현: 순수 HTTP 서버 구동(`npm start`), 대시보드 서빙, 데모 모드(`npm run demo`), 문법 검사(`npm run check`), 외부 SDP mTLS HTTPS 릴레이 호스트(`sdp-host.mjs`, `sdp-host-config.mjs`)
   - Windows 전용 기능: CurrentUser DPAPI 자격 보관함, PowerShell 네이티브 레지스트리, Native 계정 연결 모듈
-  - 비-Windows 환경(macOS, Linux): 기본 웹 UI 및 데모 실행 완전 지원. 외부 SDP mTLS 연결은 코드상 플랫폼 독립 구현이나 실물 미실측에 따른 「미검증 지원 범위」로 명시
+  - 비-Windows 환경(macOS, Linux): 기본 웹 UI 및 데모 실행 정상 지원. 외부 SDP mTLS 연결은 코드상 플랫폼 독립 구현이나 실물 미실측에 따른 「미검증 지원 범위」로 명시
 
 ---
 
