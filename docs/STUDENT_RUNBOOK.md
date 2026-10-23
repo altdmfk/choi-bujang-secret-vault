@@ -6,81 +6,92 @@
 
 ## 1. 시스템 개요
 
-케셰브는 엔드포인트 보호 및 제로 트러스트(ZTNA) 접근 제어를 수행하는 로컬 보안 Agent입니다. 
+케셰브는 엔드포인트 보호 및 제로 트러스트(ZTNA) 접근 제어 상태를 시각화하는 로컬 보안 Agent입니다. 
 사내 직원의 단말에서 신원과 기기 승인 상태를 검증합니다. 
-업무 애플리케이션 접근 인가와 실시간 보안 사건(XDR)을 감시합니다. 
-소프트웨어 의존성 취약점(OSV)을 점검합니다. 
-수업용 AI 게이트웨이(CLCO)와 연동하여 보안 사건 원인을 분석하고 대응 조치를 실행합니다.
+업무 애플리케이션 접근 인가 결과와 보안 사건(XDR) 기록을 조회하여 표시합니다. 
+소프트웨어 의존성 취약점(OSV) 점검 상태를 분류합니다. 
+수업용 AI 게이트웨이(CLCO)와 연동하여 보안 사건 원인 설명과 권고 조치 상태를 렌더링합니다.
 
-### 핵심 기능 목록
-- **신원 및 기기 세션 검증**: 사용자 신원, 기기 승인 상태, 활성 세션 정보 표시 (`renderIdentity`)
-- **업무 앱 인가 판정**: 앱별 인가 결과(`allow`, `deny`, `challenge`) 및 사유 판정 (`renderDecision`)
-- **실시간 보안 사건 감시**: XDR 보안 이벤트, 침해 시도 근거, 규칙 매칭 내역 추적 (`renderEvents`)
-- **보호 현황 요약**: 단말 상태, 세션 건수, 시스템 알림, 진단 지표 매트릭스 집약 (`renderStatus`)
-- **AI 게이트웨이 연동**: CLCO 게이트웨이 통신 상태, 허용 모델, 네트워크 지연시간 진단 (`renderAiConnection`)
-- **보안 사건 AI 분석**: 침해 탐지 로그 심층 분석 및 주의사항 도출 (`renderExplanation`)
-- **보안 대응 조치 실행**: 세션 격리, 기기 차단 실행, 전자 영수증(`receipt`) 발급 (`renderAction`)
-- **소프트웨어 취약점 점검**: `package-lock.json` 기반 OSV 취약점 분석 및 상태 분류 (`renderVulnerabilities`)
+### 핵심 기능 목록 (학생 화면 구현 영역)
+- **신원 및 기기 세션 표시**: 사용자 신원, 기기 상태, 활성 세션 정보 표시 (`renderIdentity`)
+- **업무 앱 인가 결과 렌더링**: 앱별 인가 판정 결과(`allow`, `deny`, `challenge`) 및 사유 표시 (`renderDecision`)
+- **보안 사건 모니터링**: XDR 보안 이벤트, 침해 시도 근거, 규칙 매칭 내역 렌더링 (`renderEvents`)
+- **보호 현황 매트릭스**: 단말 상태, 세션 건수, 시스템 알림, 진단 지표 집약 표시 (`renderStatus`)
+- **AI 게이트웨이 점검 상태 표시**: AI 인증 상태, 가용 모델 수, 점검 시각 렌더링 (`renderAiConnection`)
+- **보안 사건 AI 설명 렌더링**: 이상 사건에 대한 AI 원인 분석 보고서 및 주의사항 표시 (`renderExplanation`)
+- **보안 조치 상태 뷰**: 전달받은 조치 진행 상태(`prepared`, `pending`, `succeeded`, `denied` 등)와 영수증 정보 표시 (`renderAction`)
+- **의존성 취약점 점검 표시**: 프로젝트 패키지 취약점 스캔 상태 및 결과 렌더링 (`renderVulnerabilities`)
 
 ---
 
-## 2. 시스템 구성도 및 데이터 흐름
+## 2. 시스템 구성도 및 통신 경로
+
+케셰브는 로컬 UI, 로컬 백엔드 서버, 외부 SDP 릴레이 서버, 수업용 AI 게이트웨이 및 기존 배포 자료실 API로 구성됩니다.
+상호 독립적인 3대 통신 경로(Native 계정 연결, SDP mTLS HTTPS 릴레이, 기존 자료실 API)를 분리하여 운영합니다.
 
 ### 2.1 아키텍처 다이어그램
 
 ```mermaid
 flowchart LR
-    subgraph Layer1["1. 클라이언트 레이어 (UI)"]
+    subgraph ClientLayer["1. 클라이언트 레이어 (UI)"]
         Browser["웹 브라우저 대시보드<br/>on-client/public/index.html<br/>on-client/student/extension.mjs<br/>http://127.0.0.1:5189/"]
     end
 
-    subgraph Layer2["2. 로컬 앱 서버 레이어 (케셰브)"]
-        Server["Node.js HTTP 서버 & 엔진<br/>on-client/src/server.mjs<br/>on-client/src/engine.mjs<br/>127.0.0.1:5189"]
+    subgraph LocalServer["2. 로컬 앱 서버 레이어 (케셰브)"]
+        AppServer["Node.js HTTP 서버 & 엔진<br/>on-client/src/server.mjs<br/>on-client/src/engine.mjs<br/>127.0.0.1:5189"]
+        SdpModule["SDP 호스트 모듈<br/>on-client/src/engine/sdp-host.mjs<br/>sdp-host-config.mjs"]
+        NativeModule["Native 계정 연결 모듈<br/>on-client/src/connection/native-login.mjs<br/>native-context.mjs"]
         Vault["자격 보관함 (Credential Vault)<br/>on-client/src/ai/credential-vault.mjs"]
     end
 
-    subgraph Layer3["3. 접근 제어 및 XDR 레이어"]
-        Decider["ZTNA 판정기 & 이상 탐지기<br/>src/decider.mjs<br/>src/detect.mjs"]
-        XDR["XDR 탐지 샌드박스<br/>xdr/*"]
-        VaultAPI["자료실 백엔드 API<br/>api/notes.js, api/device.js"]
+    subgraph ExternalSDP["3. 외부 SDP 릴레이 서버"]
+        SDPRelay["SDP Admission 릴레이 엔드포인트<br/>https://<host>:<port>/alekov/*<br/>(/alekov/decision, /alekov/events 등)"]
     end
 
-    subgraph Layer4["4. AI 서비스 레이어 (CLCO)"]
-        AIGateway["수업용 AI 게이트웨이<br/>on-client/src/ai/service.mjs<br/>on-client/vendor/clco-http.mjs"]
+    subgraph AIGateway["4. AI 서비스 레이어 (CLCO)"]
+        CLCO["수업용 AI 게이트웨이<br/>on-client/src/ai/service.mjs<br/>on-client/vendor/clco-http.mjs"]
     end
 
-    Browser <-->|"단계 1: Loopback HTTP 요청"| Server
-    Server <-->|"단계 2: SDP Host IPC / Native 통신"| Decider
-    Server <-->|"단계 3: 자격 보관함 기반 REST 통신"| AIGateway
-    Decider --- XDR
-    Decider --- VaultAPI
+    subgraph LegacyVault["5. 기존 자료실 백엔드 (1~12단계)"]
+        VaultAPI["Vercel/Supabase 자료실 API<br/>api/notes.js, api/device.js"]
+    end
+
+    Browser <-->|"Loopback HTTP REST (/api/*)"| AppServer
+    AppServer --- NativeModule
+    AppServer --- SdpModule
+    AppServer --- Vault
+    NativeModule -.->|"경로 A: Native Host 설정 기반 포털 승인"| Browser
+    SdpModule <-->|"경로 B: mTLS 클라이언트 인증서 + Bearer HTTPS POST"| SDPRelay
+    Vault <-->|"경로 C: Credential Vault 기반 REST 통신"| AIGateway
+    Browser -.->|"경로 D: 별도 HMAC 서명 기반 기기 승인/메모 조회"| VaultAPI
 ```
 
-### 2.2 단계별 데이터 흐름 (Data Flow)
+### 2.2 독립 3대 통신 경로 및 데이터 흐름
 
-1. **트래픽 유입 (Traffic Ingress)**: 
-   - 브라우저가 로컬 호스트(`http://127.0.0.1:5189/`)로 진입합니다.
-   - 로컬 앱 서버(`server.mjs`)가 정적 자산을 반환하고 루프백 REST 엔드포인트를 개방합니다.
-2. **신원 및 기기 인증 (Authentication & Device Verification)**:
-   - 클라이언트가 `/api/me`, `/api/devices`, `/api/sessions`를 호출합니다.
-   - 서버가 로컬 신원 매핑 테이블과 기기 승인 토큰(HMAC)을 대조하여 인증 상태를 반환합니다.
-3. **ZTNA 인가 및 비즈니스 로직 처리 (Authorization & Logic Processing)**:
-   - 클라이언트가 업무 앱 접근을 요청합니다(`/api/access`).
-   - ZTNA 판정기(`src/decider.mjs`)가 기기 등록 여부, 추가 인증(Step-up), 구역 규칙(Zone rule)을 순차 검증합니다.
-   - 판정기가 최종 인가 결과(`allow`, `deny`, `challenge`)를 확정합니다.
-4. **보안 모니터링 및 AI 연동 (XDR & AI Integration)**:
-   - 이상 탐지기(`src/detect.mjs`)와 XDR 모듈이 보안 이벤트를 생성합니다.
-   - 클라이언트가 사건 분석을 요청하면(`/api/ai/explain`), 로컬 서버가 자격 보관함(`Credential Vault`)에서 앱 전용 토큰을 추출합니다.
-   - 서버가 CLCO AI 게이트웨이에 분석을 요청하고, 검증된 분석 결과를 클라이언트에 전달합니다.
+1. **경로 A: Native 계정 연결 경로 (로컬 계정 승인)**
+   - 모듈: `on-client/src/connection/native-login.mjs`, `native-context.mjs`
+   - 방식: `-NativeHostConfig` 옵션으로 주입된 설정을 바탕으로 로컬 포털 승인 번호를 확인하고 계정 컨텍스트를 바인딩합니다.
+   - 특징: SDP 릴레이와 독립된 로컬 사용자 인증 절차입니다.
+2. **경로 B: 외부 SDP 릴레이 인증·인가 경로 (mTLS HTTPS 통신)**
+   - 모듈: `on-client/src/engine/sdp-host.mjs`, `sdp-host-config.mjs`
+   - 엔드포인트: 외부 SDP 서버의 `https://<host>:<port>/alekov/decision`, `/alekov/context`, `/alekov/events`, `/alekov/devices`, `/alekov/sessions`
+   - 프로토콜: **mTLS(클라이언트 인증서 `certFile`, 개인키 `keyFile`, `caFile`) 및 Bearer 토큰(`tokenFile`) 기반의 HTTPS POST 릴레이 요청**
+   - 역할: 인가 결정(`decideAccess`) 및 사건·기기·세션 관측 데이터를 외부 SDP 릴레이로부터 수신합니다. IPC나 루트 판정기 직접 호출이 아닌 외부 HTTPS 네트워크 릴레이 통신입니다.
+3. **경로 C: 기존 자료실 API 경로 (1~12단계 배포 서비스)**
+   - 모듈: 루트의 `api/notes.js`, `api/device.js`
+   - 방식: Vercel/Supabase 상에 배포된 기존 자료실 서버와 HMAC-SHA256 기기 승인 토큰을 교환하여 메모 CRUD를 수행합니다.
+   - 특징: on-client의 SDP 릴레이 통신 및 Native 로그인과 분리된 별도 데이터 백엔드입니다.
 
 ### 2.3 컴포넌트별 역할 정의
 
 | 컴포넌트 | 위치 | 역할 정의 |
 |---|---|---|
-| **사용자 브라우저** | `on-client/public/`<br/>`on-client/student/extension.mjs` | DOM 렌더링을 실행하고 사용자 인터랙션을 수신합니다. 보안 토큰은 메모리에만 유지합니다. |
-| **로컬 앱 서버** | `on-client/src/server.mjs`<br/>`on-client/src/engine.mjs` | 루프백 통신만 허용합니다. API 요청을 라우팅하고 자격 보관함을 격리 운영합니다. |
-| **접근 제어·XDR 시스템** | `src/decider.mjs`<br/>`src/detect.mjs`<br/>`xdr/`, `api/` | ZTNA 3대 인가 규칙을 집행합니다. 이상 징후를 탐지하고 공격 패턴을 차단합니다. |
-| **AI 게이트웨이 (CLCO)** | `on-client/src/ai/`<br/>`on-client/vendor/clco-http.mjs` | 수업용 모델 목록을 공급합니다. 보안 사건 분석 및 조치 권고안을 생성합니다. |
+| **사용자 브라우저** | `on-client/public/`<br/>`on-client/student/extension.mjs` | DOM 렌더링을 실행하고 사용자 인터랙션을 수신합니다. 비밀 토큰은 일체 보관하지 않습니다. |
+| **로컬 앱 서버** | `on-client/src/server.mjs`<br/>`on-client/src/engine.mjs` | 루프백(127.0.0.1) REST API를 서빙합니다. Credential Vault를 격리 운영합니다. |
+| **SDP 호스트 모듈** | `on-client/src/engine/sdp-host.mjs`<br/>`sdp-host-config.mjs` | 외부 SDP 릴레이 서버와 mTLS HTTPS 통신을 수행합니다. 인가 및 사건 데이터를 검증합니다. |
+| **외부 SDP 릴레이 서버** | `https://<host>:<port>/alekov/*` | mTLS와 Bearer 토큰을 검증하고, ZTNA 접근 인가 판정 및 감사 이벤트를 회신합니다. |
+| **AI 게이트웨이 (CLCO)** | `on-client/src/ai/`<br/>`on-client/vendor/clco-http.mjs` | 수업용 모델 목록을 공급합니다. 보안 사건 분석 질의를 중계합니다. |
+| **기존 자료실 API** | 루트 `api/notes.js`, `api/device.js` | 1~12단계 배포 인프라입니다. HMAC 기반 기기 승인 및 메모 조회를 독립 처리합니다. |
 
 ---
 
@@ -135,7 +146,7 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   ```
 
 ### 4.4 종료 및 재실행
-- **종료**: 실행 중인 PowerShell 창에서 `Ctrl + C`를 입력합니다. 브라우저 연결이 끊어지면 프로세스가 정상 종료됩니다.
+- **종료**: 실행 중인 PowerShell 창에서 `Ctrl + C`를 입력합니다.
 - **재실행**: 종료 확인 후 4.2의 실행 명령어를 다시 입력합니다. 데이터와 기존 코드는 온전히 보존됩니다.
 
 ---
@@ -146,20 +157,23 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 
 ### 5.1 제공 프레임워크 영역 (수정 금지)
 - `on-client/src/server.mjs`: 로컬 HTTP 라우팅 및 정적 파일 서빙
-- `on-client/src/engine.mjs`: 로컬 런타임 엔진 제어
+- `on-client/src/engine/sdp-host.mjs`: 외부 SDP 릴레이 서버와의 mTLS HTTPS 통신 및 데이터 캡슐화
+- `on-client/src/connection/`: Native 계정 연결 관리
 - `on-client/src/ai/`: CLCO 게이트웨이 클라이언트 및 Credential Vault 관리
+- `on-client/src/vulnerabilities/project-scan.mjs`: 로컬 락파일 파싱 및 패키지 쿼리 빌드
 - `on-client/public/app.js`: 데이터 폴링 및 전역 이벤트 오케스트레이션
 - `on-client/tools/start-alekov.ps1`: 실행 전 환경 검증 및 부팅 래퍼
 
 ### 5.2 학생 구현 영역 (`on-client/student/extension.mjs`)
-- `renderIdentity`: 신원, 기기, 세션 정보 DOM 렌더링 및 예외 텍스트 출력
+학생은 `createStudentView` 내부의 8대 화면 표시(View) 함수를 구현하였습니다:
+- `renderIdentity`: 사용자 신원, 기기 상태, 세션 정보 DOM 렌더링
 - `renderDecision`: 인가 판정 배지 및 거절 사유 렌더링
 - `renderEvents`: 보안 이벤트 목록, 증거, 룰 식별자 렌더링
 - `renderStatus`: 기기, 세션, 알림 매트릭스 렌더링
-- `renderAiConnection`: AI 연결 상태, 모델명, 지연시간 렌더링
+- `renderAiConnection`: AI 인증 상태, 가용 모델 수, 점검 시각 렌더링 (모델명 목록이나 네트워크 지연시간은 표시하지 않음)
 - `renderExplanation`: AI 사건 해석 리포트 및 주의사항 렌더링
-- `renderAction`: 대응 조치 집행 UI, 영수증, 관측 결과 렌더링
-- `renderVulnerabilities`: 패키지 취약점 스캔 결과 및 미조회 상태 렌더링
+- `renderAction`: 전달받은 조치 상태(`idle`, `prepared`, `pending`, `succeeded` 등) 및 영수증 렌더링 (실행기가 아닌 상태 뷰어)
+- `renderVulnerabilities`: 패키지 취약점 스캔 결과 상태 렌더링
 
 ---
 
@@ -185,22 +199,32 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 | **권한 준비 중** | `ON_AI_PROVISIONING_PENDING` | AI 계정 권한 미발급 | 운영자 권한 반영 대기 |
 | **확인 불가** | `UNVERIFIED`, `CONTRACT_MISMATCH` | 응답 계약 검증 실패 | 화면 새로고침 및 도움정보 점검 |
 | **조회 실패** | `SERVER_UNAVAILABLE`, `TIMEOUT` | 네트워크 통신 장애 | 로컬 서버 구동 여부 확인 후 재시도 |
-| **취약점 조회 불가** | `LOOKUP_UNAVAILABLE` | OSV 조회 허용 목록 미제공 | 정상 분기. 패키지 버전만 단독 표시 |
+| **프로젝트 미설정** | `PROJECT_NOT_CONFIGURED` (`not_configured`) | 프로젝트 절대경로 설정 누락 | 담당자에게 프로젝트 경로를 확인한 뒤 설정을 주입하고 수동 재조회 |
+| **승인된 패키지 없음** | `NO_APPROVED_PACKAGES` (`not_checked`) | 공개 조회 승인 목록에 일치하는 패키지 부재 | 정상 분기 (`packages: []`). 담당자에게 공개 조회 승인 목록을 확인한 뒤 수동 재조회 |
+| **락파일 검증 불가** | `LOCKFILE_UNVERIFIABLE` (`unverifiable`) | lockfile 파일 변조 또는 무결성 검증 실패 | 락파일 무결성을 확인하고 수동 재조회 |
 
 ---
 
 ## 7. 지원 범위 및 미확인(UNV) 스펙
 
-실제 검증을 완료한 항목과 미확인(UNV) 항목을 명확히 구분합니다.
+시스템의 실제 지원 범위는 **화면 구현**, **별도 설정이 필요한 제공 연결**, **기본 미지원 집행**의 3단계로 명확히 구분됩니다.
 
-### 7.1 검증 완료 기능
-- **로컬 런타임 구동**: Windows Node.js 24.19.0 단독 실행 및 5189 포트 서빙 검증
-- **UI 렌더링 무결성**: 8대 UI 렌더러 함수의 DOM 생성(`createElement`), 텍스트 분기(`textContent`), 버튼 이벤트 바인딩 검증
-- **예외 처리 분기**: 외부 시스템 미연결 시 `연결 없음` 및 안전 대체 텍스트 출력 검증
-- **정적 문법 검사**: `npm run check` 통과 완료
+### 7.1 계층별 지원 범위
+1. **학생 화면 구현 영역 (검증 완료)**:
+   - 8대 UI 렌더러 함수의 DOM 생성(`createElement`), 텍스트 분기(`textContent`), 버튼 이벤트 바인딩 완료
+   - `renderAiConnection`: AI 인증 상태, 모델 수(`modelCount`), 점검 시각(`checkedAt`) 렌더링 확인 (모델명 목록이나 네트워크 지연시간은 미표시)
+   - `renderAction`: 전달받은 조치 상태(`idle`, `prepared`, `pending`, `succeeded`, `denied`, `unknown` 등) 표시 뷰어 동작 확인
+2. **별도 설정이 필요한 제공 연결 영역 (설정 주입 시 동작)**:
+   - `-NativeHostConfig`: Native 계정 연결 및 승인 컨텍스트 바인딩
+   - `-SdpHostConfig`: 외부 SDP 릴레이 서버와의 mTLS 클라이언트 인증서 기반 HTTPS 인가·사건 조회
+   - 기본 실행 시에는 해당 설정이 주입되지 않으므로 `연결 없음`(`NOT_MOUNTED`) 상태로 대기
+3. **기본 미지원 집행 영역 (플랫폼 정책상 미지원)**:
+   - `renderAction`은 조치 실행기가 아니며 상태 뷰어에 불과합니다.
+   - 기본 조치 요청은 `ACTION_UNSUPPORTED`를 반환합니다.
+   - 일반 SDP 기록의 `supportedActions`는 비어 있습니다 (`[]`). 실제 원격 조치 집행은 지원되지 않습니다.
 
 ### 7.2 미확인(기다림 - UNV) 항목
-- `UNV-01` **운영 SDP 호스트 mTLS 실시간 인증**: 실서버 상호 TLS 터널링 및 기기 인증서 실시간 검증 미확인
-- `UNV-02` **운영 상용 AI 모델 유료 생성 호출**: CLCO 게이트웨이 유료 LLM 실시간 토큰 과금 호출 미확인
-- `UNV-03` **엔터프라이즈 계정 실시간 강제 회수**: 디렉토리 서비스 기반 실시간 계정 정지 집행 미확인
-- `UNV-04` **글로벌 OSV 데이터베이스 라이브 전수 쿼리**: 수백 개 의존성 패키지의 실시간 외부 온라인 전수 조회 미확인
+- `UNV-01` **운영 SDP 호스트 mTLS 실제 통신 확인**: 로컬 코드 규격은 갖추어져 있으나, 실제 운영 SDP 릴레이 서버와의 실시간 mTLS 핸드셰이크는 별도 설정 부재로 미확인 상태 유지
+- `UNV-02` **운영 상용 AI 모델 유료 생성 호출**: CLCO 게이트웨이의 상용 LLM 유료 실시간 토큰 과금 호출은 미확인 상태 유지
+- `UNV-03` **엔터프라이즈 계정 실시간 강제 회수 집행**: 원격 Active Directory/LDAP 연계 계정 정지 집행은 미지원 및 미확인 상태 유지
+- `UNV-04` **글로벌 OSV 데이터베이스 라이브 온라인 전수 쿼리**: 수백 개 서드파티 의존성에 대한 실시간 글로벌 OSV 온라인 전수 질의는 허용 목록 부재로 미확인 상태 유지
