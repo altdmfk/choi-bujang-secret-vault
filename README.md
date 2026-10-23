@@ -281,12 +281,14 @@ flowchart LR
 - **실제 재현에 사용한 고정 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
 - **릴리스 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
   - 18단계 AI 설명 보고서 표시 미확인, 19단계 실제 원격 조치 집행기 미연결(`ACTION_UNSUPPORTED`), 21·22단계 공식 접수 서명 미연결 상태이므로 정식 `v1.0` 대신 검증 중인 버전으로 표기합니다.
-- **실제 재현 고정 커밋(`3e9beee`) 이후 문서 수정 범위**:
-  1. 21단계 장애 안내 정정: 6.2 표에서 AI 앱 승인(UUID 앞뒤 4글자 하이픈 9글자 `xxxx-xxxx`, 후속 버튼 `[승인했으며 연결 확인]`)과 Native 계정 연결 승인(6자리 숫자, 후속 버튼 `[승인 번호로 로그인 완료]`) 분리.
-  2. 22단계 취약점 조회 관찰 분리: 기동 직후 초기 `idle`(대기) 상태와 화면의 `[설치 패키지 조회]`(`vulnerabilities-load`) 버튼 클릭 후 관찰 결과 분리.
-  3. 22단계 플랫폼 지원 범위 정정: 외부 SDP mTLS HTTPS 릴레이 모듈의 플랫폼 독립 구현 인정, Windows 전용 기능(Native/DPAPI)과 분리, 비-Windows SDP 실연결은 미실측에 따른 「미검증 지원 범위」로 명시.
-  4. 데모 AI 설명 분리 및 미확인 정정: 데모 모드에서 AI 설명 요청 시 `ON_AI_PROVISIONING_PENDING`("권한 준비 중") 중단으로 18단계를 `미확인`으로 정정.
-  5. 진단 경로 정정: 버전 및 진단 정보 조회 경로를 실제 구현인 `/api/diagnostics`로 정정.
+- **고정 재현 커밋(`3e9beee`)과의 파일별 차분 및 코드 일치 검증**:
+  - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `tools/**`): **완전 동일 (`0 diff`)**
+  - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package*.json`): **완전 동일 (`0 diff`)**
+  - 파일별 차분 대상: `docs/STUDENT_RUNBOOK.md`, `README.md`, `.env.example`, `on-client/.env.example` (문서 및 환경 템플릿 보완 전용)
+- **현재 제출본 기준 재확인 항목**:
+  - 문법 검사(`npm --prefix on-client run check`), 기본 HTTP 기동(`npm start`) 및 `/api/diagnostics` 응답, 취약점 `idle` 대기 및 버튼 클릭 분기(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`), 데모 모드(`npm run demo`) 사건 1건 및 인가 배지 3종 렌더링, 데이터 복원 테스트(`npm run test:restore` 9건 통과)
+- **미재확인 항목**:
+  - 18단계 데모 AI 설명(권한 준비 중으로 미표시), 19단계 실제 조치 집행(`ACTION_UNSUPPORTED`), UNV-01~04 운영 실연동(운영 mTLS 연동, 상용 AI 호출, 엔터프라이즈 계정 강제 회수, OSV 라이브 온라인 전수 쿼리)
 
 ### 2. 새 환경 재현 절차
 1. **격리 폴더 복제**: `git clone https://github.com/altdmfk/choi-bujang-secret-vault.git <새폴더>`

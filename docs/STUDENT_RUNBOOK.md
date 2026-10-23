@@ -246,12 +246,37 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 - **현재 버전 상태**: `v0.2.11` (검증 중인 버전, Release Candidate)
   > [!IMPORTANT]
   > 22단계 통과는 원문 검토 기준의 수료 판정이며, 실제 운영 인증이나 v1.0 자동 인증이 아닙니다. 19단계 실제 원격 조치 집행기 연동과 21·22단계 공식 접수 서명 연결이 완료되기 전까지는 정식 `v1.0`으로 표기하지 않고 검증 중인 버전으로 유지합니다.
-- **실제 재현 고정 커밋(`3e9beee`) 이후 문서 수정 범위**:
-  1. **21단계 장애 안내 정정**: 6.2 표에서 AI 앱 승인(UUID 앞뒤 4글자 하이픈 연결 9글자 `xxxx-xxxx`, 후속 버튼 `[승인했으며 연결 확인]`)과 Native 계정 연결 승인(6자리 숫자, 후속 버튼 `[승인 번호로 로그인 완료]`)을 명확히 분리.
-  2. **22단계 취약점 조회의 사용자 동작 및 관찰 분리**: 8.2 절차 및 8.3 표에서 기동 직후 초기 `idle`(대기) 상태와 사용자의 `[설치 패키지 조회]`(`vulnerabilities-load`) 버튼 클릭 후 관찰 결과(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`)를 분리.
-  3. **22단계 플랫폼 지원 범위 정정**: 8.6.2절에서 외부 SDP mTLS HTTPS 릴레이 모듈의 플랫폼 독립 구현을 인정하고, Windows 전용 기능(Native/DPAPI)과 분리하며, 비-Windows 환경에서의 SDP 실연결은 미실측에 따른 「미검증 지원 범위」로 명시.
-  4. **데모 AI 설명 분리 및 미확인 정정**: 8.3 표에서 데모 모드 AI 설명 요청 시 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 18단계를 `미확인`으로 정정.
-  5. **진단 경로 정정**: 8.6.1절에서 버전 및 진단 정보 조회 경로를 실제 구현인 `/api/diagnostics`로 정정.
+
+#### 8.1.1 고정 재현 커밋(`3e9beee`)과 현재 제출본 간 파일별 차분(Diff) 및 실행 코드 일치 검증
+- **실행 코드 및 런타임 스크립트 일치 여부**: **완전 동일 (Diff 0건)**
+  - 대조 명령: `git diff 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD -- on-client/src on-client/student on-client/public tools`
+  - 결과: 변경 사항 없음 (`0 diff`). 비즈니스 로직, 에이전트 확장 모듈, 서버 라우팅, 프론트엔드 스크립트는 재현 대상 커밋과 완전히 동일합니다.
+- **의존성 명세 및 락파일 일치 여부**: **완전 동일 (Diff 0건)**
+  - 대조 명령: `git diff 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD -- package.json package-lock.json on-client/package.json on-client/package-lock.json`
+  - 결과: 변경 사항 없음 (`0 diff`). 의존성 버전 및 설치 무결성은 재현 대상 커밋과 완전히 동일합니다.
+- **파일별 차분 내역 (`git diff --stat 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD`)**:
+  - `.env.example`: 이동용 환경 템플릿에 Node.js 24 내장 `--env-file` 및 PowerShell 직접 주입 실행 절차 설명 보완
+  - `on-client/.env.example`: 클라이언트 로컬 서버 전용 환경 템플릿 및 설정 목적별(기본 구동/취약점 조회/배포 자료실) 분리 설명 보완
+  - `README.md`: 심사관 피드백 반영 (고정 커밋 SHA 대조, 파일별 차분 및 코드 일치 요약, 취약점 idle 대기 및 조회 버튼 분기 분리, OS 플랫폼 지원 범위 명확화)
+  - `docs/STUDENT_RUNBOOK.md`: 심사관 피드백 반영 (6.2 장애 가이드 형식 분리, 8.1 파일별 차분 및 재확인/미재확인 목록 수록, 8.2/8.3 취약점 분기 및 데모 AI 미확인 정정, 8.4 복원 롤백 실패 수동 감사 규정, 8.6 SDP 플랫폼 독립 구현 및 미검증 범위 명시)
+
+#### 8.1.2 현재 제출본 기준 재확인 항목 및 미재확인 항목
+- **재확인한 항목 (Items Re-verified in Current Submission)**:
+  1. **독립 문법 검사**: `npm --prefix on-client run check` 실행 결과 문법 오류 없음 (`0 error`) 재확인 완료.
+  2. **순수 표준 라이브러리 기본 기동**: `cd on-client; npm start` 실행 후 `http://127.0.0.1:5189/` 웹 대시보드 정상 렌더링 및 13~19단계 안전 대기(`연결 없음`) 표시 재확인 완료.
+  3. **서버 프로토콜 진단 엔드포인트**: `GET http://127.0.0.1:5189/api/diagnostics` 요청 시 `version: '0.1.0'`, `engine.mode: 'disconnected'` 응답 재확인 완료.
+  4. **취약점 조회 기동 직후 초기 관찰**: 기본 기동 직후 취약점 영역이 자동 조회 없이 **초기 `idle`(대기)** 상태로 정상 렌더링됨을 재확인 완료.
+  5. **취약점 조회 버튼 클릭 분기 (미설정)**: 대시보드에서 `[설치 패키지 조회]`(`vulnerabilities-load`) 버튼 클릭 시 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`)으로 전환됨을 재확인 완료.
+  6. **취약점 조회 버튼 클릭 분기 (환경변수 주입)**: `$env:ON_PROJECT_DIRECTORY` 및 `$env:ON_APPROVED_PUBLIC_PACKAGES="[]"` 주입 후 버튼 클릭 시 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`)으로 전환됨을 재확인 완료.
+  7. **가상 데이터 데모 실행**: `npm run demo` 실행 후 `demoEngine` 기반 1건의 사건(`event-01: 개발 저장소 접속이 제한됐습니다.`) 및 업무 앱 3종 인가 배지(`allow`, `deny`, `challenge`) 렌더링 재확인 완료.
+  8. **백엔드 데이터 복원 안전 규격**: `npm run test:restore` 실행 결과 9건 테스트 전체 통과 (`pass 9`, `fail 0`) 재확인 완료.
+- **미재확인 항목 (Items Not Re-verified / UNV 유지)**:
+  1. **데모 모드 AI 설명 보고서 표시**: `demoEngine`에 `readAiIdentity`가 없고 `server.mjs` 기본 데모에 `resolveAiIdentity`가 주입되지 않아 `readMapping`에서 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 화면 표시 **미재확인(미확인 유지)**.
+  2. **19단계 실제 원격 조치 집행**: 백엔드 실제 조치 집행기가 연동되지 않은 상태(`ACTION_UNSUPPORTED`, `supportedActions: []`)이므로 실제 강제 회수 집행 **미재확인(미확인 유지)**.
+  3. **UNV-01 (운영 SDP 호스트 mTLS 실제 통신)**: 운영 SDP 호스트 인증서 및 도메인 미주입으로 실제 TLS 핸드셰이크 **미재확인(미확인 유지)**.
+  4. **UNV-02 (운영 상용 AI 모델 유료 생성 호출)**: 학생 자격증명 과금 방지 및 API 키 미주입으로 유료 추론 호출 **미재확인(미확인 유지)**.
+  5. **UNV-03 (엔터프라이즈 계정 실시간 강제 회수 집행)**: 플랫폼 API 미지원으로 실시간 회수 집행 **미재확인(미확인 유지)**.
+  6. **UNV-04 (글로벌 OSV 데이터베이스 라이브 온라인 전수 쿼리)**: 안전 승인 패키지 목록 미지정(`[]`)으로 외부 API 실시간 전수 쿼리 **미재확인(미확인 유지)**.
 
 ### 8.2 새 환경 독립 재현 절차
 1. **작업 폴더 격리 및 클론**:
