@@ -1912,6 +1912,254 @@ export function createStudentView(context = {}) {
       pFallback.textContent = '확인 불가(unknown): 알 수 없는 설명 상태입니다. 정상으로 간주하지 않습니다.';
       container.appendChild(pFallback);
       return container;
-    },    renderAction() { return '학생 구현 대기: 현재 사건·조치·실제 대상·사람 확인·ACK와 원천 효과·unknown을 구분하세요.'; },
+    },
+    renderAction({ status, event, actionId, target, receipt, observation, message, confirmationExpiresAt, error } = {}) {
+      const container = document.createElement('div');
+      container.className = 'student-action-view';
+
+      // 1. 상태 정규화 및 succeeded의 엄격한 효과 확인 (observation.effectApplied === true 필수)
+      let effectiveStatus = status || 'idle';
+      let isEffectConfirmed = false;
+
+      if (effectiveStatus === 'succeeded') {
+        if (observation && observation.effectApplied === true) {
+          isEffectConfirmed = true;
+        } else {
+          // effectApplied 가 true 가 아니면 성공으로 간주하지 않고 결과 불명(unknown)으로 처리
+          effectiveStatus = 'unknown';
+        }
+      }
+
+      // 바깥 컨테이너 필수 데이터 속성 지정
+      container.setAttribute('data-student-action-status', effectiveStatus);
+      if (event?.id) {
+        container.setAttribute('data-student-action-event', event.id);
+      }
+      if (receipt?.requestId) {
+        container.setAttribute('data-student-action-request', receipt.requestId);
+      }
+
+      // 상단 상태 안내 배너
+      const statusBox = document.createElement('div');
+      statusBox.className = `action-status-box status-${effectiveStatus}`;
+      statusBox.style.padding = '10px 12px';
+      statusBox.style.borderRadius = 'var(--radius, 6px)';
+      statusBox.style.marginBottom = '12px';
+      statusBox.style.border = '1px solid var(--border, #d0d7de)';
+
+      const titleP = document.createElement('p');
+      titleP.style.margin = '0 0 4px';
+      titleP.style.fontWeight = 'bold';
+
+      const descP = document.createElement('p');
+      descP.className = 'muted';
+      descP.style.margin = '0';
+
+      switch (effectiveStatus) {
+        case 'idle':
+          titleP.textContent = '아직 미실행 (idle)';
+          descP.textContent = message || '아직 보안 조치를 실행하지 않았습니다. 필요한 경우 제공 화면의 조치 준비 기능을 이용하세요.';
+          break;
+
+        case 'loading':
+          titleP.textContent = '조치 준비 또는 결과 조회 중 (loading)';
+          descP.textContent = message || '조치 요청을 준비하거나 연동 시스템의 최신 결과를 조회하고 있습니다 (완료 아님).';
+          break;
+
+        case 'prepared':
+          titleP.textContent = '준비됨·미실행 (prepared)';
+          descP.textContent = confirmationExpiresAt
+            ? `조치가 준비되었으나 아직 실행되지 않았습니다(미실행). 확인 기한: ${confirmationExpiresAt}`
+            : '조치가 준비되었으나 아직 실행되지 않았습니다(미실행). 사람 확인이 필요합니다.';
+          break;
+
+        case 'executing':
+          titleP.textContent = '서버에 전달 중 (executing)';
+          descP.textContent = '조치 요청을 서버에 전달하고 있습니다. 결과가 아직 확인되지 않았습니다 (완료 아님).';
+          break;
+
+        case 'pending':
+          titleP.textContent = '서버 접수·처리 중 (pending)';
+          descP.textContent = '서버가 요청을 접수하여 처리 중입니다. 서버 접수 응답(ACK)은 효과 확인이나 완료가 아닙니다 (완료 아님).';
+          break;
+
+        case 'succeeded':
+          titleP.textContent = '효과 확인 (succeeded)';
+          descP.textContent = `연동 시스템에서 실제 보안 조치 효과가 확인되었습니다 (effectApplied: true, 관측 시각: ${observation?.observedAt || '시각 미기록'}).`;
+          break;
+
+        case 'denied':
+          titleP.textContent = '연동 시스템 거절 (denied)';
+          descP.textContent = message || error?.message || '연동 시스템 보안 정책에 의해 조치 요청이 거절되었습니다.';
+          break;
+
+        case 'failed':
+          titleP.textContent = '연동 시스템 실패 (failed)';
+          descP.textContent = message || error?.message || '연동 시스템에서 조치 실행에 실패했습니다.';
+          break;
+
+        case 'unknown':
+          titleP.textContent = '결과 불명 (unknown)';
+          descP.textContent = '조치 결과가 불명확합니다. 성공이나 효과 없음으로 단정하지 마시고, 제공 화면의 결과만 직접 재조회하세요.';
+          break;
+
+        case 'expired':
+          titleP.textContent = '확인 기한 지남 (expired)';
+          descP.textContent = '조치 확인 기한이 지났습니다. 조치를 처음부터 다시 준비하세요.';
+          break;
+
+        case 'error':
+          titleP.textContent = '요청 처리 안 됨 (error)';
+          const errCode = error?.code ? `[${error.code}] ` : '';
+          const errMsg = error?.message || message || '요청이 처리되지 않았습니다.';
+          descP.textContent = `${errCode}${errMsg} (기록은 그대로 유지됩니다).`;
+          break;
+
+        default:
+          titleP.textContent = `${effectiveStatus} (확인 불가)`;
+          descP.textContent = message || '알 수 없는 상태입니다. 정상이나 완료로 간주하지 마세요.';
+          break;
+      }
+
+      statusBox.appendChild(titleP);
+      statusBox.appendChild(descP);
+      container.appendChild(statusBox);
+
+      // 2. 현재 사건, 조치, 대상, 접수증 상세 정보 (받은 범위 내에서 있는 것만 표시)
+      const dl = document.createElement('dl');
+      dl.className = 'kv';
+      dl.style.margin = '0 0 12px';
+
+      let hasDetails = false;
+
+      // 사건 ID (event.id)
+      if (event?.id) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '사건 ID';
+        const dd = document.createElement('dd');
+        dd.setAttribute('data-student-action-detail-event', event.id);
+        dd.textContent = event.id;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 근거 ID 목록 (event.evidence)
+      if (Array.isArray(event?.evidence) && event.evidence.length > 0) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '사건 근거 ID';
+        const dd = document.createElement('dd');
+        dd.textContent = event.evidence.map((e) => e.id).join(', ');
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 조치 ID (actionId)
+      if (actionId) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '조치 ID';
+        const dd = document.createElement('dd');
+        dd.setAttribute('data-student-action-detail-action', actionId);
+        dd.textContent = actionId;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 대상 ID 및 대상 세대 (target.id, target.generation)
+      if (target?.id) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '실제 대상 ID';
+        const dd = document.createElement('dd');
+        dd.setAttribute('data-student-action-detail-target-id', target.id);
+        dd.textContent = target.id;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      if (target?.generation !== undefined && target?.generation !== null) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '대상 세대 (generation)';
+        const dd = document.createElement('dd');
+        dd.setAttribute('data-student-action-detail-target-generation', String(target.generation));
+        dd.textContent = String(target.generation);
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 요청 ID (receipt.requestId)
+      if (receipt?.requestId) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '요청 ID (requestId)';
+        const dd = document.createElement('dd');
+        dd.setAttribute('data-student-action-detail-request-id', receipt.requestId);
+        dd.textContent = receipt.requestId;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 접수증 ID (receipt.receiptId)
+      if (receipt?.receiptId) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '접수증 ID (receiptId)';
+        const dd = document.createElement('dd');
+        dd.setAttribute('data-student-action-detail-receipt-id', receipt.receiptId);
+        dd.textContent = receipt.receiptId;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 버전 (receipt.version)
+      if (receipt?.version !== undefined && receipt?.version !== null) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '버전 (version)';
+        const dd = document.createElement('dd');
+        dd.setAttribute('data-student-action-detail-version', String(receipt.version));
+        dd.textContent = String(receipt.version);
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 확인 기한 (confirmationExpiresAt)
+      if (confirmationExpiresAt) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '확인 기한';
+        const dd = document.createElement('dd');
+        dd.textContent = String(confirmationExpiresAt);
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      // 관측 결과 (observation: observedAt, effectApplied)
+      if (observation) {
+        hasDetails = true;
+        const dt = document.createElement('dt');
+        dt.textContent = '관측 결과';
+        const dd = document.createElement('dd');
+        dd.textContent = `시각: ${observation.observedAt || '미기록'} · effectApplied: ${String(observation.effectApplied)}`;
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      }
+
+      if (hasDetails) {
+        container.appendChild(dl);
+      }
+
+      // 3. 안내 문구 (실행 버튼 미생성 및 제공 화면 버튼 이용 안내)
+      const noticeP = document.createElement('p');
+      noticeP.className = 'muted';
+      noticeP.style.marginTop = '8px';
+      noticeP.textContent = '보안 조치 실행·확인은 학생 코드에서 직접 실행하지 않으며, 제공 화면의 사람 확인 및 재조회 버튼을 통해서만 수행됩니다.';
+      container.appendChild(noticeP);
+
+      return container;
+    },
   };
 }
