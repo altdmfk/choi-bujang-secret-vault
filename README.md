@@ -175,10 +175,11 @@ ALEPH SDP 엔진의 요청·사건 전달 계약을 바탕으로 판정기, 이�
 
 ### 2. 지원 환경 및 스펙
 - **운영체제**: Windows 10 / 11 (PowerShell 5.1 / 7.x)
-- **Node.js**: **v24.19.0** (수업 및 자동 검사 표준)
-- **npm**: **11.17.0** (실측 확인 완료)
+- **수업 및 검증 기준 환경**: Node.js **v24.19.0 (LTS)**, npm **11.17.0**
 - **런타임 의존성**: `on-client`는 외부 npm 패키지 없음 (Node.js 표준 라이브러리 구동)
-- **미지원 환경**: Node.js 21 이하(구동 차단), 비-Windows OS에서 `.ps1` 직접 실행 불가
+- **실행 방법별 지원 범위 및 버전 제약**:
+  - **PowerShell 실행 도구 (`tools/start-alekov.ps1`)**: Node.js 22~24만 허용(21 이하 및 25 이상 사전 구동 차단), 비-Windows OS에서 `.ps1` 직접 실행 불가
+  - **직접 실행 (`npm start`, `npm run demo`, `node src/server.mjs`)**: CLI 진입부 자체 버전 차단 검사 부재(`package.json`의 `engines` 표기는 안내 힌트일 뿐 직접 실행 차단 미보장), 기준 환경 외 다른 버전은 미지원·미검증
 
 ### 3. 설치 및 실행 절차
 - **작업 디렉토리**:
@@ -192,7 +193,7 @@ ALEPH SDP 엔진의 요청·사건 전달 계약을 바탕으로 판정기, 이�
   *(또는 `npm start`)*
 - **포트 충돌 해결**: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Port 5190`
 - **가상 데이터 실행**: `npm run demo`
-- **모듈 문법 검사**: `npm run check`
+- **확장 모듈 단일 파일 문법 검사**: `npm run check` (학생 확장 모듈 단 1개 `student/extension.mjs`의 `node --check` 정적 문법 검사)
 - **접속 URL**: [http://127.0.0.1:5189/](http://127.0.0.1:5189/)
 - **정상 시작 콘솔 신호**:
   ```text
@@ -282,18 +283,19 @@ flowchart LR
 - **릴리스 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
   - 18단계 AI 설명 보고서 표시 미확인, 19단계 실제 원격 조치 집행기 미연결(`ACTION_UNSUPPORTED`), 21·22단계 공식 접수 서명 미연결 상태이므로 정식 `v1.0` 대신 검증 중인 버전으로 표기합니다.
 - **고정 재현 커밋(`3e9beee`)과의 파일별 차분 및 코드 일치 검증**:
-  - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `tools/**`): **완전 동일 (`0 diff`)**
-  - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package*.json`): **완전 동일 (`0 diff`)**
+  - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `on-client/tools/**`): **완전 동일 (`0 diff`)**
+  - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package.json`): **완전 동일 (`0 diff`, `on-client`는 외부 의존성이 없어 루트 `package-lock.json` 사용)**
+  - 핵심 파일 8종 Git Blob 및 SHA-256 해시 대조: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md) 8.1.1 표 수록 (두 커밋 간 100% 동일)
   - 파일별 차분 대상: `docs/STUDENT_RUNBOOK.md`, `README.md`, `.env.example`, `on-client/.env.example` (문서 및 환경 템플릿 보완 전용)
 - **현재 제출본 기준 재확인 항목**:
-  - 문법 검사(`npm --prefix on-client run check`), 기본 HTTP 기동(`npm start`) 및 `/api/diagnostics` 응답, 취약점 `idle` 대기 및 버튼 클릭 분기(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`), 데모 모드(`npm run demo`) 사건 1건 및 인가 배지 3종 렌더링, 데이터 복원 테스트(`npm run test:restore` 9건 통과)
+  - 확장 모듈 단일 파일 문법 검사(`npm --prefix on-client run check` - `student/extension.mjs` 대상 `node --check`), 기본 HTTP 기동(`npm start`) 및 `/api/diagnostics` 응답, 취약점 `idle` 대기 및 버튼 클릭 분기(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`), 데모 모드(`npm run demo`) 사건 1건 및 인가 배지 3종 렌더링, 데이터 복원 테스트(`npm run test:restore` 9건 통과)
 - **미재확인 항목**:
   - 18단계 데모 AI 설명(권한 준비 중으로 미표시), 19단계 실제 조치 집행(`ACTION_UNSUPPORTED`), UNV-01~04 운영 실연동(운영 mTLS 연동, 상용 AI 호출, 엔터프라이즈 계정 강제 회수, OSV 라이브 온라인 전수 쿼리)
 
 ### 2. 새 환경 재현 절차
 1. **격리 폴더 복제**: `git clone https://github.com/altdmfk/choi-bujang-secret-vault.git <새폴더>`
 2. **런타임 검증**: `node -v` (v24.19.0), `npm -v` (11.17.0)
-3. **독립 문법 검사**: `npm --prefix on-client run check`
+3. **독립 문법 검사**: `npm --prefix on-client run check` (학생 확장 모듈 단 1개 `student/extension.mjs` 문법 검사)
 4. **기본 로컬 실행**: `cd on-client` 후 `npm start` (또는 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1`)
    - `http://127.0.0.1:5189/` 접속 시 케셰브 대시보드 렌더링 확인 (13~19단계 `연결 없음` 확인)
    - 기동 직후 취약점 영역은 초기 `idle`(대기) 상태 확인
@@ -342,6 +344,9 @@ flowchart LR
 - **버전 역할 분담**:
   - 패키지 및 릴리스 버전 (`0.2.11`): `on-client/package.json` 기준 학생 과제 진행 릴리스 버전
   - 서버 프로토콜 및 베이스라인 메타 버전 (`0.1.0`): `on-client/src/server.mjs`의 `GET /api/diagnostics` 응답 및 진단 메타데이터 사양 버전
+- **런타임 및 실행 방법별 버전 지원 범위**:
+  - **PowerShell 실행 도구 (`tools/start-alekov.ps1`)**: Node.js 22~24 버전만 허용(21 이하 및 25 이상 사전 차단, Windows PowerShell 전용)
+  - **직접 실행 (`npm start`, `npm run demo`, `node src/server.mjs`)**: CLI 진입부 자체 버전 차단 검사 부재(`engines` 명세는 안내 힌트일 뿐 직접 실행 차단 미보장). 기준 환경(v24.19.0) 외 다른 버전은 미지원·미검증 상태로 분류
 - **OS 지원 범위 분리**:
   - 플랫폼 독립 공통 구현: 순수 HTTP 서버 구동(`npm start`), 대시보드 서빙, 데모 모드(`npm run demo`), 문법 검사(`npm run check`), 외부 SDP mTLS HTTPS 릴레이 호스트(`sdp-host.mjs`, `sdp-host-config.mjs`)
   - Windows 전용 기능: CurrentUser DPAPI 자격 보관함, PowerShell 네이티브 레지스트리, Native 계정 연결 모듈
