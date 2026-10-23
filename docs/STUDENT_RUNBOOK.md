@@ -28,13 +28,15 @@
 
 케셰브는 로컬 UI, 로컬 백엔드 서버, 외부 SDP 릴레이 서버, 수업용 AI 게이트웨이 및 기존 배포 자료실 API로 구성됩니다.
 상호 독립적인 3대 통신 경로(Native 계정 연결, SDP mTLS HTTPS 릴레이, 기존 자료실 API)를 분리하여 운영합니다.
+케셰브 화면과 기존 자료실 화면은 분리된 클라이언트로 동작하며 상호 직접 통신하지 않습니다.
 
 ### 2.1 아키텍처 다이어그램
 
 ```mermaid
 flowchart LR
-    subgraph ClientLayer["1. 클라이언트 레이어 (UI)"]
-        Browser["웹 브라우저 대시보드<br/>on-client/public/index.html<br/>on-client/student/extension.mjs<br/>http://127.0.0.1:5189/"]
+    subgraph ClientLayer["1. 클라이언트 레이어 (UI 분리)"]
+        ClientAgent["1-A. 케셰브 에이전트 화면 (on-client)<br/>on-client/public/index.html<br/>on-client/student/extension.mjs<br/>URL: http://127.0.0.1:5189/"]
+        ClientVault["1-B. 기존 자료실 화면 (1~12단계)<br/>public/index.html<br/>public/modules/auth-device.js<br/>URL: 배포 웹 애플리케이션"]
     end
 
     subgraph LocalServer["2. 로컬 앱 서버 레이어 (케셰브)"]
@@ -56,14 +58,14 @@ flowchart LR
         VaultAPI["Vercel/Supabase 자료실 API<br/>api/notes.js, api/device.js"]
     end
 
-    Browser <-->|"Loopback HTTP REST (/api/*)"| AppServer
+    ClientAgent <-->|"Loopback HTTP REST (/api/*)"| AppServer
     AppServer --- NativeModule
     AppServer --- SdpModule
     AppServer --- Vault
-    NativeModule -.->|"경로 A: Native Host 설정 기반 포털 승인"| Browser
+    NativeModule -.->|"경로 A: Native Host 설정 기반 포털 승인"| ClientAgent
     SdpModule <-->|"경로 B: mTLS 클라이언트 인증서 + Bearer HTTPS POST"| SDPRelay
     Vault <-->|"경로 C: Credential Vault 기반 REST 통신"| AIGateway
-    Browser -.->|"경로 D: 별도 HMAC 서명 기반 기기 승인/메모 조회"| VaultAPI
+    ClientVault <-->|"경로 D: 별도 HMAC 서명 기기 승인 및 메모 CRUD"| VaultAPI
 ```
 
 ### 2.2 독립 3대 통신 경로 및 데이터 흐름
@@ -76,22 +78,23 @@ flowchart LR
    - 모듈: `on-client/src/engine/sdp-host.mjs`, `sdp-host-config.mjs`
    - 엔드포인트: 외부 SDP 서버의 `https://<host>:<port>/alekov/decision`, `/alekov/context`, `/alekov/events`, `/alekov/devices`, `/alekov/sessions`
    - 프로토콜: **mTLS(클라이언트 인증서 `certFile`, 개인키 `keyFile`, `caFile`) 및 Bearer 토큰(`tokenFile`) 기반의 HTTPS POST 릴레이 요청**
-   - 역할: 인가 결정(`decideAccess`) 및 사건·기기·세션 관측 데이터를 외부 SDP 릴레이로부터 수신합니다. IPC나 루트 판정기 직접 호출이 아닌 외부 HTTPS 네트워크 릴레이 통신입니다.
+   - 역할: 인가 결정(`decideAccess`) 및 사건·기기·세션 관측 데이터를 외부 SDP 릴레이로부터 수신합니다. 케셰브 화면(`ClientAgent`)의 요청은 로컬 서버를 거쳐 이 릴레이 경로로 전달됩니다.
 3. **경로 C: 기존 자료실 API 경로 (1~12단계 배포 서비스)**
-   - 모듈: 루트의 `api/notes.js`, `api/device.js`
-   - 방식: Vercel/Supabase 상에 배포된 기존 자료실 서버와 HMAC-SHA256 기기 승인 토큰을 교환하여 메모 CRUD를 수행합니다.
-   - 특징: on-client의 SDP 릴레이 통신 및 Native 로그인과 분리된 별도 데이터 백엔드입니다.
+   - 클라이언트 및 모듈: 기존 자료실 화면(`public/modules/auth-device.js`) 및 백엔드 `api/notes.js`, `api/device.js`
+   - 방식: 기존 자료실 화면(`ClientVault`)이 Vercel/Supabase 상에 배포된 자료실 API와 직접 통신하여 HMAC-SHA256 기기 승인 및 메모 CRUD를 수행합니다.
+   - 분리 원칙: 케셰브 대시보드(`on-client/public/app.js`)는 동일 출처 CSP 제한에 따라 로컬 서버(`127.0.0.1:5189`)와만 통신하며, 기존 자료실 API(`api/notes.js`, `api/device.js`)를 직접 호출하지 않습니다.
 
 ### 2.3 컴포넌트별 역할 정의
 
 | 컴포넌트 | 위치 | 역할 정의 |
 |---|---|---|
-| **사용자 브라우저** | `on-client/public/`<br/>`on-client/student/extension.mjs` | DOM 렌더링을 실행하고 사용자 인터랙션을 수신합니다. 비밀 토큰은 일체 보관하지 않습니다. |
+| **케셰브 에이전트 화면** | `on-client/public/`<br/>`on-client/student/extension.mjs` | 로컬 Agent UI를 렌더링합니다. 동일 출처 로컬 서버와만 통신하며, 자료실 API를 직접 호출하지 않습니다. |
+| **기존 자료실 화면** | 루트 `public/`<br/>`public/modules/auth-device.js` | 1~12단계 배포 웹 UI입니다. 별도 자료실 API로 HMAC 기기 승인 및 메모 조회를 직접 요청합니다. |
 | **로컬 앱 서버** | `on-client/src/server.mjs`<br/>`on-client/src/engine.mjs` | 루프백(127.0.0.1) REST API를 서빙합니다. Credential Vault를 격리 운영합니다. |
 | **SDP 호스트 모듈** | `on-client/src/engine/sdp-host.mjs`<br/>`sdp-host-config.mjs` | 외부 SDP 릴레이 서버와 mTLS HTTPS 통신을 수행합니다. 인가 및 사건 데이터를 검증합니다. |
 | **외부 SDP 릴레이 서버** | `https://<host>:<port>/alekov/*` | mTLS와 Bearer 토큰을 검증하고, ZTNA 접근 인가 판정 및 감사 이벤트를 회신합니다. |
 | **AI 게이트웨이 (CLCO)** | `on-client/src/ai/`<br/>`on-client/vendor/clco-http.mjs` | 수업용 모델 목록을 공급합니다. 보안 사건 분석 질의를 중계합니다. |
-| **기존 자료실 API** | 루트 `api/notes.js`, `api/device.js` | 1~12단계 배포 인프라입니다. HMAC 기반 기기 승인 및 메모 조회를 독립 처리합니다. |
+| **기존 자료실 API** | 루트 `api/notes.js`, `api/device.js` | 1~12단계 배포 인프라입니다. 기존 자료실 화면(`public/`)의 HMAC 기기 승인 및 메모 요청을 독립 처리합니다. |
 
 ---
 

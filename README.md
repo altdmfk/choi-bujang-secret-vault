@@ -205,8 +205,9 @@ ALEPH SDP 엔진의 요청·사건 전달 계약을 바탕으로 판정기, 이�
 
 ```mermaid
 flowchart LR
-    subgraph ClientLayer["1. 클라이언트 레이어 (UI)"]
-        Browser["웹 브라우저 대시보드<br/>on-client/public/index.html<br/>on-client/student/extension.mjs<br/>URL: http://127.0.0.1:5189/"]
+    subgraph ClientLayer["1. 클라이언트 레이어 (UI 분리)"]
+        ClientAgent["1-A. 케셰브 에이전트 화면 (on-client)<br/>on-client/public/index.html<br/>on-client/student/extension.mjs<br/>URL: http://127.0.0.1:5189/"]
+        ClientVault["1-B. 기존 자료실 화면 (1~12단계)<br/>public/index.html<br/>public/modules/auth-device.js<br/>URL: 배포 웹 애플리케이션"]
     end
 
     subgraph LocalServer["2. 로컬 앱 서버 레이어 (케셰브)"]
@@ -228,20 +229,21 @@ flowchart LR
         VaultAPI["Vercel/Supabase 자료실 API<br/>api/notes.js, api/device.js"]
     end
 
-    Browser <-->|"Loopback HTTP REST (/api/*)"| AppServer
+    ClientAgent <-->|"Loopback HTTP REST (/api/*)"| AppServer
     AppServer --- NativeModule
     AppServer --- SdpModule
     AppServer --- Vault
-    NativeModule -.->|"경로 A: Native Host 설정 기반 포털 승인"| Browser
+    NativeModule -.->|"경로 A: Native Host 설정 기반 포털 승인"| ClientAgent
     SdpModule <-->|"경로 B: mTLS 클라이언트 인증서 + Bearer HTTPS POST"| SDPRelay
     Vault <-->|"경로 C: Credential Vault 기반 REST 통신"| AIGateway
-    Browser -.->|"경로 D: 별도 HMAC 서명 기반 기기 승인/메모 조회"| VaultAPI
+    ClientVault <-->|"경로 D: 별도 HMAC 서명 기기 승인 및 메모 CRUD"| VaultAPI
 ```
 
-- **독립 3대 통신 경로**:
-  1. **경로 A (Native 계정 연결)**: `native-login.mjs`가 `-NativeHostConfig`를 통해 로컬 승인 번호를 확인하고 계정 컨텍스트를 바인딩합니다.
-  2. **경로 B (외부 SDP 릴레이 HTTPS 통신)**: `sdp-host.mjs`가 `sdp-host-config.mjs` 설정을 통해 외부 SDP 릴레이 서버(`https://.../alekov/*`)와 mTLS 클라이언트 인증서 및 Bearer 토큰으로 통신하여 인가 판정 및 감사 사건을 조회합니다 (IPC 아님).
-  3. **경로 C (기존 자료실 API)**: 1~12단계 Vercel/Supabase 배포 자료실(`api/notes.js`, `api/device.js`)로 HMAC 서명 기기 승인 및 메모 조회를 별도 처리합니다.
+- **독립 3대 통신 경로 및 화면 분리 원칙**:
+  1. **화면 분리**: 케셰브 에이전트 화면(`ClientAgent`)과 기존 자료실 화면(`ClientVault`)은 화면 레이어부터 분리되어 있습니다. 케셰브 대시보드는 동일 출처 CSP 제한에 따라 오직 로컬 서버(`127.0.0.1:5189`)와만 통신하며, 기존 자료실 API를 직접 호출하지 않습니다.
+  2. **경로 A (Native 계정 연결)**: `native-login.mjs`가 `-NativeHostConfig`를 통해 로컬 승인 번호를 확인하고 계정 컨텍스트를 바인딩합니다.
+  3. **경로 B (외부 SDP 릴레이 HTTPS 통신)**: `sdp-host.mjs`가 `sdp-host-config.mjs` 설정을 통해 외부 SDP 릴레이 서버(`https://.../alekov/*`)와 mTLS 클라이언트 인증서 및 Bearer 토큰으로 통신하여 인가 판정 및 감사 사건을 조회합니다 (IPC 아님).
+  4. **경로 C (기존 자료실 API)**: 기존 자료실 화면(`ClientVault`, `public/modules/auth-device.js`)이 1~12단계 Vercel/Supabase 배포 자료실(`api/notes.js`, `api/device.js`)로 HMAC 서명 기기 승인 및 메모 CRUD를 직접 전달합니다.
 
 ### 5. 컴포넌트 경계
 - **제공 프레임워크 (수정 금지)**: `on-client/src/server.mjs`, `on-client/src/engine/sdp-host.mjs`, `on-client/src/connection/`, `on-client/src/vulnerabilities/project-scan.mjs`, `on-client/public/app.js`, `on-client/tools/start-alekov.ps1`
