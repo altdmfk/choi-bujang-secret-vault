@@ -157,6 +157,108 @@ ALEPH SDP 엔진의 요청·사건 전달 계약을 바탕으로 판정기, 이�
 
 ---
 
+## 21단계 보안 Agent 「케셰브」 기술 명세서 및 시스템 구성도
+
+로컬 보안 Agent 케셰브의 목적, 기능, 시스템 구성도, 지원 환경 및 실행 규격입니다. 세부 실행 절차는 [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md)에 기술합니다.
+
+### 1. 시스템 목적 및 핵심 기능
+- **목적**: 사내 직원의 단말에서 신원과 기기 승인 상태를 검증합니다. 업무 애플리케이션 접근 인가와 실시간 보안 사건(XDR)을 감시합니다. 의존성 취약점(OSV)을 점검하고, CLCO AI 게이트웨이와 연동하여 침해 사건 원인을 분석하고 대응 조치를 실행합니다.
+- **핵심 기능**:
+  - `renderIdentity` (13단계): 신원(`me`), 기기(`devices`), 세션(`sessions`) 검증 및 상태 렌더링
+  - `renderDecision` (14단계): 업무 시스템 접근 인가(`allow`, `deny`, `challenge`) 결과 및 사유 렌더링
+  - `renderEvents` (15단계): 보안 침해 사건 목록, 단건/전체 필터, 탐지 근거 및 규칙 렌더링
+  - `renderStatus` (16단계): 기기, 세션, 알림, 진단 매트릭스 집약 렌더링
+  - `renderAiConnection` (17단계): CLCO AI 게이트웨이 통신 상태, 허용 모델, 네트워크 지연시간 렌더링
+  - `renderExplanation` (18단계): 보안 사건 AI 원인 분석 및 주의사항 렌더링
+  - `renderAction` (19단계): 대응 조치 집행 UI, 승인 기한, 조치 영수증(`receipt`) 렌더링
+  - `renderVulnerabilities` (20단계): 패키지 OSV 취약점 점검 및 미조회 상태 렌더링
+
+### 2. 지원 환경 및 스펙
+- **운영체제**: Windows 10 / 11 (PowerShell 5.1 / 7.x)
+- **Node.js**: **v24.19.0** (수업 및 자동 검사 표준)
+- **npm**: **11.17.0** (실측 확인 완료)
+- **런타임 의존성**: `on-client`는 외부 npm 패키지 없음 (Node.js 표준 라이브러리 구동)
+- **미지원 환경**: Node.js 21 이하(구동 차단), 비-Windows OS에서 `.ps1` 직접 실행 불가
+
+### 3. 설치 및 실행 절차
+- **작업 디렉토리**:
+  ```powershell
+  cd on-client
+  ```
+- **표준 실행 명령어**:
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+  ```
+  *(또는 `npm start`)*
+- **포트 충돌 해결**: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Port 5190`
+- **가상 데이터 실행**: `npm run demo`
+- **모듈 문법 검사**: `npm run check`
+- **접속 URL**: [http://127.0.0.1:5189/](http://127.0.0.1:5189/)
+- **정상 시작 콘솔 신호**:
+  ```text
+  케셰브가 켜졌습니다. 브라우저에서 http://127.0.0.1:5189/ 을 여세요.
+  서버가 응답한 것만 확인했습니다. AI 연결 상태는 화면에서 따로 확인해 주세요.
+  ```
+- **종료 및 재실행**: 콘솔에서 `Ctrl + C`로 프로세스 종료 후 동일 명령어로 재실행
+
+### 4. 시스템 구성도 및 데이터 흐름
+
+```mermaid
+flowchart LR
+    subgraph Client["1. 클라이언트 레이어 (UI)"]
+        UI["웹 브라우저 대시보드<br/>on-client/public/index.html<br/>on-client/student/extension.mjs<br/>URL: http://127.0.0.1:5189/"]
+    end
+
+    subgraph LocalServer["2. 로컬 앱 서버 레이어 (케셰브)"]
+        AppServer["HTTP 서버 & 엔진<br/>on-client/src/server.mjs<br/>on-client/src/engine.mjs<br/>바인딩: 127.0.0.1:5189"]
+        Vault["자격 보관함 (Credential Vault)<br/>on-client/src/ai/credential-vault.mjs"]
+    end
+
+    subgraph AccessXDR["3. 접근 제어 및 XDR 레이어"]
+        Decider["ZTNA 판정기 & 탐지기<br/>src/decider.mjs<br/>src/detect.mjs"]
+        XDR["XDR 격리 샌드박스<br/>xdr/*"]
+        VaultAPI["자료실 API<br/>api/notes.js, api/device.js"]
+    end
+
+    subgraph AIGateway["4. AI 서비스 레이어 (CLCO)"]
+        CLCO["수업용 AI 게이트웨이<br/>on-client/src/ai/service.mjs<br/>on-client/vendor/clco-http.mjs"]
+    end
+
+    Client <-->|"1. Loopback HTTP 요청"| LocalServer
+    LocalServer <-->|"2. SDP Host IPC 통신"| Decider
+    LocalServer <-->|"3. 자격 보관함 기반 REST 통신"| AIGateway
+    Decider --- XDR
+    Decider --- VaultAPI
+```
+
+- **데이터 흐름 (Data Flow)**:
+  1. **트래픽 유입**: 브라우저가 루프백(`127.0.0.1:5189`)으로 정적 자산과 REST API를 호출합니다.
+  2. **신원/기기 인증**: 로컬 서버가 기기 승인 토큰과 로컬 신원 매핑 테이블을 검증합니다.
+  3. **ZTNA 인가 처리**: 판정기(`src/decider.mjs`)가 기기 등록, Step-up, 구역 규칙을 평가하여 인가를 결정합니다.
+  4. **보안 감시 및 AI 연동**: XDR 탐지기가 사건을 수집하고, 자격 보관함이 격리된 토큰으로 CLCO 게이트웨이에 분석을 요청합니다.
+
+### 5. 컴포넌트 경계
+- **제공 프레임워크 (수정 금지)**: `on-client/src/server.mjs`, `on-client/src/engine.mjs`, `on-client/public/app.js`, `on-client/tools/start-alekov.ps1`
+- **학생 구현 영역**: `on-client/student/extension.mjs`의 `createStudentView` (8대 UI 렌더러 함수)
+
+### 6. 장애 복구 가이드
+- `Node.js 가 없습니다 / 지금 Node.js 는 vXX`: Node.js 24.19.0 설치 후 새 터미널에서 실행
+- `포트 5189 를 다른 프로그램이 쓰고 있습니다`: `-Port 5190` 옵션 지정 후 `:5190`으로 접속
+- `연결 없음` (`NOT_MOUNTED` / `disconnected`): 기본 단독 기동 시 정상 상태
+- `권한 준비 중` (`ON_AI_PROVISIONING_PENDING`): 운영자 AI 권한 반영 대기
+- `확인 불가` (`UNVERIFIED` / `CONTRACT_MISMATCH`): 계약 불일치 발생 시 새로고침 및 도움정보 확인
+- `취약점 조회 불가` (`LOOKUP_UNAVAILABLE`): OSV 공개 목록 미제공 시 패키지 정보만 단독 표시
+
+### 7. 지원 범위 및 미확인(UNV) 스펙
+- **검증 완료**: Windows Node.js 24.19.0 단독 구동, 8대 UI 렌더러 DOM 생성, `npm run check` 통과, 예외 분기 처리
+- **미확인(기다림 - UNV)**:
+  - `UNV-01` 운영 SDP 호스트 mTLS 실시간 인증
+  - `UNV-02` 운영 상용 AI 모델 유료 생성 호출
+  - `UNV-03` 엔터프라이즈 계정 실시간 강제 회수 집행
+  - `UNV-04` 글로벌 OSV 데이터베이스 라이브 전수 쿼리
+
+---
+
 ## 주의사항
 
 - **과거 배포·커밋 이력**: 최신 정적 파일과 코드에서 데이터를 제거하더라도, 이전 공개 커밋 이력이나 Vercel 과거 배포 기록에는 과거 데이터가 남아 있을 수 있습니다.
