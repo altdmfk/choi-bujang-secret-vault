@@ -241,27 +241,28 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 ### 8.1 기준 형상 정보 및 변경 대조
 - **저장소 URL**: `https://github.com/altdmfk/choi-bujang-secret-vault.git`
 - **대상 브랜치**: `main`
-- **기준 40자리 커밋 해시**: `3ab236bf95d7c662b3e283c5c817a4ca5a16f77f`
+- **기준 커밋**: 최종 제출본 커밋 (현재 `main` 브랜치 HEAD / 직전 2차 검토 기준 커밋: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`)
 - **현재 버전 상태**: `v0.2.11` (검증 중인 버전, Release Candidate)
   > [!IMPORTANT]
   > 22단계 통과는 원문 검토 기준의 수료 판정이며, 실제 운영 인증이나 v1.0 자동 인증이 아닙니다. 19단계 실제 원격 조치 집행기 연동과 21·22단계 공식 접수 서명 연결이 완료되기 전까지는 정식 `v1.0`으로 표기하지 않고 검증 중인 버전으로 유지합니다.
-- **직전 커밋 대비 변경 사항 대조**:
-  - `cd31b199011e3dc2dcfb5497ab93a1c24cf40a94` (21단계) 대비 `3ab236bf95d7c662b3e283c5c817a4ca5a16f77f` (22단계 1차): 새 환경 독립 재현 절차, 13~21단계 누적 재현 결과 표, 데이터 보존 계획 및 릴리스 명세 수록.
-  - `3ab236bf95d7c662b3e283c5c817a4ca5a16f77f` 대비 2차 검토 보완 사항:
-    1. `on-client/src/engine.mjs`의 `demoEngine` 실제 구현에 맞춰 데모 사건 수 기록을 1건(`event-01`)으로 정정.
-    2. `.gitignore`에 `!.env.example` 및 `!on-client/.env.example`을 적용하고 비밀 없는 이동용 설정 템플릿(`.env.example`)을 추가하여 기본 실행 설정과 취약점·외부 연결 설정을 분리 안내.
-    3. 20단계 취약점 조회 재현 시 필요한 프로젝트 경로 환경변수(`ON_PROJECT_DIRECTORY`) 주입 명령 및 관찰 결과를 8.2 절차와 8.3 표에 정확히 연결.
-    4. 데이터 보존 대상별(메모 사본, 설정, 로컬 자격) 백업·복원 절차를 상세화하고, `api/restore.js`의 복원 롤백 실패 시 중단 및 수동 확인 절차 명시, CurrentUser DPAPI 자격의 머신·사용자 이동 제한 및 재승인 필요성 명시.
-    5. 패키지/릴리스 버전(`0.2.11`)과 로컬 HTTP 서버 프로토콜/메타 버전(`0.1.0`)의 의미 차이를 밝히고, 플랫폼 독립 기본 실행과 Windows 전용 연결의 지원 범위를 분리 명시.
+- **과거 검토 이력 및 변경 사항 대조**:
+  - `cd31b199011e3dc2dcfb5497ab93a1c24cf40a94` (21단계): 기술 명세서 및 런북 규격 최초 수록
+  - `3ab236bf95d7c662b3e283c5c817a4ca5a16f77f` (22단계 1차 제출본): 22단계 새 환경 재현 절차, 누적 결과 표, 데이터 보존 계획 및 릴리스 명세 최초 수록
+  - `3e9beee5bec0348cfd93f32b6e4a281956adab1b` (22단계 2차 제출본): 데모 사건 1건 정정, 이동용 설정 템플릿(`.env.example`) 추가, 취약점 경로 환경변수 주입 절차 및 관찰 결과 연결, 복원 롤백 실패 시 중단 절차 및 DPAPI 환경 이동 제한 명시
+  - **직전 2차 검토본(`3e9beee`) 대비 최종 제출본 보완 내역**:
+    1. **데모 AI 설명 분리 및 미확인 정정**: `on-client/src/engine.mjs`의 `demoEngine`에는 `readAiIdentity`가 없고 `server.mjs` 기본 데모 실행에도 `resolveAiIdentity`가 주입되지 않아, AI 설명 요청 시 `readMapping`에서 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 AI 분석 보고서 화면 표시는 **미확인**으로 정정. (데모에서 확인 가능한 범위는 14단계 인가 판정 및 15단계 사건 1건 표시로 한정)
+    2. **설정 파일 로드 방식 명시**: 서버가 순수 표준 라이브러리로 구동되어 `.env.local`을 자동 로드하지 않으므로, PowerShell 환경변수 직접 주입 방식 또는 Node.js 24 내장 `node --env-file=.env.local src/server.mjs` 실행 방식을 파일 위치와 함께 명시.
+    3. **데이터 보존 계획 상세화**: `notes_backup` 비공개 사본의 최초 생성·보관 확인 절차와 사본 부재 시의 복원 제한(`403 RESTORE_REFUSED`)을 추가하고, 브라우저 메모리 세션의 단말 유출 위험 완화 범위를 제한적으로 서술.
+    4. **진단 경로 정정**: 버전 및 진단 정보 조회 경로를 기존의 `/api/status`에서 실제 코드에 구현된 **`/api/diagnostics`** 로 정정하고, 패키지 버전(`0.2.11`)과 제공 메타데이터 버전(`0.1.0`)의 설명 범위를 확인 가능한 코드 범위로 한정.
 
 ### 8.2 새 환경 독립 재현 절차
 1. **작업 폴더 격리 및 클론**:
    - 기존 작업 폴더(`choi-bujang-secret-vault`)와 설정 파일을 온전히 보존합니다.
-   - 새 빈 디렉토리를 생성하고 동일 커밋을 클론합니다.
+   - 새 빈 디렉토리를 생성하고 최신 제출 커밋을 클론합니다.
      ```powershell
      git clone https://github.com/altdmfk/choi-bujang-secret-vault.git choi-bujang-repro
      cd choi-bujang-repro
-     git checkout 3ab236bf95d7c662b3e283c5c817a4ca5a16f77f
+     git checkout main  # 또는 제출 커밋 해시 ($commit = git rev-parse HEAD; git checkout $commit)
      ```
 2. **런타임 환경 검증**:
    - Node.js 및 npm 버전이 명세와 일치하는지 확인합니다.
@@ -278,26 +279,34 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
    - 별도 외부 연결 설정 없이 기본값으로 기동합니다.
      ```powershell
      cd on-client
-     powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
-     # 또는 npm start
+     npm start
+     # 또는 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
      ```
    - 브라우저에서 `http://127.0.0.1:5189/`에 접속하여 케셰브 에이전트 대시보드 렌더링을 확인합니다.
    - 13~19단계 영역은 호스트 미주입 대기(`연결 없음`, `NOT_MOUNTED`) 상태를 확인합니다.
    - 20단계 취약점 영역은 프로젝트 미지정으로 인해 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 상태를 확인합니다.
+   - 별도 터미널 또는 브라우저에서 `http://127.0.0.1:5189/api/diagnostics` 접속 시 `version: '0.1.0'`, `engine.mode: 'disconnected'` 응답을 확인합니다.
 5. **취약점 조회 실행 및 관찰 (20단계 별도 설정 주입)**:
-   - 취약점 스캔 대상 프로젝트 경로를 비밀 없는 환경변수로 주입하고 실행합니다.
-     ```powershell
-     $env:ON_PROJECT_DIRECTORY = (Get-Item ..).FullName
-     $env:ON_APPROVED_PUBLIC_PACKAGES = "[]"
-     npm start
-     ```
+   - 서버는 `.env.local`을 자동 파싱하지 않으므로 아래 2가지 방법 중 하나로 설정을 적용합니다:
+     - **방법 A (PowerShell 환경변수 직접 주입 - 권장)**:
+       ```powershell
+       $env:ON_PROJECT_DIRECTORY = (Get-Item ..).FullName
+       $env:ON_APPROVED_PUBLIC_PACKAGES = "[]"
+       npm start
+       ```
+     - **방법 B (Node.js 24 내장 `--env-file` 플래그 사용)**:
+       `.env.example`을 `on-client/.env.local`로 복사하고 `ON_PROJECT_DIRECTORY`를 지정한 뒤:
+       ```powershell
+       node --env-file=.env.local src/server.mjs
+       ```
    - 브라우저 새로고침 후 취약점 조회 영역에서 로컬 `package-lock.json` 파싱 동작 및 승인 패키지 부재(`packages: []`)로 인한 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `not_checked`) 상태 렌더링을 확인합니다.
 6. **가상 데이터 데모 실행 (화면 렌더링 검증)**:
-   - 가상 데이터 모드로 기동하여 8대 렌더러 함수의 정상 동작을 확인합니다.
+   - 가상 데이터 모드로 기동하여 렌더러 함수의 동작을 확인합니다.
      ```powershell
      npm run demo
      ```
-   - `on-client/src/engine.mjs`의 `demoEngine`이 공급하는 `예제 자료` 배지, 인가 배지(`allow`, `deny`, `challenge`), 1건의 가상 보안 사건(`event-01`), AI 사건 분석 리포트가 정상 렌더링되는지 확인합니다.
+   - `on-client/src/engine.mjs`의 `demoEngine`이 공급하는 `예제 자료` 배지, 인가 배지 3종(`library`: allow, `repository`: deny, `approval`: challenge), 1건의 가상 보안 사건(`event-01`) 목록 렌더링을 확인합니다.
+   - *주의: 데모 모드에서도 AI 설명 요청은 권한 준비 중(`ON_AI_PROVISIONING_PENDING`)으로 중단되므로 AI 분석 보고서는 렌더링되지 않습니다.*
 7. **정상 종료 및 재실행 확인**:
    - 터미널에서 `Ctrl + C`를 입력하여 서버를 정상 종료합니다.
    - 다시 기동 명령을 실행하여 프로세스가 충돌 없이 바인딩되고 이전과 동일하게 브라우저 응답이 복원되는지 확인합니다.
@@ -305,31 +314,34 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 ### 8.3 누적 기능 재현 결과 표 (13~21단계)
 
 결과 분류 기준:
-- `재현됨`: 새 환경에서 직접 실행하여 정상 화면 렌더링 및 응답을 확인한 항목
+- `재현됨`: 현재 제출본에서 직접 실행하여 정상 화면 렌더링 및 응답을 확인한 항목
 - `연결 없음`: 기본 단독 기동 시 외부 호스트 설정 미주입으로 안전 대기 상태를 확인한 항목
 - `확인 불가`: 계약 불일치 또는 데이터 무결성 오류로 렌더링이 중단된 항목
+- `미확인`: 환경적 제약이나 권한 미비로 실행하지 못했거나 화면 표시를 관찰하지 못한 항목
 - `재현 안 됨`: 로직 오류나 런타임 결함으로 동작이 실패한 항목
 
 | 단계 | 확인한 기능 | 결과 | 확인 시각 | 비고 (근거, 예제 구분, 실제 사용 설정 및 관찰 결과) |
 |---|---|---|---|---|
 | **13단계** | 신원 및 기기 세션 표시 (`renderIdentity`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 Native 호스트 미주입 대기 확인 (`NOT_MOUNTED`). `npm run demo` 기동 시 `예제 자료` 배지 및 가상 세션 렌더링 확인됨 |
-| **14단계** | 업무 앱 접근 인가 판정 (`renderDecision`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 SDP 릴레이 미연결 대기 확인. `npm run demo` 실행 시 `예제 자료` 배지 및 인가 배지(`allow`, `deny`, `challenge`) 렌더링 확인됨 |
+| **14단계** | 업무 앱 접근 인가 판정 (`renderDecision`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 SDP 릴레이 미연결 대기 확인. `npm run demo` 실행 시 `예제 자료` 배지 및 업무 앱 3종 인가 배지(`allow`, `deny`, `challenge`) 렌더링 확인됨 |
 | **15단계** | 보안 사건 모니터링 (`renderEvents`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 관측 이벤트 없음 대기 확인. `npm run demo` 기동 시 `demoEngine`이 공급하는 `예제 자료` **1건**(`event-01: 개발 저장소 접속이 제한됐습니다.`) 사건 목록, 필터링, 탐지 규칙 배지 렌더링 확인됨 |
 | **16단계** | 보호 현황 매트릭스 (`renderStatus`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 단말 상태 및 0건 지표 확인. `npm run demo` 기동 시 `예제 자료` 기기 점검, 세션 수 집약 렌더링 확인됨 |
 | **17단계** | AI 게이트웨이 점검 상태 (`renderAiConnection`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 `승인 대기` 또는 `권한 준비 중` 안전 분기 확인. 모델 수·시각 렌더링 확인. 상용 유료 AI 실호출은 미확인(`UNV-02`) |
-| **18단계** | 보안 사건 AI 설명 렌더링 (`renderExplanation`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 사건 설명 대기. `npm run demo` 기동 시 `예제 자료` 1건 기반 AI 이상 징후 분석 리포트 렌더링 확인됨 |
+| **18단계** | 보안 사건 AI 설명 렌더링 (`renderExplanation`) | `미확인` | 2026-10-23 13:44 | 기본 기동 시 사건 설명 대기. 데모 모드(`npm run demo`)에서도 `demoEngine`에 `readAiIdentity`가 없고 `server.mjs`에 `resolveAiIdentity`가 주입되지 않아, 설명 요청 시 `readMapping`에서 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 AI 분석 보고서 화면 표시는 **미확인**으로 정정 |
 | **19단계** | 보안 조치 상태 뷰 (`renderAction`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 `idle` 상태 표시. 실제 원격 보안 조치 집행기는 플랫폼 미연결(`ACTION_UNSUPPORTED`) 상태 유지. 실행기가 아닌 상태 뷰어로 동작 확인됨 |
-| **20단계** | 패키지 의존성 취약점 점검 (`renderVulnerabilities`) | `재현됨` | 2026-10-23 13:44 | 1) 기본 기동 시 `ON_PROJECT_DIRECTORY` 미설정으로 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 확인.<br/>2) `ON_PROJECT_DIRECTORY` 주입 및 `ON_APPROVED_PUBLIC_PACKAGES=[]` 설정 기동 시 로컬 lockfile 파싱 및 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`) 정상 상태 렌더링 확인 |
+| **20단계** | 패키지 의존성 취약점 점검 (`renderVulnerabilities`) | `재현됨` | 2026-10-23 13:44 | 1) 기본 기동 시 `ON_PROJECT_DIRECTORY` 미설정으로 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 확인.<br/>2) `ON_PROJECT_DIRECTORY` 주입(또는 `--env-file`) 및 `ON_APPROVED_PUBLIC_PACKAGES=[]` 설정 기동 시 로컬 lockfile 파싱 및 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`) 정상 상태 렌더링 확인 |
 | **21단계** | 런북 규격 실행 및 재실행 | `재현됨` | 2026-10-23 13:44 | `npm run check` 통과. 표준 기동 스크립트 실행 후 `http://127.0.0.1:5189/` 정상 응답, `Ctrl + C` 종료 후 재기동 성공 확인 |
 
 ### 8.4 데이터 보존 및 백업·복원 계획
 
-데이터 종류별 보존 특성, 백업 생성·보관, 복원 절차 및 환경 이전 시의 제한 사항을 규정합니다.
+데이터 종류별 보존 특성, 최초 백업 생성·보관, 복원 절차 및 환경 이전 시의 제한 사항을 규정합니다.
 
 #### 8.4.1 자료실 메모 사본 (`notes_backup`)
-1. **사본 구조 및 보관**:
-   - 스키마: `notes_backup(id, owner_id, title, content, content_hash)`
-   - 서버 전용 관리자 키(`SUPABASE_SECRET_KEY`)로만 접근 가능한 비공개 테이블에 원본 메모의 SHA-256 해시와 함께 보관합니다. 공개 저장소나 클라이언트 번들에는 사본을 두지 않습니다.
+1. **최초 백업 생성 및 보관 확인 순서**:
+   - **생성 주체 및 시점**: 데이터베이스 관리자(DBA) 또는 백엔드 배치 관리 권한자(서버 전용 `SUPABASE_SECRET_KEY` 보유자)가 자료실 초기 배포 시 또는 메모 정상 승인 트랜잭션 시점에 수행합니다.
+   - **생성 절차**: `notes` 원본 테이블의 데이터를 바탕으로 SHA-256 내용 해시를 계산하여 비공개 사본 테이블 `notes_backup(id, owner_id, title, content, content_hash)`에 직접 INSERT/UPSERT 합니다.
+   - **보관 확인**: 관리자 쿼리(`SELECT id, content_hash FROM notes_backup WHERE id = ?`)를 통해 사본 행과 해시의 무결한 보관 여부를 사전에 조회·확인합니다.
+   - **사본 부재 시의 제한**: `notes_backup`에 사전 등록되지 않은 메모는 복원 시 `loadVerifiedBackup` 단계에서 `403 RESTORE_REFUSED`("이 메모는 복원할 수 없습니다.")로 차단됩니다. 따라서 사전에 백업 사본이 존재하지 않는 신규/임의 메모는 복구할 수 없는 명확한 한계가 존재합니다.
 2. **복원 절차**:
    - 클라이언트는 `POST /api/restore` 엔드포인트에 `{ id, contentHash, dryRun }`을 전달합니다.
    - 사본의 `content_hash`와 본문 SHA-256 일치 여부, 요청자가 제공한 해시 및 소유자 신원을 엄격히 사전 대조합니다.
@@ -361,14 +373,22 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
    - 새 환경에서 로컬 서버를 기동한 후 화면의 6자리 승인 번호를 확인하고, 공식 관리자 포털을 통해 신규 사용자 세션으로 재로그인 및 관리자 승인(재승인)을 거쳐 새 환경 고유의 DPAPI 컨텍스트를 새로 발급받아야 합니다.
 
 #### 8.4.4 브라우저 세션 데이터
-- 브라우저 영구 저장소(`localStorage`/`sessionStorage`) 저장을 일체 배제하고 메모리 변수 및 단기 쿠키로만 세션을 관리합니다. 브라우저 탭을 닫거나 로그아웃 시 메모리 세션이 즉시 소멸되어 단말 유출 위험을 원천 차단합니다.
+- 브라우저 영구 저장소(`localStorage`/`sessionStorage`) 저장을 일체 배제하고 메모리 변수 및 단기 쿠키로만 세션을 관리합니다.
+- 이를 통해 디스크 잔존 파일이나 오프라인 브라우저 스토리지 덤프를 통한 유출 위험을 제한적으로 완화합니다. (단, 활성 프로세스 메모리 덤프나 브라우저 탭 실행 중의 스크립트 탈취까지 완전히 차단하는 것은 아닙니다.)
 
 ### 8.5 이동 가능한 환경 구성 규격 (Portability)
 
 1. **비밀 없는 이동용 설정 템플릿 제공 (`.env.example`)**:
    - 프로젝트 루트(`.env.example`) 및 `on-client/.env.example`에 비밀 없는 환경 설정 템플릿을 제공합니다.
    - `.gitignore`에 `!.env.example` 및 `!on-client/.env.example` 예외 처리를 적용하여 이동용 템플릿이 누락 없이 형상 관리되도록 보장합니다.
-2. **설정 목적별 분리 안내**:
+2. **명시적 설정 주입 및 실행 방식 안내**:
+   - 서버는 순수 Node.js 표준 라이브러리로 구동되므로 `.env.local`을 자동 파싱하지 않습니다.
+   - 지원하는 실행 방법 2가지:
+     - **방법 1 (PowerShell 환경변수 직접 주입 - 권장)**:
+       `$env:ON_PORT = "5189"`, `$env:ON_PROJECT_DIRECTORY = (Get-Item ..).FullName`, `$env:ON_APPROVED_PUBLIC_PACKAGES = "[]"` 주입 후 `npm start` 실행
+     - **방법 2 (Node.js 24 내장 `--env-file` 플래그 사용)**:
+       설정 파일을 `on-client/.env.local`로 복사한 뒤 `cd on-client; node --env-file=.env.local src/server.mjs` 실행
+3. **설정 목적별 분리 안내**:
    - **기본 실행에 불필요한 설정 (기본값 사용)**:
      - `ON_PORT`: 로컬 웹 서버 리스닝 포트 (기본값 `5189`)
      - `ON_AI_MODEL`: AI 모델 식별자 (기본값 `aleph/auto`)
@@ -380,21 +400,21 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
      - `SUPABASE_URL`: 백엔드 데이터베이스 URL
      - `SUPABASE_SECRET_KEY`: 서버 전용 서비스 롤 키 (절대 커밋 금지, Vercel 환경변수 주입)
      - 케셰브(`on-client`) 기본 로컬 실행 시에는 주입할 필요가 없습니다.
-3. **절대경로 하드코딩 배제**:
+4. **절대경로 하드코딩 배제**:
    - 소스코드 내 개발자 개인 PC 절대경로를 일체 배제하고 상대 경로 및 프로젝트 루트 진입점을 기준으로 경로를 해석합니다.
-4. **순수 표준 라이브러리 기반 구동**:
+5. **순수 표준 라이브러리 기반 구동**:
    - `on-client`는 외부 npm 의존성 없이 Node.js 순수 표준 라이브러리만으로 즉시 구동됩니다.
 
 ### 8.6 버전 체계 및 최종 지원 범위
 
-#### 8.6.1 버전 체계의 역할 분담 및 의미 차이
-문서와 소스코드에 존재하는 두 버전 표기는 다음과 같이 역할이 명확히 구분됩니다:
+#### 8.6.1 버전 체계의 역할 분담 및 확인 가능한 코드 범위
+문서와 소스코드에 존재하는 두 버전 표기는 실제 코드상 다음과 같이 역할이 명확히 구분됩니다:
 - **패키지 및 릴리스 버전 (`0.2.11`)**:
   - 정의: 학생 과제 스타터 패키지 번들 및 개발 확장 모듈(`on-client/package.json`)의 최신 릴리스 버전입니다.
   - 적용: 과제 누적 단계 진척도 및 학생 확장 구현(`student/extension.mjs`)의 기준 버전으로 사용됩니다.
 - **서버 프로토콜 및 베이스라인 메타 버전 (`0.1.0`)**:
   - 정의: 로컬 HTTP 서버 내부 통신 규격 및 프레임워크 베이스라인 메타 사양 버전입니다.
-  - 적용: `on-client/src/server.mjs`의 `/api/status` 응답(`version: '0.1.0'`) 및 진단 메타데이터(`starterVersion: '0.1.0'`)에 명시되며, 제공 프레임워크의 HTTP API 계약 버전을 의미합니다.
+  - 적용: `on-client/src/server.mjs`의 `GET /api/diagnostics` 엔드포인트 응답(`version: '0.1.0'`) 및 진단 메타데이터 함수(`starterVersion: '0.1.0'`)에 명시되며, 제공 프레임워크의 HTTP API 계약 버전을 의미합니다. (주의: `/api/status` 라우트는 존재하지 않으며, 실제 진단 경로는 `/api/diagnostics`입니다.)
 
 #### 8.6.2 운영체제별 지원 범위 명확 분리
 - **플랫폼 독립 공통 지원 (Windows 및 비-Windows)**:
@@ -411,6 +431,7 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 #### 8.6.3 정식 v1.0 미발행 사유 및 미확인(UNV) 스펙
 - **현재 표기 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
 - **정식 v1.0 미발행 사유**:
+  - 18단계 AI 설명 보고서 표시 미확인 (데모 모드에서도 권한 준비 중으로 미표시)
   - 19단계 실제 원격 조치 집행기 연결 부재 (`ACTION_UNSUPPORTED`, `supportedActions: []` 상태 유지)
   - 21·22단계 공식 접수 및 서명 자동 검증기 미연결
   - 운영 SDP 릴레이 서버와의 실제 mTLS 연동(`UNV-01`) 및 상용 AI LLM 호출(`UNV-02`) 미확인 상태 유지
@@ -420,4 +441,4 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   - `UNV-03` 엔터프라이즈 계정 실시간 강제 회수 집행 (플랫폼 미지원으로 미확인 유지)
   - `UNV-04` 글로벌 OSV 데이터베이스 라이브 온라인 전수 쿼리 (허용 목록 미지정으로 미확인 유지)
 - **최종 검증 결론**:
-  - 제출 커밋(`3ab236bf95d7c662b3e283c5c817a4ca5a16f77f`)을 기준으로 소스코드, 런북, 구성도, 재현 기록이 완전한 일관성을 충족함을 확인하였습니다.
+  - 제출 커밋(현재 `main` 브랜치 HEAD, 직전 2차 검토본 `3e9beee5bec0348cfd93f32b6e4a281956adab1b` 대비 보완 반영)을 기준으로 소스코드, 런북, 구성도, 재현 기록이 완전한 일관성을 충족함을 확인하였습니다.
