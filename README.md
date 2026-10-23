@@ -279,17 +279,18 @@ flowchart LR
 ### 1. 기준 형상 정보 및 변경 대조
 - **저장소 URL**: `https://github.com/altdmfk/choi-bujang-secret-vault.git`
 - **대상 브랜치**: `main`
-- **실제 재현에 사용한 고정 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
+- **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
+- **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD)
 - **릴리스 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
   - 18단계 AI 설명 보고서 표시 미확인, 19단계 실제 원격 조치 집행기 미연결(`ACTION_UNSUPPORTED`), 21·22단계 공식 접수 서명 미연결 상태이므로 정식 `v1.0` 대신 검증 중인 버전으로 표기합니다.
 - **고정 재현 커밋(`3e9beee`)과의 파일별 차분 및 코드 일치 검증**:
   - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `on-client/tools/**`): **변경 없음 (`0 diff`)**
   - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package.json`): **변경 없음 (`0 diff`, `on-client`는 외부 의존성이 없어 루트 `package-lock.json` 사용)**
-  - 핵심 파일 8종 Git Blob 및 SHA-256 해시 대조: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md) 8.1.1 표 수록 (두 커밋의 산출 해시 일치 확인)
+  - 핵심 파일 8종 Git Blob 및 저장소 원문 `fileSha256`(LF 기준) 해시 대조: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md) 8.1.1 표 수록 (두 커밋의 산출 해시 일치 확인)
   - 파일별 차분 대상: `docs/STUDENT_RUNBOOK.md`, `README.md`, `.env.example`, `on-client/.env.example` (문서 및 환경 템플릿 보완 전용)
-- **현재 제출본 기준 재확인 항목**:
-  - 확장 모듈 단일 파일 문법 검사(`npm --prefix on-client run check` - `student/extension.mjs` 대상 `node --check`), 기본 HTTP 기동(`npm start`) 및 `/api/diagnostics` 응답, 취약점 `idle` 대기 및 버튼 클릭 분기(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`), 데모 모드(`npm run demo`) 사건 1건 및 인가 배지 3종 렌더링, 데이터 복원 테스트(`npm run test:restore` 9건 통과)
-- **미재확인 항목**:
+- **변경된 파일 관련 재확인 결과**:
+  - 확장 모듈 단일 파일 문법 검사(`npm --prefix on-client run check` - `student/extension.mjs` 대상 `node --check`), 환경 템플릿 기반 기본 HTTP 기동(`npm start`) 및 `/api/diagnostics` 응답, 취약점 `idle` 대기 및 버튼 클릭 분기(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`), 데모 모드(`npm run demo`) 사건 1건 및 인가 배지 3종 렌더링, 데이터 복원 테스트(`npm run test:restore` 9건 통과), 실행 방법별(PowerShell 도구 vs 직접 실행) 지원 범위 구분 명시
+- **변경된 파일 관련 미확인 사항 (UNV 유지)**:
   - 18단계 데모 AI 설명(권한 준비 중으로 미표시), 19단계 실제 조치 집행(`ACTION_UNSUPPORTED`), UNV-01~04 운영 실연동(운영 mTLS 연동, 상용 AI 호출, 엔터프라이즈 계정 강제 회수, OSV 라이브 온라인 전수 쿼리)
 
 ### 2. 새 환경 재현 절차

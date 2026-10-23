@@ -242,7 +242,8 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 ### 8.1 기준 형상 정보 및 변경 대조
 - **저장소 URL**: `https://github.com/altdmfk/choi-bujang-secret-vault.git`
 - **대상 브랜치**: `main`
-- **실제 재현에 사용한 고정 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
+- **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
+- **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD)
 - **현재 버전 상태**: `v0.2.11` (검증 중인 버전, Release Candidate)
   > [!IMPORTANT]
   > 22단계 통과는 원문 검토 기준의 수료 판정이며, 실제 운영 인증이나 v1.0 자동 인증이 아닙니다. 19단계 실제 원격 조치 집행기 연동과 21·22단계 공식 접수 서명 연결이 완료되기 전까지는 정식 `v1.0`으로 표기하지 않고 검증 중인 버전으로 유지합니다.
@@ -256,16 +257,16 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   - 결과: 변경 사항 없음 (`0 diff`). `on-client`는 외부 npm 의존성이 없어 `on-client/package-lock.json`이 존재하지 않으며 루트의 `package-lock.json`이 락파일 역할을 수행합니다. 의존성 버전 및 설치 무결성은 재현 대상 커밋과 동일하게 유지됩니다.
 - **핵심 실행 코드 및 의존성 파일 해시 대조 (두 커밋 간 무결성 증명)**:
   - 심사관 환경에서 이전 커밋(`3e9beee`)의 Git 트리를 직접 조회할 수 없는 경우에도, 현재 제출본의 파일 해시와 아래 표를 대조하여 실행 코드·스크립트·락파일에 변경이 없음을 확인할 수 있습니다.
-  - Git Blob 해시는 형상 관리 객체 식별자이며, SHA-256은 표준 파일 무결성 해시입니다. 두 커밋(`3e9beee` 및 `HEAD`)에서 산출된 해시값이 일치함을 확인하였습니다.
+  - 아래 `fileSha256`은 Git 저장소 표준 원문(LF 개행) 기준의 SHA-256 해시입니다. 두 커밋(`3e9beee` 및 `HEAD`)에서 산출된 Git Blob 및 `fileSha256` 해시값이 일치함을 확인하였습니다.
 
-| 파일 경로 | Git Blob 해시 (3e9beee / HEAD) | 파일 SHA-256 해시 | 대조 결과 |
+| 파일 경로 | Git Blob 해시 (3e9beee / HEAD) | 저장소 원문 fileSha256 (LF 기준) | 대조 결과 |
 |---|---|---|---|
-| `on-client/src/server.mjs` | `42774051fa29614e28f4f823db41fe33942166ed` | `b7a151f05ba990f1ad52f4a96fb0ff2a53250f0564b2fc844937cdae70ff2794` | **일치** |
+| `on-client/src/server.mjs` | `42774051fa29614e28f4f823db41fe33942166ed` | `32ce16598554ffcd044e3aaa1caf91bcc70f10efb42ea279463cd2a7f7d1f010` | **일치** |
 | `on-client/src/engine.mjs` | `6ceb3560da2ecd3cd4b29789204b4432f6073c69` | `67a4f794eccbe7c5ba922b030cacb92c1473e2f9ef6ab1a69f8619a3292c58df` | **일치** |
-| `on-client/student/extension.mjs` | `5c6ee174bf67954b26c395484bf5428536fb9056` | `d6133b9e08d7d3db79aad87965e7c0ade3468543fefa51743f0eb1b49d2d6978` | **일치** |
+| `on-client/student/extension.mjs` | `5c6ee174bf67954b26c395484bf5428536fb9056` | `1895f22456fff06fb785472fe15baf44202b4749b19ced71687c7cab48acc7f3` | **일치** |
 | `on-client/public/app.js` | `002bfdf421f0005c14bb98dcbf3d0163f4be091d` | `e4330a92e5a5bdceed3489088eef5a566dac24341955259feada845473debf7a` | **일치** |
-| `on-client/tools/start-alekov.ps1` | `809bccc4cbc9a5fc2f89f1a20e276d7c0c265f30` | `273c0b54337155d04d97f133a960e969a6a846b4863edddb647d755067ed18b9` | **일치** |
-| `package.json` | `52bcdd986d9b048cbbac4e88b5c3ef02955e58d9` | `b69708cbfb2fa14b3133a7437c4c92a6384465439cc5453a9d5a9c3a30f8c960` | **일치** |
+| `on-client/tools/start-alekov.ps1` | `809bccc4cbc9a5fc2f89f1a20e276d7c0c265f30` | `8953268698284c644a14651956c7a73c3e4a4025b59d23c692e8580d5d054384` | **일치** |
+| `package.json` | `52bcdd986d9b048cbbac4e88b5c3ef02955e58d9` | `64897492f0e4af20e0228f89b2f9a90f447955e8e64a52ca77b7f56b36cd4af3` | **일치** |
 | `package-lock.json` | `92791113c9680fb69cb531de7847b84ecb3f4553` | `7f7274c94193a44840a4cb1fd4a1dc8eccf51414de0dbb8de46eb344367b55d0` | **일치** |
 | `on-client/package.json` | `1a4bd0c7c9f4e2ae335bea28f28926ac015f225f` | `1e111473de7526fd674a6a5fab7167921e2f3c7ccc8a45019712585e0965a419` | **일치** |
 
@@ -275,23 +276,26 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   - `README.md`: 심사관 피드백 반영 (고정 커밋 SHA 대조, 파일별 차분 및 코드 일치 요약, 실행 도구별 지원 범위 구분, 취약점 idle 대기 및 조회 버튼 분기 분리, OS 플랫폼 지원 범위 명확화)
   - `docs/STUDENT_RUNBOOK.md`: 심사관 피드백 반영 (6.2 장애 가이드 형식 분리, 8.1 파일별 차분·해시 대조표·check 단일 파일 범위 수록, 8.2/8.3 취약점 분기 및 데모 AI 미확인 정정, 8.4 복원 롤백 실패 수동 감사 규정, 8.6 SDP 플랫폼 독립 구현 및 실행 방법별 Node 버전 범위 명시)
 
-#### 8.1.2 현재 제출본 기준 재확인 항목 및 미재확인 항목
-- **재확인한 항목 (Items Re-verified in Current Submission)**:
-  1. **확장 모듈 단일 파일 문법 검사 (`check`)**: `npm --prefix on-client run check` 실행 (명령: `node --check student/extension.mjs`). 이는 프로젝트 전체 테스트가 아닌 학생 확장 모듈 단 1개 파일(`on-client/student/extension.mjs`)에 대한 정적 문법 검사이며, 문법 오류 없음 (`0 error`) 재확인 완료.
-  2. **순수 표준 라이브러리 기본 기동**: `cd on-client; npm start` 실행 후 `http://127.0.0.1:5189/` 웹 대시보드 정상 렌더링 및 13~19단계 안전 대기(`연결 없음`) 표시 재확인 완료.
+#### 8.1.2 변경된 파일과 관련된 재확인 결과 및 미확인 사항 구분
+- **변경된 파일 4종 (`.env.example`, `on-client/.env.example`, `README.md`, `docs/STUDENT_RUNBOOK.md`) 관련 재확인 결과**:
+  1. **확장 모듈 단일 파일 문법 검사 (`check`)**: `npm --prefix on-client run check` 실행 (명령: `node --check student/extension.mjs`). 프로젝트 전체가 아닌 학생 확장 모듈 단 1개 파일(`on-client/student/extension.mjs`)에 대한 정적 문법 검사이며, 문법 오류 없음 (`0 error`) 재확인 완료.
+  2. **환경 설정 템플릿 및 순수 표준 라이브러리 기본 기동**: `.env.example` 및 `on-client/.env.example` 안내에 따라 외부 의존성 없이 `npm start` 실행 후 `http://127.0.0.1:5189/` 대시보드 정상 렌더링 및 13~19단계 안전 대기(`연결 없음`) 표시 재확인 완료.
   3. **서버 프로토콜 진단 엔드포인트**: `GET http://127.0.0.1:5189/api/diagnostics` 요청 시 `version: '0.1.0'`, `engine.mode: 'disconnected'` 응답 재확인 완료.
-  4. **취약점 조회 기동 직후 초기 관찰**: 기본 기동 직후 취약점 영역이 자동 조회 없이 **초기 `idle`(대기)** 상태로 정상 렌더링됨을 재확인 완료.
-  5. **취약점 조회 버튼 클릭 분기 (미설정)**: 대시보드에서 `[설치 패키지 조회]`(`vulnerabilities-load`) 버튼 클릭 시 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`)으로 전환됨을 재확인 완료.
-  6. **취약점 조회 버튼 클릭 분기 (환경변수 주입)**: `$env:ON_PROJECT_DIRECTORY` 및 `$env:ON_APPROVED_PUBLIC_PACKAGES="[]"` 주입 후 버튼 클릭 시 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`)으로 전환됨을 재확인 완료.
-  7. **가상 데이터 데모 실행**: `npm run demo` 실행 후 `demoEngine` 기반 1건의 사건(`event-01: 개발 저장소 접속이 제한됐습니다.`) 및 업무 앱 3종 인가 배지(`allow`, `deny`, `challenge`) 렌더링 재확인 완료.
-  8. **백엔드 데이터 복원 안전 규격**: `npm run test:restore` 실행 결과 9건 테스트 전체 통과 (`pass 9`, `fail 0`) 재확인 완료.
-- **미재확인 항목 (Items Not Re-verified / UNV 유지)**:
-  1. **데모 모드 AI 설명 보고서 표시**: `demoEngine`에 `readAiIdentity`가 없고 `server.mjs` 기본 데모에 `resolveAiIdentity`가 주입되지 않아 `readMapping`에서 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 화면 표시 **미재확인(미확인 유지)**.
-  2. **19단계 실제 원격 조치 집행**: 백엔드 실제 조치 집행기가 연동되지 않은 상태(`ACTION_UNSUPPORTED`, `supportedActions: []`)이므로 실제 강제 회수 집행 **미재확인(미확인 유지)**.
-  3. **UNV-01 (운영 SDP 호스트 mTLS 실제 통신)**: 운영 SDP 호스트 인증서 및 도메인 미주입으로 실제 TLS 핸드셰이크 **미재확인(미확인 유지)**.
-  4. **UNV-02 (운영 상용 AI 모델 유료 생성 호출)**: 학생 자격증명 과금 방지 및 API 키 미주입으로 유료 추론 호출 **미재확인(미확인 유지)**.
-  5. **UNV-03 (엔터프라이즈 계정 실시간 강제 회수 집행)**: 플랫폼 API 미지원으로 실시간 회수 집행 **미재확인(미확인 유지)**.
-  6. **UNV-04 (글로벌 OSV 데이터베이스 라이브 온라인 전수 쿼리)**: 안전 승인 패키지 목록 미지정(`[]`)으로 외부 API 실시간 전수 쿼리 **미재확인(미확인 유지)**.
+  4. **취약점 조회 초기 대기 및 단계별 버튼 분기**:
+     - 대시보드 접속 직후 취약점 영역이 자동 조회 없이 **초기 `idle`(대기)** 상태로 정상 렌더링됨을 재확인 완료.
+     - `[설치 패키지 조회]`(`vulnerabilities-load`) 버튼 클릭 시 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`)으로 전환됨을 재확인 완료.
+     - `$env:ON_PROJECT_DIRECTORY` 및 `$env:ON_APPROVED_PUBLIC_PACKAGES="[]"` 주입 후 버튼 클릭 시 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`)으로 전환됨을 재확인 완료.
+  5. **가상 데이터 데모 실행**: `npm run demo` 실행 후 `demoEngine` 기반 1건의 사건(`event-01: 개발 저장소 접속이 제한됐습니다.`) 및 업무 앱 3종 인가 배지(`allow`, `deny`, `challenge`) 렌더링 재확인 완료.
+  6. **백엔드 데이터 복원 안전 규격**: `npm run test:restore` 실행 결과 9건 테스트 전체 통과 (`pass 9`, `fail 0`) 재확인 완료.
+  7. **실행 방법별 지원 범위 규정 준수**: PowerShell 실행 도구(`tools/start-alekov.ps1`)는 Node.js 22~24 버전만 허용(21 이하 및 25 이상 사전 차단)하고, 직접 실행(`npm start`/`node`)의 다른 버전은 미지원·미검증으로 문서상 정확히 분리되었음을 재확인 완료.
+
+- **변경된 파일과 관련된 미확인 사항 (UNV 유지 및 한계 명시)**:
+  1. **18단계 데모 모드 AI 설명 보고서 표시 (미확인)**: `demoEngine`에 `readAiIdentity`가 없고 `server.mjs` 기본 데모에 `resolveAiIdentity`가 주입되지 않아 `readMapping`에서 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 화면 표시 **미확인 유지**.
+  2. **19단계 실제 원격 조치 집행 (미확인)**: 백엔드 실제 조치 집행기가 연동되지 않은 상태(`ACTION_UNSUPPORTED`, `supportedActions: []`)이므로 실제 강제 회수 집행 **미확인 유지**.
+  3. **UNV-01 (운영 SDP 호스트 mTLS 실제 통신)**: 운영 SDP 호스트 인증서 및 도메인 미주입으로 실제 TLS 핸드셰이크 **미확인 유지**.
+  4. **UNV-02 (운영 상용 AI 모델 유료 생성 호출)**: 학생 자격증명 과금 방지 및 API 키 미주입으로 유료 추론 호출 **미확인 유지**.
+  5. **UNV-03 (엔터프라이즈 계정 실시간 강제 회수 집행)**: 플랫폼 API 미지원으로 실시간 회수 집행 **미확인 유지**.
+  6. **UNV-04 (글로벌 OSV 데이터베이스 라이브 온라인 전수 쿼리)**: 안전 승인 패키지 목록 미지정(`[]`)으로 외부 API 실시간 전수 쿼리 **미확인 유지**.
 
 ### 8.2 새 환경 독립 재현 절차
 1. **작업 폴더 격리 및 클론**:
