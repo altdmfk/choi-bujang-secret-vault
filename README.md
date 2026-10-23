@@ -278,31 +278,30 @@ flowchart LR
 ### 1. 기준 형상 정보 및 변경 대조
 - **저장소 URL**: `https://github.com/altdmfk/choi-bujang-secret-vault.git`
 - **대상 브랜치**: `main`
-- **기준 커밋**: 최종 제출본 커밋 (현재 `main` 브랜치 HEAD / 직전 2차 검토 기준 커밋: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`)
+- **실제 재현에 사용한 고정 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
 - **릴리스 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
   - 18단계 AI 설명 보고서 표시 미확인, 19단계 실제 원격 조치 집행기 미연결(`ACTION_UNSUPPORTED`), 21·22단계 공식 접수 서명 미연결 상태이므로 정식 `v1.0` 대신 검증 중인 버전으로 표기합니다.
-- **과거 검토 이력 및 변경 대조**:
-  - `cd31b199011e3dc2dcfb5497ab93a1c24cf40a94` (21단계): 기술 명세서 및 런북 규격 수록
-  - `3ab236bf95d7c662b3e283c5c817a4ca5a16f77f` (22단계 1차 제출본): 22단계 새 환경 재현 절차, 누적 결과 표 수록
-  - `3e9beee5bec0348cfd93f32b6e4a281956adab1b` (22단계 2차 제출본): 데모 사건 1건 정정, 이동용 설정 템플릿(`.env.example`) 추가, 취약점 경로 주입 절차 및 관찰 결과 연결, 롤백 실패 시 중단 절차 명시
-  - **직전 2차 검토본(`3e9beee`) 대비 최종 제출본 보완 내역**:
-    1. 데모 AI 설명 분리 및 미확인 정정: `demoEngine`에는 `readAiIdentity`가 없어 AI 설명 요청 시 권한 준비 중(`ON_AI_PROVISIONING_PENDING`)으로 중단되므로 18단계를 `미확인`으로 정정 (데모 확인 범위는 14단계 인가 판정 및 15단계 사건 1건으로 한정).
-    2. 설정 파일 로드 방식 명시: 서버가 순수 표준 라이브러리로 구동되므로 PowerShell 환경변수 직접 주입 방식 또는 Node.js 24 내장 `node --env-file=.env.local src/server.mjs` 방식을 명시.
-    3. 데이터 보존 계획 보완: `notes_backup` 사본의 최초 생성·보관 확인 절차와 사본 부재 시의 복원 제한(`403 RESTORE_REFUSED`) 명시, 메모리 세션의 유출 위험 완화 범위를 제한적으로 서술.
-    4. 진단 경로 정정: 버전 및 진단 정보 조회 경로를 실제 구현인 `/api/diagnostics`로 정정하고, 패키지 버전(`0.2.11`)과 프레임워크 메타 버전(`0.1.0`) 설명 범위를 확인 가능한 코드 범위로 한정.
+- **실제 재현 고정 커밋(`3e9beee`) 이후 문서 수정 범위**:
+  1. 21단계 장애 안내 정정: 6.2 표에서 AI 앱 승인(UUID 앞뒤 4글자 하이픈 9글자 `xxxx-xxxx`, 후속 버튼 `[승인했으며 연결 확인]`)과 Native 계정 연결 승인(6자리 숫자, 후속 버튼 `[승인 번호로 로그인 완료]`) 분리.
+  2. 22단계 취약점 조회 관찰 분리: 기동 직후 초기 `idle`(대기) 상태와 화면의 `[설치 패키지 조회]`(`vulnerabilities-load`) 버튼 클릭 후 관찰 결과 분리.
+  3. 22단계 플랫폼 지원 범위 정정: 외부 SDP mTLS HTTPS 릴레이 모듈의 플랫폼 독립 구현 인정, Windows 전용 기능(Native/DPAPI)과 분리, 비-Windows SDP 실연결은 미실측에 따른 「미검증 지원 범위」로 명시.
+  4. 데모 AI 설명 분리 및 미확인 정정: 데모 모드에서 AI 설명 요청 시 `ON_AI_PROVISIONING_PENDING`("권한 준비 중") 중단으로 18단계를 `미확인`으로 정정.
+  5. 진단 경로 정정: 버전 및 진단 정보 조회 경로를 실제 구현인 `/api/diagnostics`로 정정.
 
 ### 2. 새 환경 재현 절차
 1. **격리 폴더 복제**: `git clone https://github.com/altdmfk/choi-bujang-secret-vault.git <새폴더>`
 2. **런타임 검증**: `node -v` (v24.19.0), `npm -v` (11.17.0)
 3. **독립 문법 검사**: `npm --prefix on-client run check`
 4. **기본 로컬 실행**: `cd on-client` 후 `npm start` (또는 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1`)
-   - `http://127.0.0.1:5189/` 접속 시 케셰브 대시보드 렌더링 확인 (13~19단계 `연결 없음`, 20단계 `프로젝트 미설정` 확인)
+   - `http://127.0.0.1:5189/` 접속 시 케셰브 대시보드 렌더링 확인 (13~19단계 `연결 없음` 확인)
+   - 기동 직후 취약점 영역은 초기 `idle`(대기) 상태 확인
+   - 화면에서 `[설치 패키지 조회]` 클릭 후 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 확인
    - `http://127.0.0.1:5189/api/diagnostics` 접속 시 `version: '0.1.0'`, `engine.mode: 'disconnected'` 확인
-   - 격리 환경 체크아웃: `git checkout main` (또는 제출 커밋 해시)
+   - 격리 환경 체크아웃: `git checkout 3e9beee5bec0348cfd93f32b6e4a281956adab1b`
 5. **취약점 조회 실행 (설정 주입)**:
    - PowerShell: `$env:ON_PROJECT_DIRECTORY = (Get-Item ..).FullName; $env:ON_APPROVED_PUBLIC_PACKAGES = "[]"; npm start`
    - 또는 env-file 방식: `node --env-file=.env.local src/server.mjs`
-   - lockfile 파싱 및 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`) 상태 확인
+   - 기동 직후 `idle` 확인 후 화면에서 `[설치 패키지 조회]` 클릭 -> `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`) 상태 확인
 6. **가상 데이터 데모 실행**: `npm run demo`
    - `demoEngine` 기반 1건의 사건(`event-01`), 업무 앱 3종 인가 배지 확인 (AI 설명은 권한 준비 중으로 미표시)
 7. **종료 및 재기동**: 터미널에서 `Ctrl + C` 종료 후 재기동하여 동일 결과 확인
@@ -318,7 +317,7 @@ flowchart LR
 | **17단계** | AI 게이트웨이 점검 상태 | `연결 없음` | `승인 대기` 또는 `권한 준비 중` 안전 분기 및 모델 수·시각 렌더링. 상용 유료 호출은 미확인(`UNV-02`) |
 | **18단계** | 보안 사건 AI 설명 | `미확인` | 기본 기동 대기. 데모 모드에서도 AI 권한 부재로 권한 준비 중 중단되어 보고서 미표시되므로 **미확인**으로 정정 |
 | **19단계** | 보안 조치 상태 뷰 | `연결 없음` | 기본 기동 `idle`. 실제 원격 보안 조치 집행기는 플랫폼 미연결(`ACTION_UNSUPPORTED`) 상태 유지 |
-| **20단계** | 의존성 취약점 점검 | `재현됨` | 기본 기동 시 `프로젝트 미설정` 확인, `ON_PROJECT_DIRECTORY` 주입(또는 `--env-file`) 기동 시 `승인된 패키지 없음`(`NO_APPROVED_PACKAGES`, `packages: []`) 정상 상태 렌더링 |
+| **20단계** | 의존성 취약점 점검 | `재현됨` | 기동 직후 `idle` 확인 후 `[설치 패키지 조회]` 클릭 시: 기본 기동 `프로젝트 미설정`, 설정 주입 시 `승인된 패키지 없음`(`NO_APPROVED_PACKAGES`, `packages: []`) 정상 상태 렌더링 |
 | **21단계** | 런북 규격 실행 및 재실행 | `재현됨` | 표준 기동 스크립트 실행, `http://127.0.0.1:5189/` 응답, `Ctrl + C` 종료 후 재실행 성공 |
 
 ### 4. 데이터 보존 계획
@@ -326,7 +325,7 @@ flowchart LR
 - **메모 단건 복원**: `POST /api/restore`에서 비공개 사본 해시 대조, `dryRun: true` 검증 및 충돌 시 자동 롤백 시도. 롤백 실패 시(`undone === false`) 즉시 작업을 중단하고 관리자 수동 감사를 거치도록 규정
 - **사본 최초 생성 및 부재 시 제한**: DBA가 원본 `notes`를 기반으로 `notes_backup` 사본을 생성·보관하며, 사본이 존재하지 않는 신규 메모는 복원 불가(`403 RESTORE_REFUSED`)
 - **정책 안전 롤백**: `npm run policy:restore -- <커밋 SHA>`를 통한 안전 커밋의 시험 정책 선택 복구
-- **로컬 Native Registry 및 CurrentUser DPAPI 자격 (환경 이동 제한)**: 현재 사용자의 고유 SID 및 머신 키로 암호화되므로 타 머신/사용자 계정으로 이전 불가. 새 환경 이전 시 재승인 절차 필수
+- **로컬 Native Registry 및 CurrentUser DPAPI 자격 (환경 이동 제한)**: 현재 사용자의 고유 SID 및 머신 키로 암호화되므로 타 머신/사용자 계정으로 이전 불가. 새 환경 이전 시 계정 연결(6자리) 및 AI 앱 연결(9글자) 재승인 절차 필수
 
 ### 5. 이동 가능한 환경 구성
 - **이동용 설정 템플릿(`.env.example`) 제공**: 루트 및 `on-client/.env.example`을 제공하며 `.gitignore`에서 추적 보장
@@ -342,8 +341,9 @@ flowchart LR
   - 패키지 및 릴리스 버전 (`0.2.11`): `on-client/package.json` 기준 학생 과제 진행 릴리스 버전
   - 서버 프로토콜 및 베이스라인 메타 버전 (`0.1.0`): `on-client/src/server.mjs`의 `GET /api/diagnostics` 응답 및 진단 메타데이터 사양 버전
 - **OS 지원 범위 분리**:
-  - 플랫폼 독립 공통 지원: 순수 HTTP 서버 구동(`npm start`), 대시보드 서빙, 데모 모드(`npm run demo`), 문법 검사(`npm run check`)
-  - Windows 전용 기능: CurrentUser DPAPI 자격 보관함, PowerShell 네이티브 레지스트리, 실제 외부 SDP mTLS 연결 (비-Windows에서는 `DISABLED`로 기본 화면/데모 구동만 지원)
+  - 플랫폼 독립 공통 구현: 순수 HTTP 서버 구동(`npm start`), 대시보드 서빙, 데모 모드(`npm run demo`), 문법 검사(`npm run check`), 외부 SDP mTLS HTTPS 릴레이 호스트(`sdp-host.mjs`, `sdp-host-config.mjs`)
+  - Windows 전용 기능: CurrentUser DPAPI 자격 보관함, PowerShell 네이티브 레지스트리, Native 계정 연결 모듈
+  - 비-Windows 환경(macOS, Linux): 기본 웹 UI 및 데모 실행 완전 지원. 외부 SDP mTLS 연결은 코드상 플랫폼 독립 구현이나 실물 미실측에 따른 「미검증 지원 범위」로 명시
 
 ---
 

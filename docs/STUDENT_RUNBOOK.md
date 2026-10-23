@@ -198,7 +198,8 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 |---|---|---|---|
 | **연결 없음** | `disconnected`, `NOT_MOUNTED` | 호스트 설정 미주입 기본 실행 | 정상 상태. 별도 호스트 연동 시 `-SdpHostConfig` 지정 |
 | **예제** | `demo` | 데모 모드 활성화 | `npm run demo` 실행 결과. 실제 검증 시 표준 명령으로 재구동 |
-| **승인 대기** | `awaiting_approval` | AI 연결 승인 대기 중 | 화면의 6자리 승인 번호 확인 후 포털에서 승인 완료 |
+| **AI 앱 승인 대기** | `awaiting_approval` (`/api/ai/connect/*`) | AI 연결 승인 대기 중 | 화면에 표시된 **UUID 앞뒤 4글자 하이픈 연결 확인 번호(`xxxx-xxxx`, 9글자)** 확인 후 포털에서 승인 완료하고, 화면의 **`[승인했으며 연결 확인]`** (`ai-connect-finish`) 버튼을 클릭하여 완료 |
+| **계정 연결 승인 대기** | `awaiting_approval` (`/api/native-login/*`) | Native 로컬 계정 연결 승인 대기 중 | 화면에 표시된 **6자리 숫자 승인 번호(`123456`)** 확인 후 포털에서 승인 완료하고, 화면의 **`[승인 번호로 로그인 완료]`** (또는 redeem) 버튼을 클릭하여 완료 |
 | **권한 준비 중** | `ON_AI_PROVISIONING_PENDING` | AI 계정 권한 미발급 | 운영자 권한 반영 대기 |
 | **확인 불가** | `UNVERIFIED`, `CONTRACT_MISMATCH` | 응답 계약 검증 실패 | 화면 새로고침 및 도움정보 점검 |
 | **조회 실패** | `SERVER_UNAVAILABLE`, `TIMEOUT` | 네트워크 통신 장애 | 로컬 서버 구동 여부 확인 후 재시도 |
@@ -241,28 +242,25 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 ### 8.1 기준 형상 정보 및 변경 대조
 - **저장소 URL**: `https://github.com/altdmfk/choi-bujang-secret-vault.git`
 - **대상 브랜치**: `main`
-- **기준 커밋**: 최종 제출본 커밋 (현재 `main` 브랜치 HEAD / 직전 2차 검토 기준 커밋: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`)
+- **실제 재현에 사용한 고정 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
 - **현재 버전 상태**: `v0.2.11` (검증 중인 버전, Release Candidate)
   > [!IMPORTANT]
   > 22단계 통과는 원문 검토 기준의 수료 판정이며, 실제 운영 인증이나 v1.0 자동 인증이 아닙니다. 19단계 실제 원격 조치 집행기 연동과 21·22단계 공식 접수 서명 연결이 완료되기 전까지는 정식 `v1.0`으로 표기하지 않고 검증 중인 버전으로 유지합니다.
-- **과거 검토 이력 및 변경 사항 대조**:
-  - `cd31b199011e3dc2dcfb5497ab93a1c24cf40a94` (21단계): 기술 명세서 및 런북 규격 최초 수록
-  - `3ab236bf95d7c662b3e283c5c817a4ca5a16f77f` (22단계 1차 제출본): 22단계 새 환경 재현 절차, 누적 결과 표, 데이터 보존 계획 및 릴리스 명세 최초 수록
-  - `3e9beee5bec0348cfd93f32b6e4a281956adab1b` (22단계 2차 제출본): 데모 사건 1건 정정, 이동용 설정 템플릿(`.env.example`) 추가, 취약점 경로 환경변수 주입 절차 및 관찰 결과 연결, 복원 롤백 실패 시 중단 절차 및 DPAPI 환경 이동 제한 명시
-  - **직전 2차 검토본(`3e9beee`) 대비 최종 제출본 보완 내역**:
-    1. **데모 AI 설명 분리 및 미확인 정정**: `on-client/src/engine.mjs`의 `demoEngine`에는 `readAiIdentity`가 없고 `server.mjs` 기본 데모 실행에도 `resolveAiIdentity`가 주입되지 않아, AI 설명 요청 시 `readMapping`에서 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 AI 분석 보고서 화면 표시는 **미확인**으로 정정. (데모에서 확인 가능한 범위는 14단계 인가 판정 및 15단계 사건 1건 표시로 한정)
-    2. **설정 파일 로드 방식 명시**: 서버가 순수 표준 라이브러리로 구동되어 `.env.local`을 자동 로드하지 않으므로, PowerShell 환경변수 직접 주입 방식 또는 Node.js 24 내장 `node --env-file=.env.local src/server.mjs` 실행 방식을 파일 위치와 함께 명시.
-    3. **데이터 보존 계획 상세화**: `notes_backup` 비공개 사본의 최초 생성·보관 확인 절차와 사본 부재 시의 복원 제한(`403 RESTORE_REFUSED`)을 추가하고, 브라우저 메모리 세션의 단말 유출 위험 완화 범위를 제한적으로 서술.
-    4. **진단 경로 정정**: 버전 및 진단 정보 조회 경로를 기존의 `/api/status`에서 실제 코드에 구현된 **`/api/diagnostics`** 로 정정하고, 패키지 버전(`0.2.11`)과 제공 메타데이터 버전(`0.1.0`)의 설명 범위를 확인 가능한 코드 범위로 한정.
+- **실제 재현 고정 커밋(`3e9beee`) 이후 문서 수정 범위**:
+  1. **21단계 장애 안내 정정**: 6.2 표에서 AI 앱 승인(UUID 앞뒤 4글자 하이픈 연결 9글자 `xxxx-xxxx`, 후속 버튼 `[승인했으며 연결 확인]`)과 Native 계정 연결 승인(6자리 숫자, 후속 버튼 `[승인 번호로 로그인 완료]`)을 명확히 분리.
+  2. **22단계 취약점 조회의 사용자 동작 및 관찰 분리**: 8.2 절차 및 8.3 표에서 기동 직후 초기 `idle`(대기) 상태와 사용자의 `[설치 패키지 조회]`(`vulnerabilities-load`) 버튼 클릭 후 관찰 결과(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`)를 분리.
+  3. **22단계 플랫폼 지원 범위 정정**: 8.6.2절에서 외부 SDP mTLS HTTPS 릴레이 모듈의 플랫폼 독립 구현을 인정하고, Windows 전용 기능(Native/DPAPI)과 분리하며, 비-Windows 환경에서의 SDP 실연결은 미실측에 따른 「미검증 지원 범위」로 명시.
+  4. **데모 AI 설명 분리 및 미확인 정정**: 8.3 표에서 데모 모드 AI 설명 요청 시 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 18단계를 `미확인`으로 정정.
+  5. **진단 경로 정정**: 8.6.1절에서 버전 및 진단 정보 조회 경로를 실제 구현인 `/api/diagnostics`로 정정.
 
 ### 8.2 새 환경 독립 재현 절차
 1. **작업 폴더 격리 및 클론**:
    - 기존 작업 폴더(`choi-bujang-secret-vault`)와 설정 파일을 온전히 보존합니다.
-   - 새 빈 디렉토리를 생성하고 최신 제출 커밋을 클론합니다.
+   - 새 빈 디렉토리를 생성하고 실제 재현에 사용한 고정 커밋을 클론합니다.
      ```powershell
      git clone https://github.com/altdmfk/choi-bujang-secret-vault.git choi-bujang-repro
      cd choi-bujang-repro
-     git checkout main  # 또는 제출 커밋 해시 ($commit = git rev-parse HEAD; git checkout $commit)
+     git checkout 3e9beee5bec0348cfd93f32b6e4a281956adab1b
      ```
 2. **런타임 환경 검증**:
    - Node.js 및 npm 버전이 명세와 일치하는지 확인합니다.
@@ -275,7 +273,7 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
      ```powershell
      npm --prefix on-client run check
      ```
-4. **기본 로컬 서버 기동 및 브라우저 확인 (안전 대기 상태)**:
+4. **기본 로컬 서버 기동 및 브라우저 확인 (안전 대기 상태 및 취약점 idle 확인)**:
    - 별도 외부 연결 설정 없이 기본값으로 기동합니다.
      ```powershell
      cd on-client
@@ -284,7 +282,8 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
      ```
    - 브라우저에서 `http://127.0.0.1:5189/`에 접속하여 케셰브 에이전트 대시보드 렌더링을 확인합니다.
    - 13~19단계 영역은 호스트 미주입 대기(`연결 없음`, `NOT_MOUNTED`) 상태를 확인합니다.
-   - 20단계 취약점 영역은 프로젝트 미지정으로 인해 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 상태를 확인합니다.
+   - **기동 직후 취약점 관찰**: 20단계 취약점 영역은 자동 조회를 수행하지 않고 **초기 `idle`(대기)** 상태로 렌더링됨을 확인합니다.
+   - **사용자 동작 및 조회 후 관찰**: 화면에서 **`[설치 패키지 조회]` (`vulnerabilities-load`)** 버튼을 클릭하면, 서버에 조회를 요청하여 프로젝트 경로 미설정으로 인한 **`프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`)** 상태로 갱신됨을 확인합니다.
    - 별도 터미널 또는 브라우저에서 `http://127.0.0.1:5189/api/diagnostics` 접속 시 `version: '0.1.0'`, `engine.mode: 'disconnected'` 응답을 확인합니다.
 5. **취약점 조회 실행 및 관찰 (20단계 별도 설정 주입)**:
    - 서버는 `.env.local`을 자동 파싱하지 않으므로 아래 2가지 방법 중 하나로 설정을 적용합니다:
@@ -299,7 +298,9 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
        ```powershell
        node --env-file=.env.local src/server.mjs
        ```
-   - 브라우저 새로고침 후 취약점 조회 영역에서 로컬 `package-lock.json` 파싱 동작 및 승인 패키지 부재(`packages: []`)로 인한 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `not_checked`) 상태 렌더링을 확인합니다.
+   - 브라우저 접속 직후: 취약점 영역이 초기 `idle`(대기) 상태로 표시됨을 확인합니다.
+   - 사용자 동작: 화면에서 **`[설치 패키지 조회]` (`vulnerabilities-load`)** 버튼을 클릭합니다.
+   - 조회 후 관찰: 로컬 `package-lock.json` 파싱 동작 및 승인 패키지 부재(`packages: []`)로 인한 **`승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `not_checked`)** 상태 렌더링을 확인합니다.
 6. **가상 데이터 데모 실행 (화면 렌더링 검증)**:
    - 가상 데이터 모드로 기동하여 렌더러 함수의 동작을 확인합니다.
      ```powershell
@@ -329,7 +330,7 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 | **17단계** | AI 게이트웨이 점검 상태 (`renderAiConnection`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 `승인 대기` 또는 `권한 준비 중` 안전 분기 확인. 모델 수·시각 렌더링 확인. 상용 유료 AI 실호출은 미확인(`UNV-02`) |
 | **18단계** | 보안 사건 AI 설명 렌더링 (`renderExplanation`) | `미확인` | 2026-10-23 13:44 | 기본 기동 시 사건 설명 대기. 데모 모드(`npm run demo`)에서도 `demoEngine`에 `readAiIdentity`가 없고 `server.mjs`에 `resolveAiIdentity`가 주입되지 않아, 설명 요청 시 `readMapping`에서 `ON_AI_PROVISIONING_PENDING`("권한 준비 중")으로 중단되므로 AI 분석 보고서 화면 표시는 **미확인**으로 정정 |
 | **19단계** | 보안 조치 상태 뷰 (`renderAction`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 `idle` 상태 표시. 실제 원격 보안 조치 집행기는 플랫폼 미연결(`ACTION_UNSUPPORTED`) 상태 유지. 실행기가 아닌 상태 뷰어로 동작 확인됨 |
-| **20단계** | 패키지 의존성 취약점 점검 (`renderVulnerabilities`) | `재현됨` | 2026-10-23 13:44 | 1) 기본 기동 시 `ON_PROJECT_DIRECTORY` 미설정으로 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 확인.<br/>2) `ON_PROJECT_DIRECTORY` 주입(또는 `--env-file`) 및 `ON_APPROVED_PUBLIC_PACKAGES=[]` 설정 기동 시 로컬 lockfile 파싱 및 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`) 정상 상태 렌더링 확인 |
+| **20단계** | 패키지 의존성 취약점 점검 (`renderVulnerabilities`) | `재현됨` | 2026-10-23 13:44 | 기동 직후 초기 `idle`(대기) 상태 확인.<br/>화면에서 **`[설치 패키지 조회]` (`vulnerabilities-load`)** 버튼 클릭 후 관찰:<br/>1) 기본 기동 시 `ON_PROJECT_DIRECTORY` 미설정으로 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 확인.<br/>2) `ON_PROJECT_DIRECTORY` 주입(또는 `--env-file`) 및 `ON_APPROVED_PUBLIC_PACKAGES=[]` 설정 기동 시 로컬 lockfile 파싱 및 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`) 정상 상태 렌더링 확인 |
 | **21단계** | 런북 규격 실행 및 재실행 | `재현됨` | 2026-10-23 13:44 | `npm run check` 통과. 표준 기동 스크립트 실행 후 `http://127.0.0.1:5189/` 정상 응답, `Ctrl + C` 종료 후 재기동 성공 확인 |
 
 ### 8.4 데이터 보존 및 백업·복원 계획
@@ -370,7 +371,9 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
    - 따라서 해당 자격 파일이나 레지스트리 키를 다른 운영체제는 물론, 다른 물리 머신이나 동일 머신의 다른 Windows 사용자 계정으로 복사하여 재사용할 수 없습니다.
 3. **인수인계 및 새 환경 재승인 절차**:
    - 새 환경으로 프로젝트를 이전할 경우 기존 로컬 자격 파일이나 레지스트리 덤프를 무단 복사하지 않습니다.
-   - 새 환경에서 로컬 서버를 기동한 후 화면의 6자리 승인 번호를 확인하고, 공식 관리자 포털을 통해 신규 사용자 세션으로 재로그인 및 관리자 승인(재승인)을 거쳐 새 환경 고유의 DPAPI 컨텍스트를 새로 발급받아야 합니다.
+   - 새 환경에서 로컬 서버를 기동한 후:
+     - **계정 연결 승인**: 화면에 표시된 6자리 숫자 승인 번호(`123456`)를 확인하고, 포털 승인 후 화면의 `[승인 번호로 로그인 완료]` 버튼을 클릭하여 새 DPAPI 컨텍스트를 바인딩합니다.
+     - **AI 앱 승인**: 화면에 표시된 UUID 앞뒤 4글자 하이픈 연결 확인 번호(`xxxx-xxxx`)를 확인하고, Workbench 승인 후 화면의 `[승인했으며 연결 확인]` 버튼을 클릭하여 완료합니다.
 
 #### 8.4.4 브라우저 세션 데이터
 - 브라우저 영구 저장소(`localStorage`/`sessionStorage`) 저장을 일체 배제하고 메모리 변수 및 단기 쿠키로만 세션을 관리합니다.
@@ -417,16 +420,17 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   - 적용: `on-client/src/server.mjs`의 `GET /api/diagnostics` 엔드포인트 응답(`version: '0.1.0'`) 및 진단 메타데이터 함수(`starterVersion: '0.1.0'`)에 명시되며, 제공 프레임워크의 HTTP API 계약 버전을 의미합니다. (주의: `/api/status` 라우트는 존재하지 않으며, 실제 진단 경로는 `/api/diagnostics`입니다.)
 
 #### 8.6.2 운영체제별 지원 범위 명확 분리
-- **플랫폼 독립 공통 지원 (Windows 및 비-Windows)**:
-  - `npm start` 또는 `node src/server.mjs`를 통한 순수 로컬 HTTP 서버 기동
-  - 대시보드 웹 UI 서빙 (`http://127.0.0.1:5189/`)
-  - 데모 모드(`npm run demo`)를 통한 가상 데이터 렌더링
-  - `npm run check`를 통한 학생 확장 모듈 정적 문법 검사
+- **플랫폼 독립 공통 구현 (Windows 및 비-Windows)**:
+  - `npm start` 또는 `node src/server.mjs`를 통한 순수 로컬 HTTP 서버 기동 및 웹 대시보드 서빙 (`http://127.0.0.1:5189/`)
+  - 데모 모드(`npm run demo`)를 통한 가상 데이터 렌더링 및 `npm run check` 정적 문법 검사
+  - **외부 SDP mTLS HTTPS 릴레이 호스트 (`sdp-host.mjs`, `sdp-host-config.mjs`)**: Node.js 내장 `node:https` 표준 라이브러리를 사용하며 비-Windows 절대경로(`/...`)를 온전히 지원하도록 구현되어 있어 코드상 OS 제한이 없습니다.
 - **Windows(win32) 전용 기능 (비-Windows 미지원)**:
   - CurrentUser DPAPI 기반 자격 보관함 (`credential-vault.mjs`)
   - PowerShell 기반 네이티브 호스트 레지스트리 (`native-host-registry.ps1`)
-  - `-NativeHostConfig`를 통한 로컬 포털 승인 및 실제 외부 SDP mTLS 자격 바인딩
-  - *비-Windows 환경에서는 이들 기능이 비활성화(`DISABLED`)되므로 기본 화면/데모 구동만 가능하며 실제 외부 연결은 지원되지 않습니다.*
+  - `native-context.mjs`의 Native 계정 연결 모듈 (`process.platform !== 'win32'` 시 `DISABLED` 거부)
+- **비-Windows OS (macOS, Linux) 지원 범위 및 미검증 명시**:
+  - 기본 대시보드 웹 서빙, 데모 모드, 문법 검사는 완전 지원됩니다.
+  - 외부 SDP mTLS 릴레이 연결은 플랫폼 독립 코드로 구현되어 있으나, 실제 비-Windows 실물 머신에서의 mTLS 핸드셰이크 실측 시험을 수행하지 않은 **「미검증 지원 범위」** 로 명시합니다. Native 계정 연결 및 DPAPI 자격 보관함은 Windows 전용이므로 비-Windows에서는 지원되지 않습니다.
 
 #### 8.6.3 정식 v1.0 미발행 사유 및 미확인(UNV) 스펙
 - **현재 표기 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
@@ -441,4 +445,4 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
   - `UNV-03` 엔터프라이즈 계정 실시간 강제 회수 집행 (플랫폼 미지원으로 미확인 유지)
   - `UNV-04` 글로벌 OSV 데이터베이스 라이브 온라인 전수 쿼리 (허용 목록 미지정으로 미확인 유지)
 - **최종 검증 결론**:
-  - 제출 커밋(현재 `main` 브랜치 HEAD, 직전 2차 검토본 `3e9beee5bec0348cfd93f32b6e4a281956adab1b` 대비 보완 반영)을 기준으로 소스코드, 런북, 구성도, 재현 기록이 완전한 일관성을 충족함을 확인하였습니다.
+  - 실제 재현을 완료한 고정 커밋(`3e9beee5bec0348cfd93f32b6e4a281956adab1b`)과 이후 피드백을 반영한 문서 보완 사항을 종합 대조하여 소스코드, 런북, 구성도, 재현 기록이 완전한 일관성을 충족함을 확인하였습니다.
