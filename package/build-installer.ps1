@@ -121,6 +121,81 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "src/server.mjs static syntax check passed (0 error)"
 
+# Non-admin PC status pre-flight inspection (node:os + fs.statfsSync, no admin privileges required)
+Write-Host "  [RUN] Non-admin PC status pre-flight inspection (node:os + fs.statfsSync)" -ForegroundColor Gray
+$PcProbeScript = @'
+import os from 'node:os';
+import fs from 'node:fs';
+function sampleCpu() {
+  const cpus = os.cpus() || [];
+  let idle = 0, total = 0;
+  for (const c of cpus) {
+    for (const k of Object.keys(c.times)) total += c.times[k];
+    idle += c.times.idle;
+  }
+  return { idle, total, cores: cpus.length };
+}
+const s1 = sampleCpu();
+await new Promise((r) => setTimeout(r, 200));
+const s2 = sampleCpu();
+const measuredAt = new Date().toISOString();
+const totalDiff = s2.total - s1.total;
+const idleDiff = s2.idle - s1.idle;
+const cpuPct = totalDiff > 0 ? Number((((totalDiff - idleDiff) / totalDiff) * 100).toFixed(1)) : null;
+const totalMemGb = Number((os.totalmem() / (1024 ** 3)).toFixed(2));
+const freeMemGb = Number((os.freemem() / (1024 ** 3)).toFixed(2));
+const usedMemGb = Number((totalMemGb - freeMemGb).toFixed(2));
+const memPct = totalMemGb > 0 ? Number(((usedMemGb / totalMemGb) * 100).toFixed(1)) : null;
+let diskFreeGb = null, diskTotalGb = null, diskReason = null;
+try {
+  const st = fs.statfsSync(process.cwd());
+  diskFreeGb = Number(((st.bavail * st.bsize) / (1024 ** 3)).toFixed(2));
+  diskTotalGb = Number(((st.blocks * st.bsize) / (1024 ** 3)).toFixed(2));
+} catch (err) {
+  diskReason = err?.message || 'fs.statfsSync failed';
+}
+console.log(JSON.stringify({
+  measuredAt,
+  privilegeMode: 'normal-user (non-admin)',
+  cpu: {
+    status: cpuPct !== null ? '\uC2E4\uCE21\uAC12' : '\uD655\uC778 \uBD88\uAC00',
+    usagePercent: cpuPct,
+    usageUnit: '%',
+    logicalCores: s2.cores,
+    coreUnit: '\uCF54\uC5B4',
+    reason: cpuPct !== null ? 'node:os.cpus() 200ms tick delta (non-admin)' : 'CPU tick delta unavailable'
+  },
+  memory: {
+    status: '\uC2E4\uCE21\uAC12',
+    usedGb: usedMemGb,
+    freeGb: freeMemGb,
+    totalGb: totalMemGb,
+    usagePercent: memPct,
+    unit: 'GB',
+    reason: 'node:os.totalmem()/freemem() (non-admin)'
+  },
+  disk: {
+    status: diskFreeGb !== null ? '\uC2E4\uCE21\uAC12' : '\uD655\uC778 \uBD88\uAC00',
+    freeGb: diskFreeGb,
+    totalGb: diskTotalGb,
+    unit: 'GB',
+    reason: diskFreeGb !== null ? 'node:fs.statfsSync() (non-admin)' : diskReason
+  }
+}));
+'@
+$PcStatusJsonRaw = (& $NodeCmd.Source --input-type=module -e $PcProbeScript 2>$null | Out-String).Trim()
+if ($PcStatusJsonRaw) {
+  $PcStatusObj = $PcStatusJsonRaw | ConvertFrom-Json
+  Write-Ok "[Measured] Timestamp: $($PcStatusObj.measuredAt) (non-admin normal user privilege)"
+  Write-Ok "[Measured] CPU: usage $($PcStatusObj.cpu.usagePercent)% / logical cores $($PcStatusObj.cpu.logicalCores) cores"
+  Write-Ok "[Measured] Memory: used $($PcStatusObj.memory.usedGb) GB / total $($PcStatusObj.memory.totalGb) GB (free $($PcStatusObj.memory.freeGb) GB, $($PcStatusObj.memory.usagePercent)%)"
+  if ($null -ne $PcStatusObj.disk.freeGb) {
+    Write-Ok "[Measured] Disk: free $($PcStatusObj.disk.freeGb) GB / total $($PcStatusObj.disk.totalGb) GB"
+  } else {
+    Write-InfoMsg "[Unverified] Disk: $($PcStatusObj.disk.reason)"
+  }
+}
+
 # ============================================================================
 # Step 2: Clean Staging into package/stage/
 # ============================================================================
@@ -153,6 +228,22 @@ foreach ($FileName in $AllowedRootFiles) {
   if (Test-Path -LiteralPath $SourceFile) {
     Copy-Item -LiteralPath $SourceFile -Destination (Join-Path $StageApp $FileName) -Force
   }
+}
+
+# Copy package.json and package-lock.json to stage root as referenced by package/installer.iss
+if (Test-Path -LiteralPath (Join-Path $OnClient "package.json")) {
+  Copy-Item -LiteralPath (Join-Path $OnClient "package.json") -Destination (Join-Path $StageDir "package.json") -Force
+}
+if (Test-Path -LiteralPath (Join-Path $RepoRoot "package-lock.json")) {
+  Copy-Item -LiteralPath (Join-Path $RepoRoot "package-lock.json") -Destination (Join-Path $StageDir "package-lock.json") -Force
+  Copy-Item -LiteralPath (Join-Path $RepoRoot "package-lock.json") -Destination (Join-Path $StageApp "package-lock.json") -Force
+}
+
+# Save non-admin PC status pre-flight inspection log into stage/userdata/logs/pc-status-preflight.json
+if ($PcStatusJsonRaw) {
+  $PcLogPath = Join-Path $StageDir "userdata\logs\pc-status-preflight.json"
+  Set-Content -LiteralPath $PcLogPath -Value $PcStatusJsonRaw -Encoding UTF8
+  Write-Ok "Saved non-admin PC status pre-flight report: $PcLogPath"
 }
 
 # Create .env.example (no secrets included)

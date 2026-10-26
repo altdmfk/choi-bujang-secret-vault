@@ -353,6 +353,25 @@ flowchart LR
   - Windows 전용 기능: CurrentUser DPAPI 자격 보관함, PowerShell 네이티브 레지스트리, Native 계정 연결 모듈
   - 비-Windows 환경(macOS, Linux): 기본 웹 UI 및 데모 실행 정상 지원. 외부 SDP mTLS 연결은 코드상 플랫폼 독립 구현이나 실물 미실측에 따른 「미검증 지원 범위」로 명시
 
+### 7. Final 2일차: 케셰브(Keshev) 내 PC 상태 비관리자 점검 및 추이 비교(Δ) 관제 대시보드
+- **현재 작동하는 기능**:
+  - **관제 대시보드형 화면 틀**: 상단 4대 상태 카드(`#soc-top-metrics`) 및 하단 2단 분할 뷰(좌측: 추이 비교 및 이벤트 타임라인, 우측: 내 PC 상태 비관리자 점검 및 상세 감사 로그)
+  - **직전 스냅샷 대비 추이 비교(Δ)**: 다시 불러오기/판정 시점마다 준수 기기(`대`), 활성 세션(`건`), 보안 사건(`건`), 위험 기록(`건`), 취약점(`건`) 증감(`+N`, `-N`, `±0`) 계산 및 표시
+  - **비관리자 일반 권한 내 PC 상태 점검**: 브라우저 표준 API(`navigator.hardwareConcurrency`, `performance.memory`, `navigator.storage.estimate()`)를 통한 비관리자 실측 및 미제공 OS 센서 항목에 대한 명확한 `[확인 불가]` 사유 안내
+  - **출처 및 단위·잰 시각 체계**: `[제공 기능]` vs `[내가 바꾼 부분]`, `[실측값]` vs `[예시값]` vs `[확인 불가]` 배지 적용 및 모든 수치에 단위(`대`, `건`, `종`, `개`, `코어`, `MB`, `GB`, `%`)와 `잰 시각` 부착
+  - **빌드 자동화 파이프라인**: Pre-flight 단계에서 일반 권한 Node.js(`node:os`, `fs.statfsSync`) 내 PC 상태(CPU 사용률/코어, 메모리, 디스크) 실측값 검증 및 로그(`package/stage/userdata/logs/pc-status-preflight.json`) 저장
+- **다시 실행하는 방법**:
+  ```powershell
+  # 문법 검사
+  npm --prefix on-client run check
+
+  # 프레임워크 무결성 검증, 내 PC 상태 실측 및 패키징 빌드
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\package\build-installer.ps1
+
+  # 케셰브 로컬 대시보드 실행 (데모 모드)
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\on-client\tools\start-alekov.ps1 -Port 5189 -Demo
+  ```
+
 ---
 
 ## 주의사항
