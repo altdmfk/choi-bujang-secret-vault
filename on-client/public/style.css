@@ -297,6 +297,69 @@ main:focus { outline: none; }
   border: 1px solid #8b5cf6;
 }
 
+.badge-sdp-disconnected {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #dc2626;
+}
+
+.soc-non-intrusion-banner {
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.pc-non-intrusion-notice {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-left: 4px solid #d97706;
+}
+
+.pc-notice-headline {
+  margin: 0 0 4px;
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: #92400e;
+}
+
+.pc-notice-sub {
+  margin: 2px 0 0;
+  font-size: 0.81rem;
+  color: #78350f;
+}
+
+.pc-readonly-pill {
+  display: inline-block;
+  margin: 2px 0 6px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: var(--allow-soft);
+  border: 1px solid var(--allow-border);
+  color: var(--allow);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.pc-non-intrusion-inline {
+  margin: 4px 0 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .soc-card-timestamp {
   margin: 6px 0 0;
   font-size: 0.76rem;
@@ -364,18 +427,6 @@ main:focus { outline: none; }
   border-radius: 4px;
   background: var(--surface-elevated);
   border: 1px solid var(--border-subtle);
-}
-
-.soc-safety-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: var(--unknown-soft);
-  color: var(--unknown);
-  border: 1px solid var(--unknown-border);
 }
 
 /* Top 4 SOC Metric Cards Grid */

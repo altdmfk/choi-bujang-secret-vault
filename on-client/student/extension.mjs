@@ -429,32 +429,59 @@ function formatMeasuredAt(rawIso) {
   }
 }
 
-/**
- * Pure function: Determines whether a given resource/entity originates from
- * live local measurement (`[실측값]`) or synthetic demo mode (`[예시값]`)
- * purely from the runtime `mode` without hardcoded ID lists.
- */
+const SOC_LIMITS = Object.freeze({
+  PC_STATUS_ENDPOINT: '/api/pc-status',
+  FETCH_THROTTLE_MS: 400,
+  MAX_SNAPSHOTS: 10,
+  MAX_DECISION_HISTORY: 20,
+  FIREWALL_PROFILE_TOTAL: 3,
+});
+
+const SOC_UI_TEXT = Object.freeze({
+  LIVE_BADGE: '[실측값]',
+  LIVE_FULL: '[실측값] 내 PC에서 실제로 잰 값',
+  DEMO_BADGE: '[예시값]',
+  DEMO_FULL: '[예시값] 실제 조회 결과가 아닌 설명용 값',
+  UNVERIFIED_BADGE: '「확인 불가」',
+  SDP_DISCONNECTED_BADGE: '「SDP 미연결」',
+  SDP_DISCONNECTED_FULL: '「SDP 미연결」 (외부 SDP 서버 미연결 · 내 PC 조회와 구분 표시)',
+  SDP_CONNECTED_BADGE: '「SDP 연결됨」',
+  NON_INTRUSION_CLAIM: '「이 건수는 침해나 공격 탐지 결과가 아닙니다」',
+  NON_INTRUSION_BANNER: '「이 건수는 침해나 공격 탐지 결과가 아닙니다」 — Windows 일반 로그(System·Application)의 경고·오류 집계이며, 방화벽·보안 설정은 읽기만 합니다.',
+  READONLY_PILL: '읽기 전용: 방화벽과 보안 설정은 읽기만 하고 바꾸지 않습니다.',
+  ADMIN_FIREWALL_REASON: '관리자 권한이 있어야 읽을 수 있는 항목이므로 설정을 바꾸지 않고 「확인 불가」로 표시합니다.',
+  ADMIN_SECURITY_LOG_REASON: '관리자 권한(SeSecurityPrivilege)이 있어야 읽을 수 있는 기록이므로 설정을 바꾸지 않고 「확인 불가」로 표시합니다.',
+});
+
+const DEFAULT_ADMIN_FIREWALL_ITEMS = Object.freeze([
+  Object.freeze({
+    item: '방화벽 차단 패킷 로그(pfirewall.log) 및 그룹 정책 저장소(PersistentStore)',
+    status: '확인 불가',
+    reason: SOC_UI_TEXT.ADMIN_FIREWALL_REASON,
+  }),
+]);
+
+const DEFAULT_ADMIN_EVENT_LOGS = Object.freeze([
+  Object.freeze({
+    logName: 'Security (Windows 보안 감사 로그)',
+    status: '확인 불가',
+    reason: SOC_UI_TEXT.ADMIN_SECURITY_LOG_REASON,
+  }),
+]);
+
 function resolveProvenance({ mode, forceLive = false } = {}) {
-  if (forceLive) {
-    return Object.freeze({
-      kind: 'live',
-      label: '[실측값]',
-      fullLabel: '[실측값] 내 PC·로컬 서버 실측',
-      className: 'provenance-badge badge-live',
-    });
-  }
-  if (mode === 'demo') {
+  if (!forceLive && mode === 'demo') {
     return Object.freeze({
       kind: 'demo',
-      label: '[예시값]',
-      fullLabel: '[예시값] 데모 합성 데이터 (실제 연결 아님)',
+      label: SOC_UI_TEXT.DEMO_BADGE,
+      fullLabel: SOC_UI_TEXT.DEMO_FULL,
       className: 'provenance-badge badge-demo',
     });
   }
   return Object.freeze({
     kind: 'live',
-    label: '[실측값]',
-    fullLabel: '[실측값] 내 PC·로컬 서버 실측',
+    label: SOC_UI_TEXT.LIVE_BADGE,
+    fullLabel: SOC_UI_TEXT.LIVE_FULL,
     className: 'provenance-badge badge-live',
   });
 }
@@ -477,7 +504,7 @@ function createRoleBadgeEl(roleKind = 'custom') {
   });
 }
 
-function createUnverifiedBadgeEl(label = '[확인 불가]') {
+function createUnverifiedBadgeEl(label = SOC_UI_TEXT.UNVERIFIED_BADGE) {
   return createEl('span', {
     className: 'provenance-badge badge-unverified',
     text: label,
@@ -485,12 +512,26 @@ function createUnverifiedBadgeEl(label = '[확인 불가]') {
   });
 }
 
-/**
- * Fetches live non-admin OS metrics from `/api/pc-status` served by `student/pc-status-runtime.mjs`.
- */
+function createSdpStatusBadgeEl(mode, useFull = false) {
+  const isConnected = mode === 'connected';
+  const text = isConnected
+    ? SOC_UI_TEXT.SDP_CONNECTED_BADGE
+    : useFull
+      ? SOC_UI_TEXT.SDP_DISCONNECTED_FULL
+      : SOC_UI_TEXT.SDP_DISCONNECTED_BADGE;
+  return createEl('span', {
+    className: isConnected ? 'provenance-badge badge-live' : 'provenance-badge badge-sdp-disconnected',
+    text,
+    attrs: { 'data-sdp-status': isConnected ? 'connected' : 'disconnected' },
+  });
+}
+
 function probeNodeOsRuntimeIfAvailable(pcStatus, onResolved) {
   const nowMs = Date.now();
-  if (pcStatus.osProbeLoading || (pcStatus.lastOsProbeFetchMs && nowMs - pcStatus.lastOsProbeFetchMs < 400)) {
+  if (
+    pcStatus.osProbeLoading
+    || (pcStatus.lastOsProbeFetchMs && nowMs - pcStatus.lastOsProbeFetchMs < SOC_LIMITS.FETCH_THROTTLE_MS)
+  ) {
     return;
   }
   if (typeof window === 'undefined' || typeof fetch !== 'function') {
@@ -499,7 +540,7 @@ function probeNodeOsRuntimeIfAvailable(pcStatus, onResolved) {
 
   pcStatus.osProbeLoading = true;
   pcStatus.lastOsProbeFetchMs = nowMs;
-  fetch('/api/pc-status', {
+  fetch(SOC_LIMITS.PC_STATUS_ENDPOINT, {
     method: 'GET',
     cache: 'no-store',
     headers: { Accept: 'application/json' },
@@ -522,39 +563,35 @@ function probeNodeOsRuntimeIfAvailable(pcStatus, onResolved) {
     });
 }
 
-/**
- * Defensive Non-Admin Browser & Runtime PC Status Collector (Zero hardcoded numbers).
- * Never throws when `performance.memory` or `navigator.storage.estimate()` is unsupported or delayed.
- * Unreadable metrics are explicitly marked as `확인 불가` with the exact reason.
- */
-function createInitialPcStatusState() {
-  const nowIso = new Date().toISOString();
-  let cores = null;
+function readBrowserHardwareAndHeap(fallbackCores = null) {
+  let cores = fallbackCores;
   let deviceMemoryGb = null;
+  let heapSupported = false;
   let heapUsedMb = null;
   let heapTotalMb = null;
   let heapLimitMb = null;
   let heapUsagePct = null;
-  let heapSupported = false;
 
   try {
-    if (typeof navigator !== 'undefined' && Number.isFinite(Number(navigator.hardwareConcurrency)) && Number(navigator.hardwareConcurrency) > 0) {
-      cores = Number(navigator.hardwareConcurrency);
+    const navCores = typeof navigator !== 'undefined' ? Number(navigator.hardwareConcurrency) : NaN;
+    if (Number.isFinite(navCores) && navCores > 0) {
+      cores = navCores;
     }
   } catch {
-    cores = null;
+    cores = fallbackCores;
   }
 
   try {
-    if (typeof navigator !== 'undefined' && Number.isFinite(Number(navigator.deviceMemory)) && Number(navigator.deviceMemory) > 0) {
-      deviceMemoryGb = Number(navigator.deviceMemory);
+    const navMem = typeof navigator !== 'undefined' ? Number(navigator.deviceMemory) : NaN;
+    if (Number.isFinite(navMem) && navMem > 0) {
+      deviceMemoryGb = navMem;
     }
   } catch {
     deviceMemoryGb = null;
   }
 
   try {
-    const mem = typeof performance !== 'undefined' && performance && performance.memory ? performance.memory : null;
+    const mem = typeof performance !== 'undefined' && performance?.memory ? performance.memory : null;
     if (mem && Number.isFinite(Number(mem.usedJSHeapSize))) {
       heapSupported = true;
       heapUsedMb = Number((Number(mem.usedJSHeapSize) / (1024 * 1024)).toFixed(2));
@@ -575,16 +612,24 @@ function createInitialPcStatusState() {
   }
 
   return {
-    measuredAt: nowIso,
-    osProbe: null,
-    osProbeLoading: false,
     cores,
+    deviceMemoryGb,
     heapSupported,
     heapUsedMb,
     heapTotalMb,
     heapLimitMb,
     heapUsagePct,
-    deviceMemoryGb,
+  };
+}
+
+function createInitialPcStatusState() {
+  const nowIso = new Date().toISOString();
+  const hw = readBrowserHardwareAndHeap(null);
+  return {
+    measuredAt: nowIso,
+    osProbe: null,
+    osProbeLoading: false,
+    ...hw,
     storageState: 'checking',
     storageFreeGb: null,
     storageQuotaGb: null,
@@ -596,62 +641,16 @@ function createInitialPcStatusState() {
 }
 
 function refreshBrowserPcStatus(pcStatus, onStorageResolved) {
-  const nowIso = new Date().toISOString();
-  pcStatus.measuredAt = nowIso;
-
+  pcStatus.measuredAt = new Date().toISOString();
   probeNodeOsRuntimeIfAvailable(pcStatus, onStorageResolved);
 
-  try {
-    if (typeof navigator !== 'undefined' && Number.isFinite(Number(navigator.hardwareConcurrency)) && Number(navigator.hardwareConcurrency) > 0) {
-      pcStatus.cores = Number(navigator.hardwareConcurrency);
-    } else if (pcStatus.osProbe?.cpu?.logicalCores) {
-      pcStatus.cores = Number(pcStatus.osProbe.cpu.logicalCores);
-    } else {
-      pcStatus.cores = null;
-    }
-  } catch {
-    pcStatus.cores = pcStatus.osProbe?.cpu?.logicalCores ?? null;
-  }
+  const fallbackCores = pcStatus.osProbe?.cpu?.logicalCores
+    ? Number(pcStatus.osProbe.cpu.logicalCores)
+    : null;
+  Object.assign(pcStatus, readBrowserHardwareAndHeap(fallbackCores));
 
   try {
-    if (typeof navigator !== 'undefined' && Number.isFinite(Number(navigator.deviceMemory)) && Number(navigator.deviceMemory) > 0) {
-      pcStatus.deviceMemoryGb = Number(navigator.deviceMemory);
-    }
-  } catch {
-    pcStatus.deviceMemoryGb = null;
-  }
-
-  try {
-    const mem = typeof performance !== 'undefined' && performance && performance.memory ? performance.memory : null;
-    if (mem && Number.isFinite(Number(mem.usedJSHeapSize))) {
-      pcStatus.heapSupported = true;
-      pcStatus.heapUsedMb = Number((Number(mem.usedJSHeapSize) / (1024 * 1024)).toFixed(2));
-      pcStatus.heapTotalMb = Number.isFinite(Number(mem.totalJSHeapSize))
-        ? Number((Number(mem.totalJSHeapSize) / (1024 * 1024)).toFixed(2))
-        : null;
-      pcStatus.heapLimitMb = Number.isFinite(Number(mem.jsHeapSizeLimit))
-        ? Number((Number(mem.jsHeapSizeLimit) / (1024 * 1024)).toFixed(0))
-        : null;
-      if (pcStatus.heapLimitMb && pcStatus.heapLimitMb > 0) {
-        pcStatus.heapUsagePct = Number(((pcStatus.heapUsedMb / pcStatus.heapLimitMb) * 100).toFixed(2));
-      } else if (pcStatus.heapTotalMb && pcStatus.heapTotalMb > 0) {
-        pcStatus.heapUsagePct = Number(((pcStatus.heapUsedMb / pcStatus.heapTotalMb) * 100).toFixed(1));
-      } else {
-        pcStatus.heapUsagePct = null;
-      }
-    } else {
-      pcStatus.heapSupported = false;
-      pcStatus.heapUsedMb = null;
-      pcStatus.heapUsagePct = null;
-    }
-  } catch {
-    pcStatus.heapSupported = false;
-    pcStatus.heapUsedMb = null;
-    pcStatus.heapUsagePct = null;
-  }
-
-  try {
-    if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.estimate === 'function') {
+    if (typeof navigator !== 'undefined' && typeof navigator.storage?.estimate === 'function') {
       const promise = navigator.storage.estimate();
       if (promise && typeof promise.then === 'function') {
         promise.then((est) => {
@@ -665,7 +664,7 @@ function refreshBrowserPcStatus(pcStatus, onStorageResolved) {
             pcStatus.storageQuotaGb = Number((quota / (1024 ** 3)).toFixed(2));
             pcStatus.storageUsedMb = Number((usage / (1024 ** 2)).toFixed(2));
             pcStatus.storageUsagePct = Number(((usage / quota) * 100).toFixed(2));
-            pcStatus.storageReason = '브라우저 일반 권한(navigator.storage.estimate)으로 Origin 할당 디스크 여유 공간을 실측했습니다.';
+            pcStatus.storageReason = '브라우저 일반 권한(navigator.storage.estimate)으로 Origin 할당 디스크 여유 공간을 측정했습니다.';
           } else {
             pcStatus.storageState = 'unverified';
             pcStatus.storageFreeGb = null;
@@ -678,7 +677,7 @@ function refreshBrowserPcStatus(pcStatus, onStorageResolved) {
           pcStatus.storageState = 'unverified';
           pcStatus.storageFreeGb = null;
           pcStatus.storageUsagePct = null;
-          pcStatus.storageReason = '현재 브라우저 환경에서 navigator.storage.estimate() 호출이 거부되었거나 지연되어 확인 불가로 처리했습니다.';
+          pcStatus.storageReason = '현재 브라우저 환경에서 navigator.storage.estimate() 호출이 지연되어 확인 불가로 처리했습니다.';
           if (typeof onStorageResolved === 'function') onStorageResolved();
         });
       }
@@ -692,14 +691,10 @@ function refreshBrowserPcStatus(pcStatus, onStorageResolved) {
     pcStatus.storageState = 'unverified';
     pcStatus.storageFreeGb = null;
     pcStatus.storageUsagePct = null;
-    pcStatus.storageReason = '브라우저 스토리지 추정 중 예외가 발생하여 확인 불가로 처리했습니다.';
+    pcStatus.storageReason = '브라우저 스토리지 추정 중 오류가 발생하여 확인 불가로 처리했습니다.';
   }
 }
 
-/**
- * Pure function: Normalizes Identity, Device compliance, and Session states
- * for Top SOC Card 1 without ever disguising `unknown` or `disconnected` as `allow`.
- */
 function normalizeIdentitySummary({ me, devices, sessions, mode, measuredAt } = {}) {
   const effectiveMode = me?.mode || devices?.mode || sessions?.mode || mode || 'unknown';
   const userId = me?.data?.user?.id || '';
@@ -718,8 +713,8 @@ function normalizeIdentitySummary({ me, devices, sessions, mode, measuredAt } = 
   const totalDevices = devList.length;
 
   let tone = 'unknown';
-  let headline = '확인 불가 (unknown · 기기 0대 / 세션 0건)';
-  let subline = '사유: 외부 SDP 호스트 미연결 또는 미검증 상태입니다. 정상(allow)으로 간주하지 않습니다.';
+  let headline = `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} · 확인 불가 (기기 0대 / 세션 0건)`;
+  let subline = `사유: 외부 SDP 서버 미연결 상태이므로 ${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE}로 따로 표시합니다 (내 PC 조회 결과와 구분).`;
 
   if (me?.status === 'loading' || devices?.status === 'loading' || sessions?.status === 'loading') {
     tone = 'unknown';
@@ -728,49 +723,49 @@ function normalizeIdentitySummary({ me, devices, sessions, mode, measuredAt } = 
   } else if (me?.status === 'error' || devices?.status === 'error' || sessions?.status === 'error') {
     tone = 'deny';
     headline = effectiveMode === 'disconnected'
-      ? '연결 없음 (disconnected · 확인 불가)'
+      ? `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} · 신원·기기 확인 불가 (0대 / 0건)`
       : '조회 실패 · 확인 불가 (0대 / 0건)';
-    subline = `사유: ${extractErrorText(me?.error || devices?.error || sessions?.error, '외부 호스트 미연결 또는 요청 실패 상태입니다 (허용 아님).')}`;
+    subline = `사유: ${extractErrorText(me?.error || devices?.error || sessions?.error, '외부 SDP 서버 미연결 상태입니다.')} (내 PC 조회 결과(${SOC_UI_TEXT.LIVE_BADGE})와 구분해 표시합니다.)`;
   } else if (me?.status === 'ok') {
     const devStatus = me.data?.device?.status || 'unknown';
     const sessStatus = me.data?.session?.status || 'unknown';
     const userLabel = me.data?.user?.label || userId || '사용자';
+    const demoNote = effectiveMode === 'demo' ? ` · ${SOC_UI_TEXT.DEMO_BADGE} 설명용 데모 데이터 (SDP 미연결)` : '';
     if (devStatus === 'compliant' && sessStatus === 'active') {
       tone = 'allow';
-      headline = `${userLabel} · 기준 충족 (기기 ${compliantCount}대 / 세션 ${activeSessionCount}건)`;
-      subline = `준수 기기 ${compliantCount}대 · 활성 세션 ${activeSessionCount}건`;
+      headline = `${userLabel} · 기준 충족 (기기 ${compliantCount}대 / 세션 ${activeSessionCount}건)${demoNote}`;
+      subline = `준수 기기 ${compliantCount}대 · 활성 세션 ${activeSessionCount}건${demoNote}`;
     } else if (devStatus === 'noncompliant' || sessStatus === 'revoked' || sessStatus === 'expired') {
       tone = 'deny';
-      headline = `${userLabel} · 기준 미충족/만료 (미충족 ${noncompliantCount}대)`;
-      subline = `기기(${mapDeviceStatus(devStatus)}) · 세션(${mapSessionStatus(sessStatus)})`;
+      headline = `${userLabel} · 기준 미충족/만료 (미충족 ${noncompliantCount}대)${demoNote}`;
+      subline = `기기(${mapDeviceStatus(devStatus)}) · 세션(${mapSessionStatus(sessStatus)})${demoNote}`;
     } else {
       tone = 'challenge';
-      headline = `${userLabel} · 기기 확인 불가(${devStatus} · 미확인 ${unknownDeviceCount}대)`;
-      subline = `세션(${mapSessionStatus(sessStatus)}, ${activeSessionCount}건) · 사유: 기기 OS 보안 준수 상태 미검증(unknown ≠ allow)`;
+      headline = `${userLabel} · 기기 확인 불가(${devStatus} · 미확인 ${unknownDeviceCount}대)${demoNote}`;
+      subline = `세션(${mapSessionStatus(sessStatus)}, ${activeSessionCount}건) · 사유: 기기 보안 준수 미검증(unknown ≠ allow)${demoNote}`;
     }
   }
 
   return Object.freeze({
     cardId: 'identity-compliance',
-    stepLabel: 'SOC CARD 01 · IDENTITY & DEVICE',
-    title: '신원 및 기기 준수 현황',
+    stepLabel: 'SOC CARD 01 · SDP IDENTITY & DEVICE',
+    title: '신원 및 기기 준수 현황 (SDP 영역)',
     tone,
     headline,
     subline,
     measuredAt: formatMeasuredAt(measuredAt),
     provenance,
+    sdpMode: effectiveMode,
+    showSdpBadge: true,
     kpis: Object.freeze([
+      { label: effectiveMode === 'connected' ? 'SDP 연결됨' : `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} (내 PC 조회와 별도)`, chipClass: effectiveMode === 'connected' ? 'chip-allow' : 'chip-deny' },
       { label: `준수 기기 ${compliantCount}대`, chipClass: compliantCount > 0 ? 'chip-allow' : 'chip-unknown' },
-      { label: `미충족 ${noncompliantCount}대`, chipClass: noncompliantCount > 0 ? 'chip-deny' : 'chip-unknown' },
       { label: `미확인 기기 ${unknownDeviceCount}대`, chipClass: unknownDeviceCount > 0 ? 'chip-challenge' : 'chip-unknown' },
       { label: `활성 세션 ${activeSessionCount}건`, chipClass: activeSessionCount > 0 ? 'chip-allow' : 'chip-unknown' },
     ]),
   });
 }
 
-/**
- * Pure function: Normalizes App Access Decision statistics for Top SOC Card 2.
- */
 function normalizeDecisionSummary(decisionSlice = {}, decisionHistory = [], eventsSlice = {}, fallbackMeasuredAt = null) {
   const status = decisionSlice?.status || 'idle';
   const mode = decisionSlice?.mode || eventsSlice?.mode || 'unknown';
@@ -779,8 +774,10 @@ function normalizeDecisionSummary(decisionSlice = {}, decisionHistory = [], even
   const reason = status === 'ok'
     ? (decisionSlice?.data?.reason || '사유 정보 없음')
     : status === 'error'
-      ? `확인 불가 — 사유: ${extractErrorText(decisionSlice?.error, '판정 요청 실패')}`
-      : '아직 요청한 업무 앱이 없습니다 (누적 요청 0건).';
+      ? `${SOC_UI_TEXT.UNVERIFIED_BADGE} — 사유: ${extractErrorText(decisionSlice?.error, 'SDP 판정 요청 실패 (SDP 미연결)')}`
+      : mode === 'disconnected'
+        ? `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} 상태 — 아직 요청한 업무 앱이 없습니다 (내 PC 조회 결과와 구분).`
+        : '아직 요청한 업무 앱이 없습니다 (누적 요청 0건).';
 
   const provenance = resolveProvenance({
     mode,
@@ -799,13 +796,15 @@ function normalizeDecisionSummary(decisionSlice = {}, decisionHistory = [], even
   const totalDecisions = decisionHistory.length;
 
   let tone = 'unknown';
-  let headline = `판정 대기 (idle · 요청 ${totalDecisions}건)`;
+  let headline = mode === 'disconnected'
+    ? `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} · 판정 대기 (요청 ${totalDecisions}건)`
+    : `판정 대기 (idle · 요청 ${totalDecisions}건)`;
   if (status === 'loading') {
     tone = 'unknown';
-    headline = `${targetApp || '업무 앱'} 판정 중… (누적 ${totalDecisions}건)`;
+    headline = `${targetApp || '업무 앱'} 판정 확인 중… (누적 ${totalDecisions}건)`;
   } else if (status === 'error') {
     tone = 'deny';
-    headline = `${targetApp || '업무 앱'} · 요청 실패 (실패 ${stats.failed}건)`;
+    headline = `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} · ${targetApp || '업무 앱'} 요청 실패 (${stats.failed}건)`;
   } else if (status === 'ok') {
     const mapped = mapDecision(currentDecision);
     tone = mapped.code === 'allow' ? 'allow' : mapped.code === 'deny' ? 'deny' : mapped.code === 'challenge' ? 'challenge' : 'unknown';
@@ -817,25 +816,23 @@ function normalizeDecisionSummary(decisionSlice = {}, decisionHistory = [], even
   return Object.freeze({
     cardId: 'access-decisions',
     stepLabel: 'SOC CARD 02 · ZTNA ACCESS DECISIONS',
-    title: '업무 앱 접근 판정 통계',
+    title: '업무 앱 접근 판정 통계 (SDP 영역)',
     tone,
     headline,
     subline: reason,
     measuredAt: formatMeasuredAt(rawTime),
     provenance,
+    sdpMode: mode,
+    showSdpBadge: true,
     kpis: Object.freeze([
+      { label: mode === 'connected' ? 'SDP 연결됨' : SOC_UI_TEXT.SDP_DISCONNECTED_BADGE, chipClass: mode === 'connected' ? 'chip-allow' : 'chip-deny' },
       { label: `허용(allow) ${stats.allow}건`, chipClass: stats.allow > 0 ? 'chip-allow' : 'chip-unknown' },
       { label: `거부(deny) ${stats.deny + deniedAccessEvents}건`, chipClass: (stats.deny + deniedAccessEvents) > 0 ? 'chip-deny' : 'chip-unknown' },
-      { label: `추가확인(challenge) ${stats.challenge}건`, chipClass: stats.challenge > 0 ? 'chip-challenge' : 'chip-unknown' },
-      { label: `불명/실패 ${stats.unknown + stats.failed}건`, chipClass: (stats.unknown + stats.failed) > 0 ? 'chip-deny' : 'chip-unknown' },
+      { label: `추가확인/실패 ${stats.challenge + stats.unknown + stats.failed}건`, chipClass: (stats.challenge + stats.unknown + stats.failed) > 0 ? 'chip-challenge' : 'chip-unknown' },
     ]),
   });
 }
 
-/**
- * Pure function: Normalizes XDR & Access Security Events and Rule-Matching Breakdown
- * for Top SOC Card 3 and the Bottom 2-Column Split View.
- */
 function normalizeEventsSummary(eventsSlice = {}, fallbackMeasuredAt = null) {
   const status = eventsSlice?.status || 'loading';
   const mode = eventsSlice?.mode || 'unknown';
@@ -875,29 +872,34 @@ function normalizeEventsSummary(eventsSlice = {}, fallbackMeasuredAt = null) {
     headline = '보안 기록 불러오는 중… (0건)';
   } else if (status === 'error') {
     tone = 'deny';
-    headline = mode === 'disconnected' ? '연결 없음 · 확인 불가 (0건)' : '보안 기록 조회 실패 · 확인 불가 (0건)';
-    subline = `사유: ${extractErrorText(eventsSlice?.error, '서버 연결을 확인할 수 없습니다.')}`;
+    headline = mode === 'disconnected'
+      ? `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} · 보안 기록 확인 불가 (0건)`
+      : '보안 기록 조회 실패 · 확인 불가 (0건)';
+    subline = `사유: ${extractErrorText(eventsSlice?.error, 'SDP 서버 연결을 확인할 수 없습니다.')} (내 PC Windows 기록 조회 결과와 구분해 표시함)`;
   } else if (sortedEvents.length === 0) {
     tone = 'unknown';
     headline = '관측된 보안 기록 0건 (규칙 0종)';
     subline = '표시할 보안 기록이 없습니다 (정상·안전 단정 아님).';
   } else {
     tone = xdrCount > 0 || deniedCount > 0 ? 'deny' : unknownStateCount > 0 ? 'challenge' : 'allow';
-    headline = `총 ${sortedEvents.length}건 (XDR ${xdrCount}건 · 접속 ${accessCount}건)`;
-    subline = `매칭 규칙 ${matchedRules.length}종 · 거부 상태 ${deniedCount}건 · 미확인 상태 ${unknownStateCount}건`;
+    const demoLabel = mode === 'demo' ? ` [${SOC_UI_TEXT.DEMO_BADGE} · 설명용]` : '';
+    headline = `총 ${sortedEvents.length}건 (XDR ${xdrCount}건 · 접속 ${accessCount}건)${demoLabel}`;
+    subline = `매칭 규칙 ${matchedRules.length}종 · 거부 상태 ${deniedCount}건 · 미확인 상태 ${unknownStateCount}건 (SDP 서버: ${mode === 'connected' ? '연결됨' : SOC_UI_TEXT.SDP_DISCONNECTED_BADGE})`;
   }
 
   const latestEventTime = sortedEvents[0]?.at || fallbackMeasuredAt;
 
   return Object.freeze({
     cardId: 'xdr-events',
-    stepLabel: 'SOC CARD 03 · XDR EVENTS & RULES',
-    title: 'XDR 보안 이벤트 및 규칙',
+    stepLabel: 'SOC CARD 03 · SDP/XDR EVENTS & RULES',
+    title: 'XDR 보안 이벤트 및 규칙 (SDP 영역)',
     tone,
     headline,
     subline,
     measuredAt: formatMeasuredAt(latestEventTime),
     provenance,
+    sdpMode: mode,
+    showSdpBadge: true,
     sortedEvents,
     matchedRules,
     xdrCount,
@@ -905,74 +907,71 @@ function normalizeEventsSummary(eventsSlice = {}, fallbackMeasuredAt = null) {
     deniedCount,
     unknownStateCount,
     kpis: Object.freeze([
+      { label: mode === 'connected' ? 'SDP 연결됨' : SOC_UI_TEXT.SDP_DISCONNECTED_BADGE, chipClass: mode === 'connected' ? 'chip-allow' : 'chip-deny' },
       { label: `XDR 경보 ${xdrCount}건`, chipClass: xdrCount > 0 ? 'chip-deny' : 'chip-unknown' },
       { label: `접속 기록 ${accessCount}건`, chipClass: accessCount > 0 ? 'chip-challenge' : 'chip-unknown' },
       { label: `매칭 규칙 ${matchedRules.length}종`, chipClass: matchedRules.length > 0 ? 'chip-challenge' : 'chip-unknown' },
-      { label: `거부(denied) ${deniedCount}건`, chipClass: deniedCount > 0 ? 'chip-deny' : 'chip-unknown' },
     ]),
   });
 }
 
-/**
- * Pure function: Normalizes Non-Admin PC Status, Diagnostics, and Vulnerability Scan
- * for Top SOC Card 4 (zero hardcoded numbers).
- */
-function normalizeDiagAndVulnSummary({ diagnostics, vulnerabilities, notifications, mode, pcStatus } = {}) {
+function normalizeDiagAndVulnSummary({ diagnostics, vulnerabilities, notifications, pcStatus } = {}) {
   const provenance = resolveProvenance({ forceLive: true });
   const diagStatus = diagnostics?.status || 'idle';
-  const engineMode = diagnostics?.data?.engine?.mode || diagnostics?.data?.engineMode || mode || 'unknown';
-  const engineCode = diagnostics?.data?.engine?.code || diagnostics?.data?.engineCode || (engineMode === 'disconnected' ? 'ENGINE_NOT_CONNECTED' : engineMode === 'demo' ? 'DEMO_ONLY' : 'IDLE');
-
   const vulnStatus = vulnerabilities?.status || 'idle';
-  const pkgCount = Array.isArray(vulnerabilities?.data?.packages) ? vulnerabilities.data.packages.length : 0;
-  const notiCount = Array.isArray(notifications) ? notifications.length : 0;
+
+  const netObj = pcStatus?.osProbe?.network;
+  const fwObj = pcStatus?.osProbe?.firewall;
+  const winEvObj = pcStatus?.osProbe?.windowsEvents;
+
+  const netCount = typeof netObj?.interfaceCount === 'number' ? netObj.interfaceCount : null;
+  const netText = netCount !== null ? `네트워크 ${netCount}개` : '네트워크 확인 불가';
+
+  const fwEnabled = typeof fwObj?.enabledCount === 'number' ? fwObj.enabledCount : null;
+  const fwTotal = typeof fwObj?.totalProfiles === 'number' ? fwObj.totalProfiles : SOC_LIMITS.FIREWALL_PROFILE_TOTAL;
+  const fwText = fwEnabled !== null ? `방화벽 ${fwEnabled}/${fwTotal} 켜짐(읽기전용)` : '방화벽 확인 불가';
+
+  const sysTotal = typeof winEvObj?.system?.totalCount === 'number' ? winEvObj.system.totalCount : null;
+  const appTotal = typeof winEvObj?.application?.totalCount === 'number' ? winEvObj.application.totalCount : null;
+  const winLogText = (sysTotal !== null && appTotal !== null)
+    ? `Windows 기록 System ${sysTotal}건·App ${appTotal}건`
+    : 'Windows 기록 확인 불가';
 
   const osCpuPct = pcStatus?.osProbe?.cpu?.usagePercent ?? null;
   const coresVal = pcStatus?.cores ?? pcStatus?.osProbe?.cpu?.logicalCores ?? null;
-  const cpuText = osCpuPct !== null && coresVal !== null
-    ? `CPU ${osCpuPct}% (${coresVal}코어)`
-    : coresVal !== null
-      ? `논리 ${coresVal}코어`
-      : 'CPU 확인 불가';
-
   const osMemUsedGb = pcStatus?.osProbe?.memory?.usedGb ?? null;
-  const osMemTotalGb = pcStatus?.osProbe?.memory?.totalGb ?? null;
-  const memText = osMemUsedGb !== null && osMemTotalGb !== null
-    ? `RAM ${osMemUsedGb}/${osMemTotalGb} GB`
-    : pcStatus?.heapSupported && pcStatus.heapUsedMb !== null
-      ? `JS 힙 ${pcStatus.heapUsedMb} MB${pcStatus.heapUsagePct !== null ? ` (${pcStatus.heapUsagePct}%)` : ''}`
-      : '메모리 확인 불가';
-
   const osDiskFreeGb = pcStatus?.osProbe?.disk?.freeGb ?? null;
-  const diskText = osDiskFreeGb !== null
-    ? `디스크 여유 ${osDiskFreeGb} GB`
-    : pcStatus?.storageState === 'ok' && pcStatus.storageFreeGb !== null
-      ? `디스크(Origin) 여유 ${pcStatus.storageFreeGb} GB`
-      : '디스크 확인 불가';
+  const hwText = coresVal !== null
+    ? `CPU ${osCpuPct !== null ? `${osCpuPct}%` : `${coresVal}코어`}${osMemUsedGb !== null ? ` · RAM ${osMemUsedGb}GB` : ''}${osDiskFreeGb !== null ? ` · 디스크 여유 ${osDiskFreeGb}GB` : ''}`
+    : '자원 측정 중';
 
   let tone = 'allow';
-  if (vulnStatus === 'error' || diagStatus === 'error') {
+  if (vulnStatus === 'error' || diagStatus === 'error' || netCount === null) {
     tone = 'challenge';
   }
 
-  const headline = `${cpuText} · ${memText} · ${diskText}`;
-  const subline = `일반 권한 비관리자 실측 (진단 ${engineMode}/${engineCode} · 패키지 ${pkgCount}개 · 알림 ${notiCount}건)`;
-  const rawTime = pcStatus?.measuredAt || pcStatus?.osProbe?.measuredAt || diagnostics?.data?.checkedAt || vulnerabilities?.data?.checkedAt;
+  const headline = `${netText} · ${fwText} · ${winLogText}`;
+  const subline = `${SOC_UI_TEXT.NON_INTRUSION_CLAIM} · 방화벽·보안 설정은 읽기만 하며, 내 PC 조회(${SOC_UI_TEXT.LIVE_BADGE})는 ${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE}과 따로 표시합니다 (${hwText}).`;
+  const rawTime = pcStatus?.osProbe?.measuredAt || pcStatus?.measuredAt || diagnostics?.data?.checkedAt || vulnerabilities?.data?.checkedAt;
+  const notiCount = Array.isArray(notifications) ? notifications.length : 0;
 
   return Object.freeze({
     cardId: 'diagnostics-vuln',
-    stepLabel: 'SOC CARD 04 · PC STATUS & DIAGNOSTICS / OSV',
-    title: '내 PC 상태·진단 및 취약점 요약',
+    stepLabel: 'SOC CARD 04 · LOCAL PC NETWORK · FIREWALL · WINDOWS LOGS',
+    title: '내 PC 네트워크·방화벽·Windows 기록 실측 (로컬 조회)',
     tone,
     headline,
     subline,
+    nonIntrusionBanner: SOC_UI_TEXT.NON_INTRUSION_BANNER,
     measuredAt: formatMeasuredAt(rawTime),
     provenance,
+    sdpMode: 'local-pc-only',
+    showSdpBadge: false,
     kpis: Object.freeze([
-      { label: `${cpuText} ${coresVal !== null ? '[실측값]' : '[확인 불가]'}`, chipClass: coresVal !== null ? 'chip-allow' : 'chip-unknown' },
-      { label: `${memText} ${osMemUsedGb !== null || pcStatus?.heapSupported ? '[실측값]' : '[확인 불가]'}`, chipClass: osMemUsedGb !== null || pcStatus?.heapSupported ? 'chip-allow' : 'chip-unknown' },
-      { label: `${diskText} ${osDiskFreeGb !== null || pcStatus?.storageFreeGb !== null ? '[실측값]' : '[확인 불가]'}`, chipClass: osDiskFreeGb !== null || pcStatus?.storageFreeGb !== null ? 'chip-allow' : 'chip-unknown' },
-      { label: `패키지 ${pkgCount}개 / 알림 ${notiCount}건`, chipClass: notiCount > 0 ? 'chip-deny' : 'chip-allow' },
+      { label: `${netText} ${netCount !== null ? SOC_UI_TEXT.LIVE_BADGE : SOC_UI_TEXT.UNVERIFIED_BADGE}`, chipClass: netCount !== null ? 'chip-allow' : 'chip-unknown' },
+      { label: `${fwText} ${fwEnabled !== null ? SOC_UI_TEXT.LIVE_BADGE : SOC_UI_TEXT.UNVERIFIED_BADGE}`, chipClass: fwEnabled !== null ? 'chip-allow' : 'chip-unknown' },
+      { label: `${winLogText} (침해·공격 탐지 아님)`, chipClass: sysTotal !== null ? 'chip-challenge' : 'chip-unknown' },
+      { label: `관리자 권한 항목: ${SOC_UI_TEXT.UNVERIFIED_BADGE} / 알림 ${notiCount}건`, chipClass: 'chip-unknown' },
     ]),
   });
 }
@@ -992,7 +991,6 @@ function aggregateSocTopCards(store) {
     diagnostics: store.status?.diagnostics,
     vulnerabilities: store.vulnerabilities,
     notifications: store.status?.notifications,
-    mode: store.status?.mode,
     pcStatus: store.pcStatus,
   });
   return Object.freeze([card1, card2, card3, card4]);
@@ -1018,17 +1016,28 @@ function buildSocMetricCardsDom(cards) {
       },
     });
 
+    const headerBadges = [
+      createRoleBadgeEl('custom'),
+      createProvenanceBadgeEl(card.provenance),
+    ];
+    if (card.showSdpBadge) {
+      headerBadges.push(createSdpStatusBadgeEl(card.sdpMode));
+    }
+
     const header = createEl('header', { className: 'soc-card-header' }, [
       createEl('span', { className: 'soc-card-step', text: card.stepLabel }),
-      createEl('div', { className: 'row' }, [
-        createRoleBadgeEl('custom'),
-        createProvenanceBadgeEl(card.provenance),
-      ]),
+      createEl('div', { className: 'row' }, headerBadges),
     ]);
     article.appendChild(header);
     article.appendChild(createEl('h3', { className: 'soc-card-title', text: card.title }));
     article.appendChild(createEl('p', { className: 'soc-card-value', text: card.headline }));
     article.appendChild(createEl('p', { className: 'soc-card-sub muted', text: card.subline }));
+    if (card.nonIntrusionBanner) {
+      article.appendChild(createEl('p', {
+        className: 'soc-non-intrusion-banner',
+        text: card.nonIntrusionBanner,
+      }));
+    }
     article.appendChild(createEl('p', {
       className: 'soc-card-timestamp',
       text: `잰 시각: ${card.measuredAt}`,
@@ -1051,7 +1060,7 @@ function buildSocMetricCardsDom(cards) {
   return grid;
 }
 
-function recordSocSnapshot(store) {
+function createSocSnapshotData(store) {
   const evSummary = normalizeEventsSummary(store.events, store.pcStatus?.measuredAt);
   const devList = Array.isArray(store.status?.devices?.data)
     ? store.status.devices.data
@@ -1061,28 +1070,42 @@ function recordSocSnapshot(store) {
     : (Array.isArray(store.identity?.sessions?.data) ? store.identity.sessions.data : []);
   const unknownDevices = devList.filter((d) => !d?.status || d.status === 'unknown').length;
   const deniedDecisions = store.decisionHistory.filter((d) => d?.decision === 'deny' || d?.status === 'error').length;
+  const osProbe = store.pcStatus?.osProbe;
 
-  const snap = {
+  return {
     at: new Date().toISOString(),
     totalEvents: evSummary.sortedEvents.length,
     xdrCount: evSummary.xdrCount,
     deniedTotal: evSummary.deniedCount + deniedDecisions,
     unknownTotal: evSummary.unknownStateCount + unknownDevices,
     activeSessions: sessList.filter((s) => s?.status === 'active').length,
-    cpuPct: store.pcStatus?.osProbe?.cpu?.usagePercent ?? null,
-    cores: store.pcStatus?.cores ?? store.pcStatus?.osProbe?.cpu?.logicalCores ?? null,
-    memUsedGb: store.pcStatus?.osProbe?.memory?.usedGb ?? null,
-    memTotalGb: store.pcStatus?.osProbe?.memory?.totalGb ?? null,
-    diskFreeGb: store.pcStatus?.osProbe?.disk?.freeGb ?? store.pcStatus?.storageFreeGb ?? null,
+    netCount: osProbe?.network?.interfaceCount ?? null,
+    fwEnabledCount: osProbe?.firewall?.enabledCount ?? null,
+    winSysTotal: osProbe?.windowsEvents?.system?.totalCount ?? null,
+    winSysErr: osProbe?.windowsEvents?.system?.errorCount ?? null,
+    winSysWarn: osProbe?.windowsEvents?.system?.warningCount ?? null,
+    winAppTotal: osProbe?.windowsEvents?.application?.totalCount ?? null,
+    winAppErr: osProbe?.windowsEvents?.application?.errorCount ?? null,
+    winAppWarn: osProbe?.windowsEvents?.application?.warningCount ?? null,
+    cpuPct: osProbe?.cpu?.usagePercent ?? null,
+    cores: store.pcStatus?.cores ?? osProbe?.cpu?.logicalCores ?? null,
+    memUsedGb: osProbe?.memory?.usedGb ?? null,
+    memTotalGb: osProbe?.memory?.totalGb ?? null,
+    diskFreeGb: osProbe?.disk?.freeGb ?? store.pcStatus?.storageFreeGb ?? null,
     heapUsedMb: store.pcStatus?.heapSupported ? store.pcStatus.heapUsedMb : null,
     mode: store.events?.mode || store.status?.mode || 'unknown',
   };
+}
 
+function recordSocSnapshot(store) {
+  const snap = createSocSnapshotData(store);
   const prev = store.snapshots[0];
-  const sig = `${snap.totalEvents}|${snap.xdrCount}|${snap.deniedTotal}|${snap.unknownTotal}|${snap.activeSessions}|${snap.heapUsedMb}|${snap.cpuPct}|${snap.diskFreeGb}|${snap.mode}`;
+  const sig = `${snap.totalEvents}|${snap.xdrCount}|${snap.deniedTotal}|${snap.unknownTotal}|${snap.activeSessions}|${snap.netCount}|${snap.fwEnabledCount}|${snap.winSysTotal}|${snap.winAppTotal}|${snap.heapUsedMb}|${snap.cpuPct}|${snap.diskFreeGb}|${snap.mode}`;
   if (!prev || prev.sig !== sig) {
     store.snapshots.unshift({ ...snap, sig });
-    if (store.snapshots.length > 10) store.snapshots.length = 10;
+    if (store.snapshots.length > SOC_LIMITS.MAX_SNAPSHOTS) {
+      store.snapshots.length = SOC_LIMITS.MAX_SNAPSHOTS;
+    }
   } else {
     store.snapshots[0] = { ...snap, sig };
   }
@@ -1104,26 +1127,15 @@ function buildTrendComparisonBoxDom(store, provenance) {
     },
   });
 
-  const curr = store.snapshots[0] || {
-    at: new Date().toISOString(),
-    totalEvents: 0,
-    xdrCount: 0,
-    deniedTotal: 0,
-    unknownTotal: 0,
-    activeSessions: 0,
-    cpuPct: store.pcStatus?.osProbe?.cpu?.usagePercent ?? null,
-    cores: store.pcStatus?.cores ?? store.pcStatus?.osProbe?.cpu?.logicalCores ?? null,
-    memUsedGb: store.pcStatus?.osProbe?.memory?.usedGb ?? null,
-    memTotalGb: store.pcStatus?.osProbe?.memory?.totalGb ?? null,
-    diskFreeGb: store.pcStatus?.osProbe?.disk?.freeGb ?? store.pcStatus?.storageFreeGb ?? null,
-    heapUsedMb: store.pcStatus?.heapUsedMb ?? null,
-  };
+  const curr = store.snapshots[0] || createSocSnapshotData(store);
   const prev = store.snapshots[1] || curr;
+  const effectiveMode = curr.mode || store.events?.mode || store.status?.mode || 'unknown';
 
   box.appendChild(createEl('div', { className: 'event-head' }, [
-    createEl('strong', { text: '스냅샷 추이 비교 (Δ) 및 내 PC 리소스·보안 지표 변화 설명' }),
+    createEl('strong', { text: `스냅샷 추이 비교 (Δ) — 내 PC 실측(${SOC_UI_TEXT.LIVE_BADGE}) 및 SDP 상태 추이` }),
     createRoleBadgeEl('custom'),
-    createProvenanceBadgeEl(provenance),
+    createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    createSdpStatusBadgeEl(effectiveMode),
   ]));
   box.appendChild(createEl('p', {
     className: 'soc-card-timestamp',
@@ -1131,182 +1143,381 @@ function buildTrendComparisonBoxDom(store, provenance) {
   }));
 
   const ul = createEl('ul', { className: 'trend-delta-list' });
+  if (curr.netCount !== null && prev.netCount !== null) {
+    ul.appendChild(createEl('li', {
+      className: 'trend-delta-item',
+      text: `내 PC 활성 네트워크 어댑터: 현재 ${curr.netCount}개 — ${formatDeltaNumber(curr.netCount, prev.netCount, '개')} ${SOC_UI_TEXT.LIVE_BADGE}`,
+    }));
+  }
+  if (curr.fwEnabledCount !== null && prev.fwEnabledCount !== null) {
+    ul.appendChild(createEl('li', {
+      className: 'trend-delta-item',
+      text: `내 PC 방화벽 활성 프로필(Domain·Private·Public, 읽기 전용): 현재 ${curr.fwEnabledCount}/${SOC_LIMITS.FIREWALL_PROFILE_TOTAL}개 켜짐 — ${formatDeltaNumber(curr.fwEnabledCount, prev.fwEnabledCount, '개')} ${SOC_UI_TEXT.LIVE_BADGE}`,
+    }));
+  }
+  if (curr.winSysTotal !== null && prev.winSysTotal !== null) {
+    ul.appendChild(createEl('li', {
+      className: 'trend-delta-item',
+      text: `최근 Windows System 기록(${SOC_UI_TEXT.NON_INTRUSION_CLAIM}): 현재 ${curr.winSysTotal}건 (오류 ${curr.winSysErr ?? 0}건 · 경고 ${curr.winSysWarn ?? 0}건) — ${formatDeltaNumber(curr.winSysTotal, prev.winSysTotal, '건')} ${SOC_UI_TEXT.LIVE_BADGE}`,
+    }));
+  }
+  if (curr.winAppTotal !== null && prev.winAppTotal !== null) {
+    ul.appendChild(createEl('li', {
+      className: 'trend-delta-item',
+      text: `최근 Windows Application 기록(${SOC_UI_TEXT.NON_INTRUSION_CLAIM}): 현재 ${curr.winAppTotal}건 (오류 ${curr.winAppErr ?? 0}건 · 경고 ${curr.winAppWarn ?? 0}건) — ${formatDeltaNumber(curr.winAppTotal, prev.winAppTotal, '건')} ${SOC_UI_TEXT.LIVE_BADGE}`,
+    }));
+  }
   if (curr.cpuPct !== null && prev.cpuPct !== null) {
     const coreNote = curr.cores !== null ? ` (${curr.cores} 코어)` : '';
     ul.appendChild(createEl('li', {
       className: 'trend-delta-item',
-      text: `CPU 사용률 추이: 현재 ${curr.cpuPct}%${coreNote} — ${formatDeltaNumber(curr.cpuPct, prev.cpuPct, '%')} [실측값]`,
+      text: `CPU 사용률 추이: 현재 ${curr.cpuPct}%${coreNote} — ${formatDeltaNumber(curr.cpuPct, prev.cpuPct, '%')} ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   } else if (curr.cores !== null && prev.cores !== null) {
     ul.appendChild(createEl('li', {
       className: 'trend-delta-item',
-      text: `내 PC 논리 CPU 코어: 현재 ${curr.cores} 코어 — ${formatDeltaNumber(curr.cores, prev.cores, ' 코어')} [실측값]`,
+      text: `내 PC 논리 CPU 코어: 현재 ${curr.cores} 코어 — ${formatDeltaNumber(curr.cores, prev.cores, ' 코어')} ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   }
   if (curr.memUsedGb !== null && prev.memUsedGb !== null) {
     const totalNote = curr.memTotalGb !== null ? ` (전체 ${curr.memTotalGb} GB)` : '';
     ul.appendChild(createEl('li', {
       className: 'trend-delta-item',
-      text: `내 PC 물리 메모리(RAM) 사용량: 현재 ${curr.memUsedGb} GB${totalNote} — ${formatDeltaNumber(curr.memUsedGb, prev.memUsedGb, ' GB')} [실측값]`,
+      text: `내 PC 물리 메모리(RAM) 사용량: 현재 ${curr.memUsedGb} GB${totalNote} — ${formatDeltaNumber(curr.memUsedGb, prev.memUsedGb, ' GB')} ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   }
   if (curr.heapUsedMb !== null && prev.heapUsedMb !== null) {
     ul.appendChild(createEl('li', {
       className: 'trend-delta-item',
-      text: `브라우저 JS 힙 메모리 사용량: 현재 ${curr.heapUsedMb} MB — ${formatDeltaNumber(curr.heapUsedMb, prev.heapUsedMb, ' MB')} [실측값]`,
+      text: `브라우저 JS 힙 메모리 사용량: 현재 ${curr.heapUsedMb} MB — ${formatDeltaNumber(curr.heapUsedMb, prev.heapUsedMb, ' MB')} ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   }
   if (curr.diskFreeGb !== null && prev.diskFreeGb !== null) {
     ul.appendChild(createEl('li', {
       className: 'trend-delta-item',
-      text: `디스크 할당 여유 공간: 현재 ${curr.diskFreeGb} GB — ${formatDeltaNumber(curr.diskFreeGb, prev.diskFreeGb, ' GB')} [실측값]`,
+      text: `디스크 여유 공간: 현재 ${curr.diskFreeGb} GB — ${formatDeltaNumber(curr.diskFreeGb, prev.diskFreeGb, ' GB')} ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   }
+  const sdpNote = effectiveMode === 'demo'
+    ? `${SOC_UI_TEXT.DEMO_BADGE} 설명용 값 (${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE})`
+    : effectiveMode === 'connected'
+      ? `${SOC_UI_TEXT.LIVE_BADGE} SDP 연결됨`
+      : `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} (내 PC 조회 결과와 구분)`;
   ul.appendChild(createEl('li', {
     className: 'trend-delta-item',
-    text: `보안 기록 총계: 현재 ${curr.totalEvents}건 (XDR 경보 ${curr.xdrCount}건) — ${formatDeltaNumber(curr.totalEvents, prev.totalEvents, '건')}`,
+    text: `SDP 보안 기록 총계 (${sdpNote}): 현재 ${curr.totalEvents}건 (XDR 경보 ${curr.xdrCount}건) — ${formatDeltaNumber(curr.totalEvents, prev.totalEvents, '건')}`,
   }));
   ul.appendChild(createEl('li', {
     className: 'trend-delta-item',
-    text: `거부·요청실패 누적: 현재 ${curr.deniedTotal}건 | 미확인(unknown) 상태: 현재 ${curr.unknownTotal}건 — ${formatDeltaNumber(curr.deniedTotal, prev.deniedTotal, '건')}`,
+    text: `SDP 거부·요청실패 누적: 현재 ${curr.deniedTotal}건 | 미확인(unknown) 상태: 현재 ${curr.unknownTotal}건 — ${formatDeltaNumber(curr.deniedTotal, prev.deniedTotal, '건')} (${provenance?.label || SOC_UI_TEXT.LIVE_BADGE})`,
   }));
   box.appendChild(ul);
   return box;
 }
 
-function buildPcStatusInspectionCardDom(pcStatus) {
+function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown') {
   const card = createEl('div', {
     className: 'soc-audit-card',
     attrs: {
       role: 'region',
-      'aria-label': '내 PC 상태 점검 (일반 권한 실측 및 확인 불가 사유)',
+      'aria-label': '내 PC 네트워크·방화벽·Windows 기록 및 자원 점검 (읽기 전용 · 비관리자 실측 및 확인 불가 사유)',
       'data-student-pc-status': 'non-admin',
     },
   });
 
+  const liveProv = resolveProvenance({ forceLive: true });
   card.appendChild(createEl('div', { className: 'event-head' }, [
-    createEl('h4', { text: '내 PC 상태 점검 (일반 권한 · 비관리자 실시간 측정값 및 읽지 못한 항목 확인 불가 사유)' }),
+    createEl('h4', { text: '내 PC 네트워크 구성 · 방화벽 설정 · 최근 Windows 기록(System·Application) 및 자원 점검' }),
     createRoleBadgeEl('custom'),
-    createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    createProvenanceBadgeEl(liveProv, true),
+    createSdpStatusBadgeEl(sdpMode, true),
   ]));
-  card.appendChild(createEl('p', {
-    className: 'muted',
-    text: '하드코딩된 수치나 관리자 권한을 쓰지 않고, 현재 실행 환경(브라우저 표준 API · Node.js 일반 권한)에서 실시간으로 읽은 측정값만 단위(%, 코어, GB, MB)와 잰 시각과 함께 표시합니다. 읽지 못한 값은 예시 값으로 위장하지 않고「확인 불가」와 사유를 표시합니다.',
-  }));
+
+  const noticeBox = createEl('div', {
+    className: 'pc-non-intrusion-notice',
+    attrs: { 'data-student-non-intrusion-notice': 'true' },
+  }, [
+    createEl('p', {
+      className: 'pc-notice-headline',
+      text: `안내 (Windows System·Application 기록): ${SOC_UI_TEXT.NON_INTRUSION_CLAIM}`,
+    }),
+    createEl('p', {
+      className: 'pc-notice-sub',
+      text: `1) 방화벽과 보안 설정은 읽기만 하고 바꾸지 않습니다. 관리자 권한이 필요한 항목은 ${SOC_UI_TEXT.UNVERIFIED_BADGE}와 이유로 표시합니다.`,
+    }),
+    createEl('p', {
+      className: 'pc-notice-sub',
+      text: `2) 외부 SDP 서버에 연결되지 않았으면 ${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE}로 따로 표시하며, 내 PC 조회 결과(${SOC_UI_TEXT.LIVE_BADGE})와 섞지 않습니다.`,
+    }),
+    createEl('p', {
+      className: 'pc-notice-sub',
+      text: `3) 내 PC에서 실제로 잰 값(${SOC_UI_TEXT.LIVE_BADGE})과 설명용 데모 값(${SOC_UI_TEXT.DEMO_BADGE})은 배지로 구별해 표시합니다.`,
+    }),
+  ]);
+  card.appendChild(noticeBox);
 
   const grid = createEl('div', { className: 'pc-status-grid' });
   const osTimeText = formatMeasuredAt(pcStatus?.osProbe?.measuredAt || pcStatus?.measuredAt);
 
+  const osNet = pcStatus?.osProbe?.network;
+  const osFw = pcStatus?.osProbe?.firewall;
+  const osWinEv = pcStatus?.osProbe?.windowsEvents;
   const osCpu = pcStatus?.osProbe?.cpu;
   const osMem = pcStatus?.osProbe?.memory;
   const osDisk = pcStatus?.osProbe?.disk;
 
-  // 1) CPU 사용률 (%) 및 논리 코어 수 (코어)
+  // 1) 이 PC의 네트워크 구성
+  const netInterfaces = Array.isArray(osNet?.interfaces) ? osNet.interfaces : [];
+  const netOk = osNet?.status === 'ok' && netInterfaces.length > 0;
+  const netItem = createEl('div', {
+    className: `pc-status-item ${netOk ? '' : 'pc-item-unverified'}`,
+    attrs: { 'data-pc-section': 'network' },
+  });
+  netItem.appendChild(createEl('div', { className: 'pc-status-head' }, [
+    createEl('span', { text: '1. 이 PC의 네트워크 구성 (읽기 전용)' }),
+    createEl('div', { className: 'row' }, [
+      createRoleBadgeEl('custom'),
+      netOk ? createProvenanceBadgeEl(liveProv) : createUnverifiedBadgeEl(),
+    ]),
+  ]));
+  if (netOk) {
+    const gwText = osNet.primaryGateway || '없음(로컬/가상 어댑터)';
+    const dnsText = Array.isArray(osNet.dnsServers) && osNet.dnsServers.length > 0
+      ? osNet.dnsServers.join(', ')
+      : '설정된 IPv4 DNS 없음';
+    netItem.appendChild(createEl('p', {
+      text: `활성 네트워크 인터페이스: ${osNet.interfaceCount}개 · 기본 게이트웨이: ${gwText} · DNS 서버: ${dnsText} ${SOC_UI_TEXT.LIVE_BADGE}`,
+    }));
+    const netUl = createEl('ul', { className: 'soc-rule-list' });
+    for (const nic of netInterfaces) {
+      const ipv4Str = Array.isArray(nic.ipv4) && nic.ipv4.length > 0 ? nic.ipv4.join(', ') : 'IPv4 없음';
+      const gwStr = Array.isArray(nic.gateway) && nic.gateway.length > 0 ? ` · 게이트웨이: ${nic.gateway.join(', ')}` : '';
+      const dnsStr = Array.isArray(nic.dns) && nic.dns.length > 0 ? ` · DNS: ${nic.dns.join(', ')}` : '';
+      const macStr = nic.mac ? ` · MAC: ${nic.mac}` : '';
+      netUl.appendChild(createEl('li', {
+        className: 'soc-rule-item',
+        text: `${SOC_UI_TEXT.LIVE_BADGE} ${nic.name} (${nic.description || nic.type}) — 상태: ${nic.status} · IPv4: ${ipv4Str}${gwStr}${dnsStr}${macStr}`,
+      }));
+    }
+    netItem.appendChild(netUl);
+    netItem.appendChild(createEl('p', {
+      className: 'muted',
+      text: `측정 근거: ${osNet.reason}`,
+    }));
+  } else {
+    netItem.appendChild(createEl('p', {
+      className: 'pc-status-reason',
+      text: `이 PC의 네트워크 구성: ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: ${osNet?.reason || '런타임 브리지(student/pc-status-runtime.mjs) 미연결 또는 조회 대기 중입니다.'}`,
+    }));
+  }
+  netItem.appendChild(createEl('p', { className: 'soc-card-timestamp', text: `잰 시각: ${osTimeText}` }));
+  grid.appendChild(netItem);
+
+  // 2) 이 PC의 방화벽 설정 (읽기 전용)
+  const fwProfiles = Array.isArray(osFw?.profiles) ? osFw.profiles : [];
+  const fwOk = osFw?.status === 'ok' && fwProfiles.length > 0;
+  const fwItem = createEl('div', {
+    className: `pc-status-item ${fwOk ? '' : 'pc-item-unverified'}`,
+    attrs: { 'data-pc-section': 'firewall' },
+  });
+  fwItem.appendChild(createEl('div', { className: 'pc-status-head' }, [
+    createEl('span', { text: '2. 이 PC의 방화벽 설정 (읽기 전용)' }),
+    createEl('div', { className: 'row' }, [
+      createRoleBadgeEl('custom'),
+      fwOk ? createProvenanceBadgeEl(liveProv) : createUnverifiedBadgeEl(),
+    ]),
+  ]));
+  fwItem.appendChild(createEl('p', {
+    className: 'pc-readonly-pill',
+    text: SOC_UI_TEXT.READONLY_PILL,
+  }));
+  if (fwOk) {
+    fwItem.appendChild(createEl('p', {
+      text: `Windows Defender 방화벽 활성 프로필: ${osFw.enabledCount}/${osFw.totalProfiles}개 켜짐 ${SOC_UI_TEXT.LIVE_BADGE}`,
+    }));
+    const fwUl = createEl('ul', { className: 'soc-rule-list' });
+    for (const prof of fwProfiles) {
+      if (prof.status === 'ok' && typeof prof.enabled === 'boolean') {
+        const stateStr = prof.enabled ? '켜짐 (Enabled: True)' : '꺼짐 (Enabled: False)';
+        fwUl.appendChild(createEl('li', {
+          className: 'soc-rule-item',
+          text: `${SOC_UI_TEXT.LIVE_BADGE} 프로필 ${prof.name}: 상태=${stateStr} · 기본 인바운드=${prof.defaultInboundAction} · 기본 아웃바운드=${prof.defaultOutboundAction}`,
+        }));
+      } else {
+        fwUl.appendChild(createEl('li', {
+          className: 'soc-rule-item',
+          text: `${SOC_UI_TEXT.UNVERIFIED_BADGE} 프로필 ${prof.name}: 이유 — ${prof.reason || '권한 또는 경로 제한으로 읽지 못해 확인 불가로 표시합니다.'}`,
+        }));
+      }
+    }
+    fwItem.appendChild(fwUl);
+  } else {
+    fwItem.appendChild(createEl('p', {
+      className: 'pc-status-reason',
+      text: `방화벽 프로필 상태: ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: ${osFw?.reason || '런타임 브리지 미실행 또는 권한 제한으로 확인 불가로 표시합니다.'}`,
+    }));
+  }
+  const fwAdminItems = Array.isArray(osFw?.adminOnlyItems) && osFw.adminOnlyItems.length > 0
+    ? osFw.adminOnlyItems
+    : DEFAULT_ADMIN_FIREWALL_ITEMS;
+  for (const adm of fwAdminItems) {
+    fwItem.appendChild(createEl('p', {
+      className: 'pc-status-reason',
+      text: `[관리자 권한 필요 항목] ${adm.item}: 「${adm.status || '확인 불가'}」 — 이유: ${adm.reason}`,
+    }));
+  }
+  fwItem.appendChild(createEl('p', { className: 'soc-card-timestamp', text: `잰 시각: ${osTimeText}` }));
+  grid.appendChild(fwItem);
+
+  // 3) 최근 Windows 기록 (System · Application) 경고·오류 건수
+  const sysLog = osWinEv?.system;
+  const appLog = osWinEv?.application;
+  const winEvOk = sysLog?.status === 'ok' || appLog?.status === 'ok';
+  const winEvItem = createEl('div', {
+    className: `pc-status-item ${winEvOk ? '' : 'pc-item-unverified'}`,
+    attrs: { 'data-pc-section': 'windows-events' },
+  });
+  winEvItem.appendChild(createEl('div', { className: 'pc-status-head' }, [
+    createEl('span', { text: '3. 최근 Windows 기록 (System · Application) 경고·오류 건수 (최근 24시간)' }),
+    createEl('div', { className: 'row' }, [
+      createRoleBadgeEl('custom'),
+      winEvOk ? createProvenanceBadgeEl(liveProv) : createUnverifiedBadgeEl(),
+    ]),
+  ]));
+  winEvItem.appendChild(createEl('p', {
+    className: 'pc-non-intrusion-inline',
+    text: `${SOC_UI_TEXT.NON_INTRUSION_CLAIM} (Windows 운영체제와 응용프로그램의 일반 경고·오류 건수이며, 침해 판정이나 SDP XDR 사건과 별개입니다.)`,
+  }));
+
+  const winUl = createEl('ul', { className: 'soc-rule-list' });
+  for (const [logTitle, logEntry] of [['Windows System 기록', sysLog], ['Windows Application 기록', appLog]]) {
+    if (logEntry?.status === 'ok') {
+      const latestText = logEntry.latestAt ? ` · 최근 발생: ${formatMeasuredAt(logEntry.latestAt)}` : '';
+      winUl.appendChild(createEl('li', {
+        className: 'soc-rule-item',
+        text: `${SOC_UI_TEXT.LIVE_BADGE} ${logTitle} (최근 24시간): 오류(Level 2) ${logEntry.errorCount}건 · 경고(Level 3) ${logEntry.warningCount}건 · 합계 ${logEntry.totalCount}건${latestText} (침해·공격 탐지 아님)`,
+      }));
+    } else {
+      winUl.appendChild(createEl('li', {
+        className: 'soc-rule-item',
+        text: `${logTitle}: ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: ${logEntry?.reason || '권한 제한 또는 런타임 브리지 미연결로 확인 불가로 표시합니다.'}`,
+      }));
+    }
+  }
+  winEvItem.appendChild(winUl);
+
+  const adminLogs = Array.isArray(osWinEv?.adminOnlyLogs) && osWinEv.adminOnlyLogs.length > 0
+    ? osWinEv.adminOnlyLogs
+    : DEFAULT_ADMIN_EVENT_LOGS;
+  for (const admLog of adminLogs) {
+    winEvItem.appendChild(createEl('p', {
+      className: 'pc-status-reason',
+      text: `[관리자 권한 필요 기록] ${admLog.logName}: 「${admLog.status || '확인 불가'}」 — 이유: ${admLog.reason}`,
+    }));
+  }
+  winEvItem.appendChild(createEl('p', { className: 'soc-card-timestamp', text: `잰 시각: ${osTimeText}` }));
+  grid.appendChild(winEvItem);
+
+  // 4) CPU 사용률 (%) 및 논리 코어 수 (코어)
   const coresVal = pcStatus?.cores ?? osCpu?.logicalCores ?? null;
   const osCpuPct = typeof osCpu?.usagePercent === 'number' ? osCpu.usagePercent : null;
   const cpuOk = osCpuPct !== null || coresVal !== null;
 
   const cpuItem = createEl('div', { className: `pc-status-item ${cpuOk ? '' : 'pc-item-unverified'}` });
   cpuItem.appendChild(createEl('div', { className: 'pc-status-head' }, [
-    createEl('span', { text: '1. CPU 코어 수 (코어) 및 사용률 (%)' }),
+    createEl('span', { text: '4. CPU 코어 수 (코어) 및 사용률 (%)' }),
     createEl('div', { className: 'row' }, [
       createRoleBadgeEl('custom'),
-      cpuOk ? createProvenanceBadgeEl(resolveProvenance({ forceLive: true })) : createUnverifiedBadgeEl(),
+      cpuOk ? createProvenanceBadgeEl(liveProv) : createUnverifiedBadgeEl(),
     ]),
   ]));
   if (coresVal !== null) {
-    const loadDesc = osCpuPct !== null ? `OS CPU 사용률: ${osCpuPct} %` : 'OS CPU 사용률: 확인 불가';
+    const loadDesc = osCpuPct !== null ? `OS CPU 사용률: ${osCpuPct} %` : `OS CPU 사용률: ${SOC_UI_TEXT.UNVERIFIED_BADGE}`;
     cpuItem.appendChild(createEl('p', {
-      text: `논리 프로세서: ${coresVal} 코어 · ${loadDesc} [실측값]`,
+      text: `논리 프로세서: ${coresVal} 코어 · ${loadDesc} ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   }
   if (osCpuPct === null) {
     cpuItem.appendChild(createEl('p', {
       className: 'muted',
-      text: 'OS 커널 전체 CPU 사용률(%): 확인 불가 — 사유: 기본 서버(src/server.mjs) 단독 실행 시 OS 센서 API가 없습니다. | 어떻게 확인하나요?: 터미널에서 node --import ./student/pc-status-runtime.mjs src/server.mjs --demo 로 실행하면 일반 권한으로 실시간 측정됩니다.',
+      text: `OS CPU 사용률(%): ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: 기본 서버 단독 실행 시 OS 센서 API가 없습니다. student/pc-status-runtime.mjs 브리지 포함 실행 시 측정됩니다.`,
     }));
   } else {
     cpuItem.appendChild(createEl('p', {
       className: 'muted',
-      text: `측정 근거: ${osCpu?.reason || 'node:os.cpus() 실시간 틱 차분 측정 (일반 권한)'}`,
+      text: `측정 근거: ${osCpu?.reason || 'node:os.cpus() 틱 차분 측정 (일반 권한)'}`,
     }));
   }
-  cpuItem.appendChild(createEl('p', {
-    className: 'soc-card-timestamp',
-    text: `잰 시각: ${osTimeText}`,
-  }));
+  cpuItem.appendChild(createEl('p', { className: 'soc-card-timestamp', text: `잰 시각: ${osTimeText}` }));
   grid.appendChild(cpuItem);
 
-  // 2) 메모리 사용량 (GB / MB)
+  // 5) 메모리 사용량 (GB / MB)
   const memOk = typeof osMem?.usedGb === 'number' || Boolean(pcStatus?.heapSupported);
   const memItem = createEl('div', { className: `pc-status-item ${memOk ? '' : 'pc-item-unverified'}` });
   memItem.appendChild(createEl('div', { className: 'pc-status-head' }, [
-    createEl('span', { text: '2. 메모리 사용량 (MB / GB)' }),
+    createEl('span', { text: '5. 메모리 사용량 (MB / GB)' }),
     createEl('div', { className: 'row' }, [
       createRoleBadgeEl('custom'),
-      memOk ? createProvenanceBadgeEl(resolveProvenance({ forceLive: true })) : createUnverifiedBadgeEl(),
+      memOk ? createProvenanceBadgeEl(liveProv) : createUnverifiedBadgeEl(),
     ]),
   ]));
   if (typeof osMem?.usedGb === 'number') {
     memItem.appendChild(createEl('p', {
-      text: `OS 물리 메모리 (RAM): 사용 ${osMem.usedGb} GB / 전체 ${osMem.totalGb} GB (여유 ${osMem.freeGb} GB · 사용률 ${osMem.usagePercent} %) [실측값]`,
+      text: `OS 물리 메모리 (RAM): 사용 ${osMem.usedGb} GB / 전체 ${osMem.totalGb} GB (여유 ${osMem.freeGb} GB · 사용률 ${osMem.usagePercent} %) ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   }
   if (pcStatus?.heapSupported && pcStatus.heapUsedMb !== null) {
     const devMemNote = pcStatus.deviceMemoryGb ? ` · 브라우저 보고 기기 RAM 약 ${pcStatus.deviceMemoryGb} GB` : '';
     const pctNote = pcStatus.heapUsagePct !== null ? ` · 사용률 ${pcStatus.heapUsagePct} %` : '';
     memItem.appendChild(createEl('p', {
-      text: `브라우저 JS 힙 메모리: 사용 ${pcStatus.heapUsedMb} MB / 할당 ${pcStatus.heapTotalMb ?? '-'} MB (한도 ${pcStatus.heapLimitMb ?? '-'} MB${pctNote}${devMemNote}) [실측값]`,
+      text: `브라우저 JS 힙 메모리: 사용 ${pcStatus.heapUsedMb} MB / 할당 ${pcStatus.heapTotalMb ?? '-'} MB (한도 ${pcStatus.heapLimitMb ?? '-'} MB${pctNote}${devMemNote}) ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   } else {
     memItem.appendChild(createEl('p', {
       className: 'pc-status-reason',
-      text: '브라우저 JS 힙 메모리: 확인 불가 — 사유: 현재 브라우저 환경에서 performance.memory API를 지원하지 않습니다. | 어떻게 확인하나요?: Chromium 계열 브라우저(Chrome·Edge)에서 접속하거나 작업 관리자(Ctrl+Shift+Esc) → 성능 → 메모리 탭에서 확인하세요.',
+      text: `브라우저 JS 힙 메모리: ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: 현재 브라우저 환경에서 performance.memory API를 지원하지 않습니다.`,
     }));
   }
   if (typeof osMem?.usedGb !== 'number') {
     memItem.appendChild(createEl('p', {
       className: 'muted',
-      text: 'OS 전체 물리 메모리(GB): 확인 불가 — 사유: 기본 서버 단독 실행 시 OS RAM 조회 API가 없습니다. | 어떻게 확인하나요?: node --import ./student/pc-status-runtime.mjs src/server.mjs --demo 로 실행하면 일반 권한(node:os.totalmem/freemem)으로 즉시 측정됩니다.',
+      text: `OS 물리 메모리(GB): ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: 기본 서버 단독 실행 시 OS RAM 조회 API가 없습니다.`,
     }));
   }
-  memItem.appendChild(createEl('p', {
-    className: 'soc-card-timestamp',
-    text: `잰 시각: ${osTimeText}`,
-  }));
+  memItem.appendChild(createEl('p', { className: 'soc-card-timestamp', text: `잰 시각: ${osTimeText}` }));
   grid.appendChild(memItem);
 
-  // 3) 디스크 남은 공간 (GB / MB)
+  // 6) 디스크 남은 공간 (GB / MB)
   const storageOk = pcStatus?.storageState === 'ok' && pcStatus.storageFreeGb !== null;
   const diskOk = typeof osDisk?.freeGb === 'number' || storageOk;
   const diskItem = createEl('div', { className: `pc-status-item ${diskOk ? '' : 'pc-item-unverified'}` });
   diskItem.appendChild(createEl('div', { className: 'pc-status-head' }, [
-    createEl('span', { text: '3. 디스크 남은 공간 (GB / MB)' }),
+    createEl('span', { text: '6. 디스크 남은 공간 (GB / MB)' }),
     createEl('div', { className: 'row' }, [
       createRoleBadgeEl('custom'),
-      diskOk ? createProvenanceBadgeEl(resolveProvenance({ forceLive: true })) : createUnverifiedBadgeEl(),
+      diskOk ? createProvenanceBadgeEl(liveProv) : createUnverifiedBadgeEl(),
     ]),
   ]));
   if (typeof osDisk?.freeGb === 'number') {
     diskItem.appendChild(createEl('p', {
-      text: `OS 로컬 디스크: 남은 공간 ${osDisk.freeGb} GB / 전체 ${osDisk.totalGb} GB (사용 ${osDisk.usedGb} GB · 사용률 ${osDisk.usagePercent} %) [실측값]`,
+      text: `OS 로컬 디스크: 남은 공간 ${osDisk.freeGb} GB / 전체 ${osDisk.totalGb} GB (사용 ${osDisk.usedGb} GB · 사용률 ${osDisk.usagePercent} %) ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   }
   if (storageOk) {
     const pctNote = pcStatus.storageUsagePct !== null ? ` · 사용률 ${pcStatus.storageUsagePct} %` : '';
     diskItem.appendChild(createEl('p', {
-      text: `브라우저 할당 디스크(Origin Storage): 남은 공간 ${pcStatus.storageFreeGb} GB / 할당 ${pcStatus.storageQuotaGb} GB (사용 ${pcStatus.storageUsedMb} MB${pctNote}) [실측값]`,
+      text: `브라우저 할당 디스크(Origin Storage): 남은 공간 ${pcStatus.storageFreeGb} GB / 할당 ${pcStatus.storageQuotaGb} GB (사용 ${pcStatus.storageUsedMb} MB${pctNote}) ${SOC_UI_TEXT.LIVE_BADGE}`,
     }));
   } else {
     diskItem.appendChild(createEl('p', {
       className: 'pc-status-reason',
-      text: `브라우저 할당 디스크(Origin Storage): 확인 불가 — 사유: ${pcStatus?.storageReason || 'StorageManager 미지원 또는 조회 지연'}`,
+      text: `브라우저 할당 디스크(Origin Storage): ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: ${pcStatus?.storageReason || 'StorageManager 미지원 또는 조회 지연'}`,
     }));
   }
   if (typeof osDisk?.freeGb !== 'number') {
     diskItem.appendChild(createEl('p', {
       className: 'muted',
-      text: 'OS 물리 파티션 전체 남은 공간(GB): 확인 불가 — 사유: 기본 서버 단독 실행 시 디스크 볼륨 조회 API가 없습니다. | 어떻게 확인하나요?: node --import ./student/pc-status-runtime.mjs src/server.mjs --demo 로 실행하면 일반 권한(node:fs.statfsSync)으로 즉시 측정됩니다.',
+      text: `OS 로컬 디스크 남은 공간(GB): ${SOC_UI_TEXT.UNVERIFIED_BADGE} — 이유: 기본 서버 단독 실행 시 디스크 볼륨 조회 API가 없습니다.`,
     }));
   }
   diskItem.appendChild(createEl('p', {
@@ -1322,19 +1533,22 @@ function buildPcStatusInspectionCardDom(pcStatus) {
 function buildRoleSeparationCardDom() {
   const card = createEl('div', { className: 'soc-audit-card' });
   card.appendChild(createEl('div', { className: 'event-head' }, [
-    createEl('h4', { text: '제공 기능과 내가 바꾼 부분 구분 요약' }),
-    createRoleBadgeEl('provided'),
-    createRoleBadgeEl('custom'),
+    createEl('h4', { text: `${SOC_UI_TEXT.LIVE_BADGE} · ${SOC_UI_TEXT.DEMO_BADGE} · ${SOC_UI_TEXT.UNVERIFIED_BADGE} · ${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} 구분 안내` }),
+    createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    createProvenanceBadgeEl(resolveProvenance({ mode: 'demo' })),
+    createUnverifiedBadgeEl(),
+    createSdpStatusBadgeEl('disconnected'),
   ]));
+  const items = [
+    `${SOC_UI_TEXT.LIVE_BADGE} (내 PC에서 실제로 잰 값): 네트워크 구성(인터페이스·IPv4·게이트웨이·DNS), 방화벽 설정(Domain·Private·Public 읽기 전용 상태), 최근 Windows 기록(System·Application 경고·오류 건수 — 침해·공격 탐지 아님), CPU·RAM·디스크 측정값`,
+    `${SOC_UI_TEXT.DEMO_BADGE} (실제 조회 결과가 아닌 설명용 값): 데모 모드(--demo) 실행 시 제공 엔진(demoEngine)이 공급하는 가상 사용자(practice-user)·가상 기기(practice-pc)·가상 업무 앱 3종·가상 사건 1건(event-01)`,
+    `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE}: 외부 SDP 서버에 연결되지 않은 상태를 나타내며, 내 PC 로컬 조회 결과(${SOC_UI_TEXT.LIVE_BADGE})와 구분해 표시합니다.`,
+    `${SOC_UI_TEXT.UNVERIFIED_BADGE}: 방화벽과 보안 설정은 읽기만 하고 바꾸지 않습니다. 관리자 권한이 필요한 항목(Windows Security 감사 로그, 방화벽 pfirewall.log 및 PersistentStore 정책 저장소)은 설정을 바꾸지 않고 이유와 함께 표시합니다.`,
+  ];
   const ul = createEl('ul', { className: 'soc-rule-list' });
-  ul.appendChild(createEl('li', {
-    className: 'soc-rule-item',
-    text: '[제공 기능] on-client/src/server.mjs · public/app.js: 루프백(127.0.0.1:5189) 서버, 3개 기본 메뉴 탭, /api/me · /api/apps · /api/access · /api/events · /api/devices · /api/sessions · /api/diagnostics · /api/vulnerabilities · AI 연결/설명/조치 요청',
-  }));
-  ul.appendChild(createEl('li', {
-    className: 'soc-rule-item',
-    text: '[내가 바꾼 부분] on-client/student/extension.mjs · public/index.html · style.css · package/: 관제 대시보드형 상단 상태 카드 4개, 직전 스냅샷 대비 추이 비교(Δ), 일반 권한 내 PC 상태 실시간 점검 및 확인 불가 사유 명시, [실측값]·[예시값]·[확인 불가] 배지 분리, Inno Setup 사용자 단위 설치(setup.exe)',
-  }));
+  for (const text of items) {
+    ul.appendChild(createEl('li', { className: 'soc-rule-item', text }));
+  }
   card.appendChild(ul);
   return card;
 }
@@ -1349,22 +1563,25 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
   });
 
   panel.appendChild(createEl('h3', { className: 'soc-panel-heading' }, [
-    createEl('span', { text: '내 PC 상태(일반 권한 점검) & 상세 판정·규칙 감사 설명' }),
+    createEl('span', { text: '내 PC 네트워크·방화벽·Windows 기록(읽기 전용) & SDP 판정 감사' }),
     createEl('div', { className: 'row' }, [
       createRoleBadgeEl('custom'),
-      createProvenanceBadgeEl(provenance),
+      createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+      createSdpStatusBadgeEl(mode),
     ]),
   ]));
 
-  // 0. 내 PC 상태 점검 (일반 권한 실측 및 확인 불가 사유) + 제공/변경 구분 카드
   if (pcStatus) {
-    panel.appendChild(buildPcStatusInspectionCardDom(pcStatus));
+    panel.appendChild(buildPcStatusInspectionCardDom(pcStatus, mode));
   }
   panel.appendChild(buildRoleSeparationCardDom());
 
-  // 1. 최근 업무 앱 접근 판정 감사 요약
   const decCard = createEl('div', { className: 'soc-audit-card' });
-  decCard.appendChild(createEl('h4', { text: '업무 앱 판정 감사 (Access Decision Breakdown)' }));
+  decCard.appendChild(createEl('div', { className: 'event-head' }, [
+    createEl('h4', { text: '업무 앱 판정 감사 (SDP Access Decision Breakdown)' }),
+    createSdpStatusBadgeEl(mode),
+    createProvenanceBadgeEl(provenance),
+  ]));
   const decStatus = decisionSlice?.status || 'idle';
   if (decStatus === 'ok' && decisionSlice?.data) {
     const info = mapDecision(decisionSlice.data.decision);
@@ -1377,25 +1594,27 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
     }));
   } else if (decStatus === 'error') {
     decCard.appendChild(createEl('p', {
-      text: `[ERROR / 요청 실패 · 확인 불가] 사유: ${extractErrorText(decisionSlice?.error, '판정 요청 실패')} (차단/허용 판정이 아님 · 허용 금지)`,
+      text: `[${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} / 요청 실패 · 확인 불가] 사유: ${extractErrorText(decisionSlice?.error, '판정 요청 실패')} (차단/허용 판정이 아니며 내 PC 조회 결과와 구분 표시함)`,
     }));
   } else {
     decCard.appendChild(createEl('p', {
       className: 'muted',
-      text: '업무 앱 탭에서 앱을 선택하면 allow / deny / challenge / unknown 판정 사유와 잰 시각이 이곳에 기록됩니다 (현재 0건).',
+      text: '업무 앱 탭에서 앱을 선택하면 allow / deny / challenge / unknown 판정 사유와 잰 시각이 기록됩니다 (현재 0건).',
     }));
   }
   panel.appendChild(decCard);
 
-  // 2. 선택된(또는 최신) 보안 사건 감사 상세 및 규칙 매칭
   const evCard = createEl('div', { className: 'soc-audit-card' });
-  evCard.appendChild(createEl('h4', { text: '선택 사건 상태·근거·규칙 매칭 (Event Rule Breakdown)' }));
+  evCard.appendChild(createEl('div', { className: 'event-head' }, [
+    createEl('h4', { text: '선택 사건 상태·근거·규칙 매칭 (SDP Event Rule Breakdown)' }),
+    createSdpStatusBadgeEl(mode),
+  ]));
   if (selectedEvent) {
     const evProv = resolveProvenance({ mode });
     const headRow = createEl('p', {
       text: `사건 ${selectedEvent.id} (${mapKind(selectedEvent.kind)}) · 앱: ${selectedEvent.appId || '확인 불가(앱 ID 없음)'} · 잰 시각: ${formatMeasuredAt(selectedEvent.at)} `,
     });
-    headRow.appendChild(createProvenanceBadgeEl(evProv));
+    headRow.appendChild(createProvenanceBadgeEl(evProv, true));
     evCard.appendChild(headRow);
 
     evCard.appendChild(createEl('p', {
@@ -1425,13 +1644,12 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
     evCard.appendChild(createEl('p', {
       className: 'muted',
       text: mode === 'disconnected'
-        ? '[실측값] 로컬 서버 연결 없음(disconnected · 확인 불가) 상태이므로 수신된 보안 사건이 0건입니다 (사유: SDP 호스트 미연결).'
+        ? `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} 상태이므로 수신된 SDP 보안 사건이 0건입니다 (내 PC의 Windows System·Application 기록 조회 결과와 구분해 표시함).`
         : '현재 선택되거나 수신된 보안 사건이 0건입니다.',
     }));
   }
   panel.appendChild(evCard);
 
-  // 3. 누적 규칙 매칭 집계
   const ruleAggCard = createEl('div', { className: 'soc-audit-card' });
   const ruleList = Array.isArray(matchedRules) ? matchedRules : [];
   ruleAggCard.appendChild(createEl('h4', {
@@ -1485,6 +1703,7 @@ export function createStudentView() {
       topMetricsEl.replaceChildren(...Array.from(renderedGrid.childNodes));
     }
 
+    const effectiveModeForTrend = socStore.events?.mode || socStore.status?.mode || 'unknown';
     if (typeof document.querySelectorAll === 'function') {
       const allGrids = document.querySelectorAll('.student-status-view > .soc-metric-grid');
       for (const gridEl of allGrids) {
@@ -1493,10 +1712,9 @@ export function createStudentView() {
       }
       const allPcCards = document.querySelectorAll('[data-student-pc-status="non-admin"]');
       for (const pcCardEl of allPcCards) {
-        const freshPcCard = buildPcStatusInspectionCardDom(socStore.pcStatus);
+        const freshPcCard = buildPcStatusInspectionCardDom(socStore.pcStatus, effectiveModeForTrend);
         pcCardEl.replaceChildren(...Array.from(freshPcCard.childNodes));
       }
-      const effectiveModeForTrend = socStore.events?.mode || socStore.status?.mode || 'unknown';
       const trendProv = resolveProvenance({ mode: effectiveModeForTrend, forceLive: effectiveModeForTrend !== 'demo' });
       const allTrendBoxes = document.querySelectorAll('.student-status-view > .trend-delta-box, .student-events-view .trend-delta-box');
       for (const trendEl of allTrendBoxes) {
@@ -1514,10 +1732,11 @@ export function createStudentView() {
       if (leftTimelineEl) {
         const leftChildren = [
           createEl('h3', { className: 'soc-panel-heading' }, [
-            createEl('span', { text: '직전 스냅샷 대비 추이 비교(Δ) 및 시간순 보안 기록' }),
+            createEl('span', { text: '직전 스냅샷 대비 추이 비교(Δ) 및 시간순 기록' }),
             createEl('div', { className: 'row' }, [
               createRoleBadgeEl('custom'),
               createProvenanceBadgeEl(evSummary.provenance),
+              createSdpStatusBadgeEl(effectiveMode),
             ]),
           ]),
           buildTrendComparisonBoxDom(socStore, evSummary.provenance),
@@ -1544,7 +1763,7 @@ export function createStudentView() {
               createEl('div', { className: 'event-head' }, [
                 createEl('strong', { text: `${ev.id} · ${ev.summary || '요약 없음'}` }),
                 createEl('span', { className: 'tag', text: mapKind(ev.kind) }),
-                createProvenanceBadgeEl(evProv),
+                createProvenanceBadgeEl(evProv, true),
               ]),
               createEl('p', {
                 className: 'muted',
@@ -1558,7 +1777,7 @@ export function createStudentView() {
           leftChildren.push(createEl('p', {
             className: 'state state-empty',
             text: effectiveMode === 'disconnected'
-              ? `[실측값] 로컬 서버 연결 없음(disconnected · 확인 불가) — 수신된 이벤트 0건 (사유: 외부 SDP 호스트 미연결 · 정상/허용으로 간주하지 않음, 잰 시각: ${evSummary.measuredAt})`
+              ? `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} — 외부 SDP 서버에 연결되지 않아 수신된 SDP 보안 사건이 0건입니다 (내 PC 조회 결과(${SOC_UI_TEXT.LIVE_BADGE})와 구분 표시 · 잰 시각: ${evSummary.measuredAt}).`
               : `표시할 시간순 보안 이벤트가 0건입니다 (잰 시각: ${evSummary.measuredAt}).`,
           }));
         }
@@ -1748,7 +1967,9 @@ export function createStudentView() {
             reason: status === 'ok' ? (data?.reason || '이유 정보 없음') : extractErrorText(error, '요청 실패'),
             checkedAt: data?.checkedAt || null,
           });
-          if (socStore.decisionHistory.length > 20) socStore.decisionHistory.length = 20;
+          if (socStore.decisionHistory.length > SOC_LIMITS.MAX_DECISION_HISTORY) {
+            socStore.decisionHistory.length = SOC_LIMITS.MAX_DECISION_HISTORY;
+          }
         }
       }
       syncGlobalSocRegions();
@@ -2175,8 +2396,8 @@ export function createStudentView() {
       const socCards = aggregateSocTopCards(socStore);
       container.appendChild(buildSocMetricCardsDom(socCards));
 
-      // 0-A. 내 PC 상태 비관리자 점검 카드 ([내가 바꾼 부분] — CPU·메모리·디스크 실측값 및 확인 불가 사유)
-      container.appendChild(buildPcStatusInspectionCardDom(socStore.pcStatus));
+      // 0-A. 내 PC 상태 비관리자 점검 카드 ([내가 바꾼 부분] — 네트워크·방화벽·Windows 기록·CPU·메모리·디스크 실측값 및 확인 불가 사유)
+      container.appendChild(buildPcStatusInspectionCardDom(socStore.pcStatus, mode));
 
       // 0-B. 직전 스냅샷 대비 상태·보안 지표 추이 비교(Δ) 및 제공 기능 vs 내가 바꾼 부분 구분
       const statusProv = resolveProvenance({ mode, forceLive: mode !== 'demo' });
