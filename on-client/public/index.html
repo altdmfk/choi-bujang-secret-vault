@@ -44,49 +44,59 @@
       </p>
 
       <section id="soc-executive-overview" class="soc-overview-shell" role="region" aria-label="SOC 통합 보안 관제 지표 및 데이터 출처 요약" aria-live="polite">
-        <div class="soc-provenance-bar" role="region" aria-label="데이터 출처 및 안전 계약 안내">
+        <div class="soc-provenance-bar" role="region" aria-label="제공 기능과 내가 바꾼 부분 및 데이터 출처 구분 안내">
           <div class="soc-provenance-badges">
-            <span class="provenance-badge badge-live" data-provenance="live">[실측값] 로컬 서버·진단·락파일 실측</span>
+            <span class="provenance-badge badge-provided" data-role-kind="provided">[제공 기능] 서버 API·기본 탭 UI (src/server.mjs · public/app.js)</span>
+            <span class="provenance-badge badge-custom" data-role-kind="custom">[내가 바꾼 부분] 상단 카드 4개·추이 비교(Δ)·내 PC 일반 권한 점검 (student/extension.mjs)</span>
+            <span class="provenance-badge badge-live" data-provenance="live">[실측값] 내 PC·로컬 서버 실측</span>
             <span class="provenance-badge badge-demo" data-provenance="demo">[예시값] 데모 합성 데이터 (실제 연결 아님)</span>
-            <span class="soc-safety-pill" data-safety-contract="unv-guard">안전 계약: 확인 불가(unknown)·미연결(disconnected)·미검증(UNV-01~04) ≠ 허용(allow)</span>
+            <span class="provenance-badge badge-unverified" data-provenance="unverified">[확인 불가] 미제공 센서·미연결·미검증 (사유 명시 · 정상 위장 금지)</span>
           </div>
         </div>
         <div id="soc-top-metrics" class="soc-metric-grid" role="region" aria-label="상단 4대 SOC 핵심 지표 카드" aria-live="polite">
           <article class="soc-metric-card soc-card-unknown" data-soc-card="identity-compliance" role="region" aria-label="1. 신원 및 기기 준수 현황">
             <header class="soc-card-header">
               <span class="soc-card-step">SOC CARD 01</span>
+              <span class="provenance-badge badge-custom">[내가 바꾼 부분]</span>
               <span class="provenance-badge badge-live">[실측값]</span>
             </header>
             <h2 class="soc-card-title">신원 및 기기 준수 현황</h2>
-            <p class="soc-card-value">상태 수집 중…</p>
-            <p class="soc-card-sub muted">사용자·기기 적합성·세션 활성 여부를 집계합니다.</p>
+            <p class="soc-card-value">상태 수집 중… (0대 / 0건)</p>
+            <p class="soc-card-sub muted">사용자·기기 적합성(대)·세션 활성 여부(건)를 집계합니다.</p>
+            <p class="soc-card-timestamp">잰 시각: 측정 대기 중…</p>
           </article>
           <article class="soc-metric-card soc-card-unknown" data-soc-card="access-decisions" role="region" aria-label="2. 업무 앱 접근 판정 통계">
             <header class="soc-card-header">
               <span class="soc-card-step">SOC CARD 02</span>
+              <span class="provenance-badge badge-custom">[내가 바꾼 부분]</span>
               <span class="provenance-badge badge-live">[실측값]</span>
             </header>
             <h2 class="soc-card-title">업무 앱 접근 판정 통계</h2>
-            <p class="soc-card-value">판정 대기 (idle)</p>
-            <p class="soc-card-sub muted">allow · deny · challenge · unknown 판정 및 실패 사유를 집계합니다.</p>
+            <p class="soc-card-value">판정 대기 (0건)</p>
+            <p class="soc-card-sub muted">allow · deny · challenge · unknown 판정 건수(건)와 사유를 집계합니다.</p>
+            <p class="soc-card-timestamp">잰 시각: 측정 대기 중…</p>
           </article>
           <article class="soc-metric-card soc-card-unknown" data-soc-card="xdr-events" role="region" aria-label="3. XDR 보안 이벤트 및 규칙">
             <header class="soc-card-header">
               <span class="soc-card-step">SOC CARD 03</span>
+              <span class="provenance-badge badge-custom">[내가 바꾼 부분]</span>
               <span class="provenance-badge badge-live">[실측값]</span>
             </header>
             <h2 class="soc-card-title">XDR 보안 이벤트 및 규칙</h2>
-            <p class="soc-card-value">기록 확인 중…</p>
-            <p class="soc-card-sub muted">접속 기록·XDR 경보 건수 및 탐지 규칙 매칭 현황을 집계합니다.</p>
+            <p class="soc-card-value">기록 확인 중… (0건 / 0종)</p>
+            <p class="soc-card-sub muted">접속 기록·XDR 경보 건수(건) 및 탐지 규칙 매칭(종) 현황을 집계합니다.</p>
+            <p class="soc-card-timestamp">잰 시각: 측정 대기 중…</p>
           </article>
-          <article class="soc-metric-card soc-card-unknown" data-soc-card="diagnostics-vuln" role="region" aria-label="4. 진단 및 취약점·UNV 상태">
+          <article class="soc-metric-card soc-card-unknown" data-soc-card="diagnostics-vuln" role="region" aria-label="4. 내 PC 상태·진단 및 취약점 요약">
             <header class="soc-card-header">
               <span class="soc-card-step">SOC CARD 04</span>
+              <span class="provenance-badge badge-custom">[내가 바꾼 부분]</span>
               <span class="provenance-badge badge-live">[실측값]</span>
             </header>
-            <h2 class="soc-card-title">진단 및 취약점·UNV 상태</h2>
-            <p class="soc-card-value">로컬 진단 대기</p>
-            <p class="soc-card-sub muted">엔진 모드, OSV 패키지 스캔 및 UNV-01~04 경계를 표시합니다.</p>
+            <h2 class="soc-card-title">내 PC 상태·진단 및 취약점 요약</h2>
+            <p class="soc-card-value">로컬 진단 대기 (0개 / 0코어)</p>
+            <p class="soc-card-sub muted">일반 권한 PC 상태(코어·MB·GB), OSV 패키지(개) 및 확인 불가 사유를 표시합니다.</p>
+            <p class="soc-card-timestamp">잰 시각: 측정 대기 중…</p>
           </article>
         </div>
       </section>
@@ -276,16 +286,16 @@
         </section>
       </section>
 
-      <section id="soc-bottom-split-overview" class="card student soc-split-overview-card" role="region" aria-label="하단 2단 분할 뷰 (좌측: 시간순 보안 이벤트 추이, 우측: 판정 감사 및 규칙 매칭 분석)" aria-live="polite">
-        <h2 id="soc-bottom-split-title">SOC 통합 타임라인 &amp; 판정 감사 분할 뷰 <span class="tag tag-student">Timeline &amp; Audit Split View</span></h2>
-        <div id="soc-bottom-split" class="audit-split-view" role="region" aria-label="시간순 이벤트 추이 및 규칙 매칭 감사 2단 분할 영역" aria-live="polite">
-          <div id="soc-split-left-timeline" class="soc-split-panel soc-timeline-panel" role="region" aria-label="좌측: 시간순 보안 이벤트 추이 및 타임라인" aria-live="polite">
-            <h3 class="soc-panel-heading">시간순 보안 이벤트 추이 (Chronological Timeline)</h3>
+      <section id="soc-bottom-split-overview" class="card student soc-split-overview-card" role="region" aria-label="하단 2단 분할 뷰 (좌측: 시간순 보안 이벤트 추이 및 스냅샷 비교, 우측: 내 PC 상태·판정 감사 및 제공/변경 구분 설명)" aria-live="polite">
+        <h2 id="soc-bottom-split-title">SOC 통합 추이 비교(Δ) &amp; 내 PC 상태·판정 감사 분할 뷰 <span class="provenance-badge badge-custom">[내가 바꾼 부분]</span> <span class="tag tag-student">Timeline &amp; Audit Split View</span></h2>
+        <div id="soc-bottom-split" class="audit-split-view" role="region" aria-label="시간순 이벤트 추이 비교 및 내 PC 상태·규칙 감사 2단 분할 영역" aria-live="polite">
+          <div id="soc-split-left-timeline" class="soc-split-panel soc-timeline-panel" role="region" aria-label="좌측: 직전 조회 대비 추이 비교(Δ) 및 시간순 보안 기록" aria-live="polite">
+            <h3 class="soc-panel-heading">직전 스냅샷 대비 추이 비교(Δ) 및 시간순 보안 기록</h3>
             <p class="muted">데이터 수집 대기 중…</p>
           </div>
-          <div id="soc-split-right-audit" class="soc-split-panel soc-audit-panel" role="region" aria-label="우측: 상세 판정 감사 로그 및 규칙 매칭 분석" aria-live="polite">
-            <h3 class="soc-panel-heading">상세 감사 로그 및 규칙 매칭 분석 (Audit &amp; Rule Breakdown)</h3>
-            <p class="muted">판정 및 규칙 매칭 데이터를 불러오는 중…</p>
+          <div id="soc-split-right-audit" class="soc-split-panel soc-audit-panel" role="region" aria-label="우측: 내 PC 상태(일반 권한 점검·확인 불가 사유) 및 상세 판정·규칙 감사" aria-live="polite">
+            <h3 class="soc-panel-heading">내 PC 상태(일반 권한 점검) &amp; 상세 판정·규칙 감사 설명</h3>
+            <p class="muted">내 PC 상태 및 규칙 매칭 데이터를 불러오는 중…</p>
           </div>
         </div>
       </section>
