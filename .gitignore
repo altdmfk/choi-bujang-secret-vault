@@ -10,3 +10,6 @@ public/aleph.json
 .vercel
 *.log
 xdr/blocklist.json
+package/stage/
+package/dist/
+
