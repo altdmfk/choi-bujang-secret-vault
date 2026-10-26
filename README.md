@@ -353,9 +353,16 @@ flowchart LR
   - Windows 전용 기능: CurrentUser DPAPI 자격 보관함, PowerShell 네이티브 레지스트리, Native 계정 연결 모듈
   - 비-Windows 환경(macOS, Linux): 기본 웹 UI 및 데모 실행 정상 지원. 외부 SDP mTLS 연결은 코드상 플랫폼 독립 구현이나 실물 미실측에 따른 「미검증 지원 범위」로 명시
 
-### 7. Final 2~3일차: 케셰브(Keshev) 네트워크·방화벽(읽기 전용)·Windows 기록(`System`·`Application`) 점검 및 관제 대시보드 패키징
+### 7. Final 2~4일차: 케셰브(Keshev) 네트워크·방화벽(읽기 전용)·Windows 기록(`System`·`Application`) 점검 및 관제 대시보드 패키징
 - **현재 작동하는 기능**:
-  - **관제 대시보드형 화면 틀**: 상단 4대 상태 카드(`#soc-top-metrics`: `01~03` SDP 연동 영역 + `04` 내 PC 로컬 실측 영역) 및 하단 2단 분할 뷰(`#soc-bottom-split`: 좌측 추이 비교(Δ) 및 이벤트 타임라인, 우측 내 PC 네트워크·방화벽·Windows 기록 점검 카드 및 역할 분리·상세 감사 로그)
+  - **관제 대시보드형 화면 틀**:
+    - **상단 4대 관제 카드 (`Card 01 ~ Card 04`)**:
+      - `Card 01 (네트워크 어댑터)`: 활성 어댑터 수 및 네트워크 설정 요약(대표 IPv4, 기본 게이트웨이, DNS 서버)
+      - `Card 02 (방화벽 설정)`: 3대 프로필(Domain/Private/Public) 상태 매트릭스 및 인·아웃바운드 동작 요약, `[읽기 전용]` 및 `[실측값]` 배지
+      - `Card 03 (Windows 일반 기록)`: 최근 24시간 채널별(System/Application/Security) 기록 건수 및 비침해 안내 배너
+      - `Card 04 (하드웨어 자원)`: CPU 코어 및 사용률, 메모리(RAM) 및 디스크 여유 공간 지표
+    - **태그/배지 규격 정돈**: `[실측값]`, `[읽기 전용]`, `「확인 불가」`, `「SDP 미연결」` 배지의 높이와 여백 정렬
+    - **하단 2단 분할 뷰 (`#soc-bottom-split`)**: 좌측 직전 스냅샷 대비 추이 비교(Δ) 및 이벤트 목록, 우측 내 PC 상태 점검 및 판정 감사 패널
   - **내 PC 네트워크·방화벽(읽기 전용)·Windows 기록(`System`·`Application`) 비관리자 실측**:
     - **네트워크 구성 (`[실측값]`)**: 활성 인터페이스 수(`4개`), 주 어댑터(`이더넷` Realtek PCIe GbE Family Controller `192.168.3.2/24`, VMware `VMnet1`·`VMnet8`·`VMnet2`), 기본 게이트웨이(`192.168.3.1`), DNS 서버(`168.126.63.1, 168.126.63.2`), MAC 주소 조회
     - **방화벽 설정 (`[실측값]` · 읽기 전용)**: Windows Defender 방화벽 3대 프로필(`Domain`·`Private`·`Public`) 활성 여부(`3/3 켜짐`) 및 인바운드(`Block`)·아웃바운드(`Allow`) 기본 동작을 **읽기만 하고 바꾸지 않음**

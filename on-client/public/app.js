@@ -46,7 +46,7 @@ const RESOURCE_LABELS = {
 };
 
 const state = {
-  view: 'protection',
+  view: 'dashboard',
   checkedAt: null,
   me: { status: 'loading' },
   apps: { status: 'loading' },
@@ -411,19 +411,39 @@ function renderErrors() {
 
 function selectView(view, { focus = false } = {}) {
   state.view = view;
-  for (const tab of document.querySelectorAll('#nav [role="tab"]')) {
-    const selected = tab.dataset.view === view;
+  const tabs = document.querySelectorAll('#tab-list [role="tab"], #nav [role="tab"]');
+  for (const tab of tabs) {
+    const tabView = tab.dataset.view || (tab.id ? tab.id.replace(/^tab-/, '') : '');
+    const selected = (tabView === view) || (tab.getAttribute('aria-controls') === `view-${view}`);
     tab.setAttribute('aria-selected', String(selected));
     tab.tabIndex = selected ? 0 : -1;
+    tab.classList.toggle('is-active', selected);
     if (selected && focus) tab.focus();
-    $(tab.getAttribute('aria-controls')).hidden = !selected;
+    const ctrlId = tab.getAttribute('aria-controls') || `view-${tabView}`;
+    const panel = $(ctrlId);
+    if (panel) {
+      panel.hidden = !selected;
+      panel.classList.toggle('is-active', selected);
+    }
+  }
+  const knownViews = ['dashboard', 'protection', 'apps', 'records', 'action'];
+  for (const v of knownViews) {
+    const panel = $(`view-${v}`);
+    if (panel) {
+      const isCur = (v === view);
+      panel.hidden = !isCur;
+      panel.classList.toggle('is-active', isCur);
+    }
   }
 }
 
 function setupNav() {
-  const tabs = [...document.querySelectorAll('#nav [role="tab"]')];
+  const tabs = [...document.querySelectorAll('#tab-list [role="tab"], #nav [role="tab"]')];
   for (const tab of tabs) {
-    tab.addEventListener('click', () => selectView(tab.dataset.view));
+    tab.addEventListener('click', () => {
+      const v = tab.dataset.view || (tab.id ? tab.id.replace(/^tab-/, '') : '');
+      selectView(v);
+    });
     tab.addEventListener('keydown', (event) => {
       const index = tabs.indexOf(tab);
       let next = null;
@@ -433,7 +453,8 @@ function setupNav() {
       else if (event.key === 'End') next = tabs[tabs.length - 1];
       if (!next) return;
       event.preventDefault();
-      selectView(next.dataset.view, { focus: true });
+      const v = next.dataset.view || (next.id ? next.id.replace(/^tab-/, '') : '');
+      selectView(v, { focus: true });
     });
   }
 }
