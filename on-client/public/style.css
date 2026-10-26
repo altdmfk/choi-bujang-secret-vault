@@ -1,25 +1,41 @@
 /* Alekov 학생 클라이언트 — 자체 작성 CSS. 외부 폰트·라이브러리·이미지 없음. PC 1280px 이상 기준. */
 
 :root {
-  --bg: #f5f6f8;
+  --bg: #f1f5f9;
   --surface: #ffffff;
-  --border: #d9dde3;
-  --text: #1c2430;
-  --muted: #5a6472;
-  --accent: #2357c6;
-  --accent-soft: #e7eefc;
-  --allow: #1d7a3e;
-  --allow-soft: #e5f4ea;
-  --deny: #b42318;
-  --deny-soft: #fdeceb;
-  --challenge: #9a5b00;
-  --challenge-soft: #fff4e0;
-  --unknown: #4b5563;
-  --unknown-soft: #eceff3;
-  --student: #6b3fb3;
-  --student-soft: #f3edfb;
+  --surface-elevated: #f8fafc;
+  --border: #cbd5e1;
+  --border-subtle: #e2e8f0;
+  --text: #0f172a;
+  --muted: #475569;
+  --accent: #0284c7;
+  --accent-soft: #e0f2fe;
+  /* Semantic Status Colors: allow (emerald), deny (rose/red), challenge (amber), unknown/disconnected (slate gray) */
+  --allow: #047857;
+  --allow-soft: #ecfdf5;
+  --allow-border: #10b981;
+  --deny: #be123c;
+  --deny-soft: #fff1f2;
+  --deny-border: #f43f5e;
+  --challenge: #b45309;
+  --challenge-soft: #fffbeb;
+  --challenge-border: #f59e0b;
+  --unknown: #475569;
+  --unknown-soft: #f1f5f9;
+  --unknown-border: #94a3b8;
+  /* Data Provenance Badge Variables: [실측값] (Blue/Teal) vs. [예시값] (Amber/Orange) */
+  --badge-live-bg: #e0f2fe;
+  --badge-live-fg: #0369a1;
+  --badge-live-border: #0284c7;
+  --badge-demo-bg: #ffedd5;
+  --badge-demo-fg: #c2410c;
+  --badge-demo-border: #ea580c;
+  --student: #6d28d9;
+  --student-soft: #f5f3ff;
   --radius: 8px;
-  --focus: 0 0 0 3px #f5b400;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --focus: 0 0 0 3px #f59e0b;
   font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
   font-size: 15px;
   line-height: 1.5;
@@ -207,3 +223,346 @@ main:focus { outline: none; }
 .state-ok { background: var(--allow-soft); color: var(--allow); }
 .ai-result[data-state="connected"] { border-left: 3px solid var(--allow); padding-left: 12px; }
 .ai-result[data-state="unknown"] { border-left: 3px solid var(--unknown); padding-left: 12px; }
+
+/* ==========================================================================
+   SOC Operations Dashboard — Data Provenance Badges, Top 4 Metric Cards & 2-Column Split View
+   ========================================================================== */
+
+.soc-overview-shell {
+  margin: 0 0 20px;
+}
+
+.soc-provenance-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.soc-provenance-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Data Provenance Badges: [실측값] (Blue/Teal) vs. [예시값] (Amber/Orange) */
+.provenance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge-live {
+  background: var(--badge-live-bg);
+  color: var(--badge-live-fg);
+  border: 1px solid var(--badge-live-border);
+}
+
+.badge-demo {
+  background: var(--badge-demo-bg);
+  color: var(--badge-demo-fg);
+  border: 1px solid var(--badge-demo-border);
+}
+
+.soc-safety-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--unknown-soft);
+  color: var(--unknown);
+  border: 1px solid var(--unknown-border);
+}
+
+/* Top 4 SOC Metric Cards Grid */
+.soc-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 16px;
+}
+
+@media (max-width: 1280px) {
+  .soc-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .soc-metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.soc-metric-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--unknown-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.soc-metric-card.soc-card-allow {
+  border-top-color: var(--allow-border);
+  background: linear-gradient(180deg, var(--allow-soft) 0%, var(--surface) 42%);
+}
+
+.soc-metric-card.soc-card-deny {
+  border-top-color: var(--deny-border);
+  background: linear-gradient(180deg, var(--deny-soft) 0%, var(--surface) 42%);
+}
+
+.soc-metric-card.soc-card-challenge {
+  border-top-color: var(--challenge-border);
+  background: linear-gradient(180deg, var(--challenge-soft) 0%, var(--surface) 42%);
+}
+
+.soc-metric-card.soc-card-unknown {
+  border-top-color: var(--unknown-border);
+  background: linear-gradient(180deg, var(--unknown-soft) 0%, var(--surface) 42%);
+}
+
+.soc-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.soc-card-step {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.soc-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--text);
+}
+
+.soc-card-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.soc-card-allow .soc-card-value { color: var(--allow); }
+.soc-card-deny .soc-card-value { color: var(--deny); }
+.soc-card-challenge .soc-card-value { color: var(--challenge); }
+.soc-card-unknown .soc-card-value { color: var(--unknown); }
+
+.soc-card-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.soc-card-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.soc-kpi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text);
+}
+
+.soc-kpi-chip.chip-allow { background: var(--allow-soft); color: var(--allow); border-color: var(--allow-border); }
+.soc-kpi-chip.chip-deny { background: var(--deny-soft); color: var(--deny); border-color: var(--deny-border); }
+.soc-kpi-chip.chip-challenge { background: var(--challenge-soft); color: var(--challenge); border-color: var(--challenge-border); }
+.soc-kpi-chip.chip-unknown { background: var(--unknown-soft); color: var(--unknown); border-color: var(--unknown-border); }
+
+/* Bottom 2-Column Split View (Left: Timeline Trend, Right: Audit & Rule Breakdown) */
+.audit-split-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+@media (max-width: 1100px) {
+  .audit-split-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.soc-split-panel {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.soc-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.soc-timeline-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0 0 0 14px;
+  border-left: 2px solid var(--border);
+  display: grid;
+  gap: 10px;
+}
+
+.soc-timeline-node {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.soc-timeline-node::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--unknown);
+  border: 2px solid var(--surface);
+}
+
+.soc-timeline-node.node-allow::before { background: var(--allow); }
+.soc-timeline-node.node-deny::before { background: var(--deny); }
+.soc-timeline-node.node-challenge::before { background: var(--challenge); }
+.soc-timeline-node.node-unknown::before { background: var(--unknown); }
+
+.soc-audit-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.soc-audit-card:last-child {
+  margin-bottom: 0;
+}
+
+.soc-rule-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.soc-rule-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--surface-elevated);
+  border-left: 3px solid var(--accent);
+  font-size: 0.85rem;
+}
+
+.soc-unv-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .soc-unv-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.soc-unv-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--unknown-soft);
+  border: 1px solid var(--unknown-border);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.status-section {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+
+.event-detail-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.table.packages-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-top: 10px;
+}
+
+.table.packages-table th,
+.table.packages-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.table.packages-table th {
+  background: var(--surface-elevated);
+}

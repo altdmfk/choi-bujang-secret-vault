@@ -410,10 +410,608 @@ function appendStatusResourceError(section, attrName, error, timeoutLabel, failL
   }));
 }
 
+// ============================================================================
+// Pure State Normalization, Provenance Tagging & SOC Aggregation Layer
+// ============================================================================
+
+const DEMO_SYNTHETIC_IDS = new Set([
+  'practice-user',
+  'demo-user',
+  'practice-pc',
+  'dev-01',
+  'practice-session',
+  'event-01',
+  'practice-project',
+]);
+
+const UNV_BOUNDARIES = Object.freeze([
+  Object.freeze({
+    code: 'UNV-01',
+    title: '운영 SDP mTLS 실통신',
+    status: '미확인 (대기)',
+    detail: '운영 SDP 호스트 인증서(-SdpHostConfig) 미주입 · 연결 없음 유지 (allow 위장 금지)',
+  }),
+  Object.freeze({
+    code: 'UNV-02',
+    title: '상용 AI 유료 생성 호출',
+    status: '미확인 (대기)',
+    detail: '운영 AI 권한 발급 전 · ON_AI_PROVISIONING_PENDING 분리 표시',
+  }),
+  Object.freeze({
+    code: 'UNV-03',
+    title: '원격 계정·기기 강제 회수 집행',
+    status: '미지원 / 미확인',
+    detail: 'supportedActions: [] · ACTION_UNSUPPORTED (상태 뷰어로만 동작)',
+  }),
+  Object.freeze({
+    code: 'UNV-04',
+    title: '글로벌 OSV 온라인 전수 쿼리',
+    status: '미확인 (대기)',
+    detail: '승인 패키지 목록 기본 [] · 미조회를 취약점 없음(clean)으로 간주하지 않음',
+  }),
+]);
+
+/**
+ * Pure function: Determines whether a given resource/entity originates from
+ * live local measurement (`[실측값]`) or synthetic demo fixtures (`[예시값]`).
+ */
+function resolveProvenance({ mode, id, ids = [], forceLive = false } = {}) {
+  if (forceLive) {
+    return Object.freeze({
+      kind: 'live',
+      label: '[실측값]',
+      fullLabel: '[실측값] 로컬 서버·환경 실측',
+      className: 'provenance-badge badge-live',
+    });
+  }
+  const hasSyntheticId = (id && DEMO_SYNTHETIC_IDS.has(String(id)))
+    || (Array.isArray(ids) && ids.some((item) => item && DEMO_SYNTHETIC_IDS.has(String(item))));
+  if (mode === 'demo' || hasSyntheticId) {
+    return Object.freeze({
+      kind: 'demo',
+      label: '[예시값]',
+      fullLabel: '[예시값] 데모 합성 데이터 (실제 연결 아님)',
+      className: 'provenance-badge badge-demo',
+    });
+  }
+  return Object.freeze({
+    kind: 'live',
+    label: '[실측값]',
+    fullLabel: '[실측값] 로컬 서버·환경 실측',
+    className: 'provenance-badge badge-live',
+  });
+}
+
+function createProvenanceBadgeEl(provenance, useFull = false) {
+  const p = provenance || resolveProvenance({ forceLive: true });
+  return createEl('span', {
+    className: p.className,
+    text: useFull ? p.fullLabel : p.label,
+    attrs: { 'data-provenance': p.kind },
+  });
+}
+
+/**
+ * Pure function: Normalizes Identity, Device compliance, and Session states
+ * for Top SOC Card 1 without ever disguising `unknown` or `disconnected` as `allow`.
+ */
+function normalizeIdentitySummary({ me, devices, sessions, mode } = {}) {
+  const effectiveMode = me?.mode || devices?.mode || sessions?.mode || mode || 'unknown';
+  const userId = me?.data?.user?.id || '';
+  const deviceId = me?.data?.device?.id || '';
+  const sessionId = me?.data?.session?.id || '';
+  const provenance = resolveProvenance({
+    mode: effectiveMode,
+    ids: [userId, deviceId, sessionId],
+  });
+
+  const devList = Array.isArray(devices?.data) ? devices.data : [];
+  const sessList = Array.isArray(sessions?.data) ? sessions.data : [];
+
+  const compliantCount = devList.filter((d) => d?.status === 'compliant').length;
+  const noncompliantCount = devList.filter((d) => d?.status === 'noncompliant').length;
+  const unknownDeviceCount = devList.filter((d) => !d?.status || d.status === 'unknown').length;
+  const activeSessionCount = sessList.filter((s) => s?.status === 'active').length;
+
+  let tone = 'unknown';
+  let headline = '확인 불가 (unknown)';
+  let subline = '미연결 또는 미검증 상태입니다. 정상(allow)으로 간주하지 않습니다.';
+
+  if (me?.status === 'loading' || devices?.status === 'loading' || sessions?.status === 'loading') {
+    tone = 'unknown';
+    headline = '신원·기기 확인 중…';
+    subline = '로컬 서버에서 신원 및 기기 상태를 조회하고 있습니다.';
+  } else if (me?.status === 'error' || devices?.status === 'error' || sessions?.status === 'error') {
+    tone = 'deny';
+    headline = effectiveMode === 'disconnected' ? '연결 없음 (disconnected)' : '조회 실패 · 확인 불가';
+    subline = '외부 호스트 미연결 또는 요청 실패 상태입니다 (허용 아님).';
+  } else if (me?.status === 'ok') {
+    const devStatus = me.data?.device?.status || 'unknown';
+    const sessStatus = me.data?.session?.status || 'unknown';
+    const userLabel = me.data?.user?.label || userId || '사용자';
+    if (devStatus === 'compliant' && sessStatus === 'active') {
+      tone = 'allow';
+      headline = `${userLabel} · 기준 충족`;
+      subline = `준수 기기 ${compliantCount}대 · 활성 세션 ${activeSessionCount}건`;
+    } else if (devStatus === 'noncompliant' || sessStatus === 'revoked' || sessStatus === 'expired') {
+      tone = 'deny';
+      headline = `${userLabel} · 기준 미충족/만료`;
+      subline = `기기(${mapDeviceStatus(devStatus)}) · 세션(${mapSessionStatus(sessStatus)})`;
+    } else {
+      tone = 'challenge';
+      headline = `${userLabel} · 기기 확인 불가(${devStatus})`;
+      subline = `세션(${mapSessionStatus(sessStatus)}) · 기기 보안 상태 미검증(unknown ≠ allow)`;
+    }
+  }
+
+  return Object.freeze({
+    cardId: 'identity-compliance',
+    stepLabel: 'SOC CARD 01 · IDENTITY & DEVICE',
+    title: '신원 및 기기 준수 현황',
+    tone,
+    headline,
+    subline,
+    provenance,
+    kpis: Object.freeze([
+      { label: `준수 기기 ${compliantCount}`, chipClass: compliantCount > 0 ? 'chip-allow' : 'chip-unknown' },
+      { label: `미충족 ${noncompliantCount}`, chipClass: noncompliantCount > 0 ? 'chip-deny' : 'chip-unknown' },
+      { label: `미확인 기기 ${unknownDeviceCount}`, chipClass: unknownDeviceCount > 0 ? 'chip-challenge' : 'chip-unknown' },
+      { label: `활성 세션 ${activeSessionCount}`, chipClass: activeSessionCount > 0 ? 'chip-allow' : 'chip-unknown' },
+    ]),
+  });
+}
+
+/**
+ * Pure function: Normalizes App Access Decision statistics for Top SOC Card 2.
+ */
+function normalizeDecisionSummary(decisionSlice = {}, decisionHistory = [], eventsSlice = {}) {
+  const status = decisionSlice?.status || 'idle';
+  const mode = decisionSlice?.mode || eventsSlice?.mode || 'unknown';
+  const currentDecision = status === 'ok' ? (decisionSlice?.data?.decision || 'unknown') : null;
+  const targetApp = decisionSlice?.data?.appId || decisionSlice?.appId || null;
+  const reason = status === 'ok'
+    ? (decisionSlice?.data?.reason || '사유 정보 없음')
+    : status === 'error'
+      ? extractErrorText(decisionSlice?.error, '판정 요청 실패')
+      : '아직 요청한 업무 앱이 없습니다.';
+
+  const provenance = resolveProvenance({
+    mode,
+    id: targetApp,
+    forceLive: status === 'idle' || status === 'error',
+  });
+
+  const stats = { allow: 0, deny: 0, challenge: 0, unknown: 0, failed: 0 };
+  for (const item of decisionHistory) {
+    if (item?.status === 'error') stats.failed += 1;
+    else if (item?.decision && Object.hasOwn(stats, item.decision)) stats[item.decision] += 1;
+    else if (item?.status === 'ok') stats.unknown += 1;
+  }
+
+  const eventsList = Array.isArray(eventsSlice?.data) ? eventsSlice.data : [];
+  const deniedAccessEvents = eventsList.filter((e) => e?.kind === 'access' && e?.state?.access === 'denied').length;
+
+  let tone = 'unknown';
+  let headline = '판정 대기 (idle)';
+  if (status === 'loading') {
+    tone = 'unknown';
+    headline = `${targetApp || '업무 앱'} 판정 중…`;
+  } else if (status === 'error') {
+    tone = 'deny';
+    headline = `${targetApp || '업무 앱'} · 요청 실패 (error)`;
+  } else if (status === 'ok') {
+    const mapped = mapDecision(currentDecision);
+    tone = mapped.code === 'allow' ? 'allow' : mapped.code === 'deny' ? 'deny' : mapped.code === 'challenge' ? 'challenge' : 'unknown';
+    headline = `${targetApp || '업무 앱'} · ${mapped.text}`;
+  }
+
+  return Object.freeze({
+    cardId: 'access-decisions',
+    stepLabel: 'SOC CARD 02 · ZTNA ACCESS DECISIONS',
+    title: '업무 앱 접근 판정 통계',
+    tone,
+    headline,
+    subline: reason,
+    provenance,
+    kpis: Object.freeze([
+      { label: `허용(allow) ${stats.allow}`, chipClass: stats.allow > 0 ? 'chip-allow' : 'chip-unknown' },
+      { label: `거부(deny) ${stats.deny + deniedAccessEvents}`, chipClass: (stats.deny + deniedAccessEvents) > 0 ? 'chip-deny' : 'chip-unknown' },
+      { label: `추가확인(challenge) ${stats.challenge}`, chipClass: stats.challenge > 0 ? 'chip-challenge' : 'chip-unknown' },
+      { label: `불명/실패 ${stats.unknown + stats.failed}`, chipClass: (stats.unknown + stats.failed) > 0 ? 'chip-deny' : 'chip-unknown' },
+    ]),
+  });
+}
+
+/**
+ * Pure function: Normalizes XDR & Access Security Events and Rule-Matching Breakdown
+ * for Top SOC Card 3 and the Bottom 2-Column Split View.
+ */
+function normalizeEventsSummary(eventsSlice = {}) {
+  const status = eventsSlice?.status || 'loading';
+  const mode = eventsSlice?.mode || 'unknown';
+  const rawList = Array.isArray(eventsSlice?.data) ? eventsSlice.data : [];
+  const sortedEvents = [...rawList].sort((a, b) => new Date(b?.at || 0).getTime() - new Date(a?.at || 0).getTime());
+
+  const provenance = resolveProvenance({
+    mode,
+    ids: sortedEvents.map((e) => e?.id),
+    forceLive: status === 'error' || mode === 'disconnected',
+  });
+
+  const xdrCount = sortedEvents.filter((e) => e?.kind === 'xdr').length;
+  const accessCount = sortedEvents.filter((e) => e?.kind === 'access').length;
+  const deniedCount = sortedEvents.filter((e) => e?.state?.access === 'denied').length;
+  const unknownStateCount = sortedEvents.filter((e) =>
+    e?.state?.access === 'unknown' || e?.state?.session === 'unknown' || e?.state?.device === 'unknown').length;
+
+  const ruleMap = new Map();
+  for (const ev of sortedEvents) {
+    const rules = Array.isArray(ev?.rules) ? ev.rules : [];
+    for (const r of rules) {
+      if (!r?.id) continue;
+      const prev = ruleMap.get(r.id) || { id: r.id, text: r.text || '', count: 0, eventIds: [] };
+      prev.count += 1;
+      if (ev.id && !prev.eventIds.includes(ev.id)) prev.eventIds.push(ev.id);
+      ruleMap.set(r.id, prev);
+    }
+  }
+  const matchedRules = [...ruleMap.values()];
+
+  let tone = 'unknown';
+  let headline = '기록 확인 중…';
+  let subline = '접속 기록과 저장된 XDR 경보를 집계합니다.';
+
+  if (status === 'loading') {
+    tone = 'unknown';
+    headline = '보안 기록 불러오는 중…';
+  } else if (status === 'error') {
+    tone = 'deny';
+    headline = mode === 'disconnected' ? '연결 없음 · 기록 미수신' : '보안 기록 조회 실패';
+    subline = extractErrorText(eventsSlice?.error, '서버 연결을 확인할 수 없습니다.');
+  } else if (sortedEvents.length === 0) {
+    tone = 'unknown';
+    headline = '관측된 보안 기록 0건';
+    subline = '표시할 보안 기록이 없습니다 (정상·안전 단정 아님).';
+  } else {
+    tone = xdrCount > 0 || deniedCount > 0 ? 'deny' : unknownStateCount > 0 ? 'challenge' : 'allow';
+    headline = `총 ${sortedEvents.length}건 (XDR ${xdrCount} · 접속 ${accessCount})`;
+    subline = `매칭 규칙 ${matchedRules.length}종 · 거부 상태 ${deniedCount}건 · 미확인 상태 ${unknownStateCount}건`;
+  }
+
+  return Object.freeze({
+    cardId: 'xdr-events',
+    stepLabel: 'SOC CARD 03 · XDR EVENTS & RULES',
+    title: 'XDR 보안 이벤트 및 규칙',
+    tone,
+    headline,
+    subline,
+    provenance,
+    sortedEvents,
+    matchedRules,
+    xdrCount,
+    accessCount,
+    deniedCount,
+    unknownStateCount,
+    kpis: Object.freeze([
+      { label: `XDR 경보 ${xdrCount}`, chipClass: xdrCount > 0 ? 'chip-deny' : 'chip-unknown' },
+      { label: `접속 기록 ${accessCount}`, chipClass: accessCount > 0 ? 'chip-challenge' : 'chip-unknown' },
+      { label: `매칭 규칙 ${matchedRules.length}`, chipClass: matchedRules.length > 0 ? 'chip-challenge' : 'chip-unknown' },
+      { label: `미지원 조치(UNV-03)`, chipClass: 'chip-unknown' },
+    ]),
+  });
+}
+
+/**
+ * Pure function: Normalizes Diagnostics, Vulnerability Scan, and UNV-01~04 safety status
+ * for Top SOC Card 4. Always tagged as `[실측값]` because `/api/diagnostics` and local
+ * lockfile inspection are measured directly on this PC/server.
+ */
+function normalizeDiagAndVulnSummary({ diagnostics, vulnerabilities, notifications, mode } = {}) {
+  const provenance = resolveProvenance({ forceLive: true });
+  const diagStatus = diagnostics?.status || 'idle';
+  const engineMode = diagnostics?.data?.engine?.mode || diagnostics?.data?.engineMode || mode || 'unknown';
+  const engineCode = diagnostics?.data?.engine?.code || diagnostics?.data?.engineCode || (engineMode === 'disconnected' ? 'ENGINE_NOT_CONNECTED' : engineMode === 'demo' ? 'DEMO_ONLY' : 'IDLE');
+
+  const vulnStatus = vulnerabilities?.status || 'idle';
+  const scanStatus = vulnStatus === 'ok' ? (vulnerabilities?.data?.status || 'not_checked') : vulnStatus;
+  const notiCount = Array.isArray(notifications) ? notifications.length : 0;
+
+  let tone = 'unknown';
+  if (vulnStatus === 'error' || diagStatus === 'error' || engineMode === 'disconnected') {
+    tone = 'challenge';
+  } else if (scanStatus === 'complete' && engineMode === 'connected') {
+    tone = 'allow';
+  }
+
+  const headline = diagStatus === 'ok'
+    ? `진단 ${engineMode} (${engineCode})`
+    : `엔진 ${engineMode} · 취약점 ${scanStatus}`;
+  const subline = `패키지 스캔: ${scanStatus} · 알림 ${notiCount}건 · UNV-01~04 대기(allow 위장 금지)`;
+
+  return Object.freeze({
+    cardId: 'diagnostics-vuln',
+    stepLabel: 'SOC CARD 04 · DIAGNOSTICS & OSV / UNV',
+    title: '진단 및 취약점·UNV 상태',
+    tone,
+    headline,
+    subline,
+    provenance,
+    kpis: Object.freeze([
+      { label: `모드: ${engineMode}`, chipClass: engineMode === 'connected' ? 'chip-allow' : engineMode === 'demo' ? 'chip-challenge' : 'chip-unknown' },
+      { label: `OSV: ${scanStatus}`, chipClass: scanStatus === 'complete' ? 'chip-allow' : scanStatus === 'error' ? 'chip-deny' : 'chip-unknown' },
+      { label: `경보 알림: ${notiCount}건`, chipClass: notiCount > 0 ? 'chip-deny' : 'chip-unknown' },
+      { label: 'UNV-01~04 보호', chipClass: 'chip-unknown' },
+    ]),
+  });
+}
+
+function aggregateSocTopCards(store) {
+  const card1 = normalizeIdentitySummary({
+    me: store.identity?.me,
+    devices: store.status?.devices || store.identity?.devices,
+    sessions: store.status?.sessions || store.identity?.sessions,
+    mode: store.status?.mode,
+  });
+  const card2 = normalizeDecisionSummary(store.decision, store.decisionHistory, store.events);
+  const card3 = normalizeEventsSummary(store.events);
+  const card4 = normalizeDiagAndVulnSummary({
+    diagnostics: store.status?.diagnostics,
+    vulnerabilities: store.vulnerabilities,
+    notifications: store.status?.notifications,
+    mode: store.status?.mode,
+  });
+  return Object.freeze([card1, card2, card3, card4]);
+}
+
+function buildSocMetricCardsDom(cards) {
+  const grid = createEl('div', {
+    className: 'soc-metric-grid',
+    attrs: {
+      role: 'region',
+      'aria-label': '상단 4대 SOC 핵심 지표 카드',
+    },
+  });
+
+  for (const card of cards) {
+    const article = createEl('article', {
+      className: `soc-metric-card soc-card-${card.tone || 'unknown'}`,
+      attrs: {
+        role: 'region',
+        'aria-label': card.title,
+        'data-soc-card': card.cardId,
+        'data-soc-tone': card.tone || 'unknown',
+      },
+    });
+
+    const header = createEl('header', { className: 'soc-card-header' }, [
+      createEl('span', { className: 'soc-card-step', text: card.stepLabel }),
+      createProvenanceBadgeEl(card.provenance),
+    ]);
+    article.appendChild(header);
+    article.appendChild(createEl('h3', { className: 'soc-card-title', text: card.title }));
+    article.appendChild(createEl('p', { className: 'soc-card-value', text: card.headline }));
+    article.appendChild(createEl('p', { className: 'soc-card-sub muted', text: card.subline }));
+
+    if (Array.isArray(card.kpis) && card.kpis.length > 0) {
+      const kpiWrap = createEl('div', { className: 'soc-card-kpis' });
+      for (const kpi of card.kpis) {
+        kpiWrap.appendChild(createEl('span', {
+          className: `soc-kpi-chip ${kpi.chipClass || 'chip-unknown'}`,
+          text: kpi.label,
+        }));
+      }
+      article.appendChild(kpiWrap);
+    }
+
+    grid.appendChild(article);
+  }
+
+  return grid;
+}
+
+function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRules, provenance, mode }) {
+  const panel = createEl('div', {
+    className: 'soc-split-panel soc-audit-panel',
+    attrs: {
+      role: 'region',
+      'aria-label': '상세 감사 로그 및 규칙 매칭 분석 (allow / deny / challenge / unknown)',
+    },
+  });
+
+  panel.appendChild(createEl('h3', { className: 'soc-panel-heading' }, [
+    createEl('span', { text: '상세 판정 감사 및 규칙 매칭 분석' }),
+    createProvenanceBadgeEl(provenance),
+  ]));
+
+  // 1. 최근 업무 앱 접근 판정 감사 요약
+  const decCard = createEl('div', { className: 'soc-audit-card' });
+  decCard.appendChild(createEl('h4', { text: '업무 앱 판정 감사 (Access Decision Breakdown)' }));
+  const decStatus = decisionSlice?.status || 'idle';
+  if (decStatus === 'ok' && decisionSlice?.data) {
+    const info = mapDecision(decisionSlice.data.decision);
+    decCard.appendChild(createEl('p', {
+      text: `[${info.code.toUpperCase()}] 앱: ${decisionSlice.data.appId || decisionSlice.appId || '미지정'} · ${info.text}`,
+    }));
+    decCard.appendChild(createEl('p', {
+      className: 'muted',
+      text: `명시적 판정 사유: ${decisionSlice.data.reason || '사유 정보 없음'} (${decisionSlice.data.checkedAt || '시각 미상'})`,
+    }));
+  } else if (decStatus === 'error') {
+    decCard.appendChild(createEl('p', {
+      text: `[ERROR / 요청 실패] ${extractErrorText(decisionSlice?.error, '판정 요청 실패')} (차단/허용 판정이 아님 · 허용 금지)`,
+    }));
+  } else {
+    decCard.appendChild(createEl('p', {
+      className: 'muted',
+      text: '업무 앱 탭에서 앱을 선택하면 allow / deny / challenge / unknown 판정 사유가 이곳에 기록됩니다.',
+    }));
+  }
+  panel.appendChild(decCard);
+
+  // 2. 선택된(또는 최신) 보안 사건 감사 상세 및 규칙 매칭
+  const evCard = createEl('div', { className: 'soc-audit-card' });
+  evCard.appendChild(createEl('h4', { text: '선택 사건 상태·근거·규칙 매칭 (Event Rule Breakdown)' }));
+  if (selectedEvent) {
+    const evProv = resolveProvenance({ mode, id: selectedEvent.id });
+    const headRow = createEl('p', {
+      text: `사건 ${selectedEvent.id} (${mapKind(selectedEvent.kind)}) · 앱: ${selectedEvent.appId || '없음'} `,
+    });
+    headRow.appendChild(createProvenanceBadgeEl(evProv));
+    evCard.appendChild(headRow);
+
+    evCard.appendChild(createEl('p', {
+      className: 'muted',
+      text: `상태 분해 — 접속: ${formatAccessState(selectedEvent.state?.access)} | 세션: ${formatSessionState(selectedEvent.state?.session)} | 기기: ${formatDeviceState(selectedEvent.state?.device)}`,
+    }));
+
+    const rules = Array.isArray(selectedEvent.rules) ? selectedEvent.rules : [];
+    const evidences = Array.isArray(selectedEvent.evidence) ? selectedEvent.evidence : [];
+    if (rules.length > 0 || evidences.length > 0) {
+      const ruleUl = createEl('ul', { className: 'soc-rule-list' });
+      for (const r of rules) {
+        ruleUl.appendChild(createEl('li', {
+          className: 'soc-rule-item',
+          text: `[규칙 ${r.id}] ${r.text || ''}`,
+        }));
+      }
+      for (const e of evidences) {
+        ruleUl.appendChild(createEl('li', {
+          className: 'soc-rule-item',
+          text: `[근거 ${e.id}] ${e.text || ''}`,
+        }));
+      }
+      evCard.appendChild(ruleUl);
+    }
+  } else {
+    evCard.appendChild(createEl('p', {
+      className: 'muted',
+      text: mode === 'disconnected'
+        ? '[실측값] 로컬 서버 연결 없음(disconnected) 상태이므로 수신된 보안 사건이 없습니다.'
+        : '현재 선택되거나 수신된 보안 사건이 없습니다.',
+    }));
+  }
+  panel.appendChild(evCard);
+
+  // 3. 전체 규칙 매칭 집계 및 UNV-01~04 안전 계약 경계
+  const unvCard = createEl('div', { className: 'soc-audit-card' });
+  unvCard.appendChild(createEl('h4', {
+    text: `누적 규칙 매칭 (${Array.isArray(matchedRules) ? matchedRules.length : 0}종) 및 UNV-01~04 미검증 보호 경계`,
+  }));
+  const unvList = createEl('ul', { className: 'soc-unv-list' });
+  for (const item of UNV_BOUNDARIES) {
+    unvList.appendChild(createEl('li', {
+      className: 'soc-unv-item',
+      text: `${item.code} ${item.title}: ${item.status} — ${item.detail}`,
+    }));
+  }
+  unvCard.appendChild(unvList);
+  panel.appendChild(unvCard);
+
+  return panel;
+}
+
 export function createStudentView() {
+  const socStore = {
+    identity: { me: { status: 'loading' }, devices: { status: 'loading' }, sessions: { status: 'loading' } },
+    decision: { status: 'idle', mode: null, data: null, error: null, appId: null },
+    decisionHistory: [],
+    lastDecisionKey: '',
+    events: { status: 'loading', mode: null, data: [], error: null },
+    status: { devices: { status: 'loading' }, sessions: { status: 'loading' }, notifications: [], diagnostics: { status: 'idle' }, mode: 'unknown' },
+    vulnerabilities: { status: 'idle', mode: null, data: null, error: null },
+  };
+
+  function syncGlobalSocRegions() {
+    if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+
+    const topMetricsEl = document.getElementById('soc-top-metrics');
+    if (topMetricsEl) {
+      const cards = aggregateSocTopCards(socStore);
+      const renderedGrid = buildSocMetricCardsDom(cards);
+      topMetricsEl.replaceChildren(...Array.from(renderedGrid.childNodes));
+    }
+
+    const leftTimelineEl = document.getElementById('soc-split-left-timeline');
+    const rightAuditEl = document.getElementById('soc-split-right-audit');
+    if (leftTimelineEl || rightAuditEl) {
+      const evSummary = normalizeEventsSummary(socStore.events);
+      const effectiveMode = socStore.events?.mode || socStore.status?.mode || 'unknown';
+
+      if (leftTimelineEl) {
+        const leftChildren = [
+          createEl('h3', { className: 'soc-panel-heading' }, [
+            createEl('span', { text: '시간순 보안 이벤트 추이 (Chronological Timeline)' }),
+            createProvenanceBadgeEl(evSummary.provenance),
+          ]),
+          createEl('p', {
+            className: 'muted',
+            text: `${evSummary.headline} — ${evSummary.subline}`,
+          }),
+        ];
+
+        if (evSummary.sortedEvents.length > 0) {
+          const tlList = createEl('ul', { className: 'soc-timeline-list' });
+          for (const ev of evSummary.sortedEvents.slice(0, 10)) {
+            const nodeTone = ev?.state?.access === 'denied' || ev?.kind === 'xdr'
+              ? 'node-deny'
+              : ev?.state?.access === 'allowed' && ev?.state?.device === 'compliant'
+                ? 'node-allow'
+                : ev?.state?.device === 'unknown' || ev?.state?.access === 'unknown'
+                  ? 'node-challenge'
+                  : 'node-unknown';
+            const evProv = resolveProvenance({ mode: effectiveMode, id: ev?.id });
+            const item = createEl('li', { className: `soc-timeline-node ${nodeTone}` }, [
+              createEl('div', { className: 'event-head' }, [
+                createEl('strong', { text: `${ev.id} · ${ev.summary || '요약 없음'}` }),
+                createEl('span', { className: 'tag', text: mapKind(ev.kind) }),
+                createProvenanceBadgeEl(evProv),
+              ]),
+              createEl('p', {
+                className: 'muted',
+                text: `시각: ${ev.at || '시각 미상'} · 앱: ${ev.appId || '없음'} · 접속: ${formatAccessState(ev.state?.access)} · 기기: ${formatDeviceState(ev.state?.device)}`,
+              }),
+            ]);
+            tlList.appendChild(item);
+          }
+          leftChildren.push(tlList);
+        } else {
+          leftChildren.push(createEl('p', {
+            className: 'state state-empty',
+            text: effectiveMode === 'disconnected'
+              ? '[실측값] 로컬 서버 연결 없음(disconnected) — 수신된 이벤트가 없으며 정상/허용으로 간주하지 않습니다.'
+              : '표시할 시간순 보안 이벤트가 없습니다.',
+          }));
+        }
+        leftTimelineEl.replaceChildren(...leftChildren);
+      }
+
+      if (rightAuditEl) {
+        const auditDom = buildAuditBreakdownPanelDom({
+          selectedEvent: evSummary.sortedEvents[0] || null,
+          decisionSlice: socStore.decision,
+          matchedRules: evSummary.matchedRules,
+          provenance: evSummary.provenance,
+          mode: effectiveMode,
+        });
+        rightAuditEl.replaceChildren(...Array.from(auditDom.childNodes));
+      }
+    }
+  }
+
   return {
     renderIdentity({ me, devices, sessions } = {}) {
-      const container = createEl('div', { className: 'student-identity-view' });
+      socStore.identity = { me, devices, sessions };
+      syncGlobalSocRegions();
+
+      const container = createEl('div', {
+        className: 'student-identity-view',
+        attrs: { role: 'region', 'aria-label': '신원 및 기기·세션 준수 현황' },
+      });
+
+      const idSummary = normalizeIdentitySummary({ me, devices, sessions });
+      container.appendChild(createEl('div', { className: 'row' }, [
+        createProvenanceBadgeEl(idSummary.provenance, true),
+      ]));
 
       // 1. me 가 에러인 경우: 사용자 정보를 노출하지 않고 오류 문구와 모드 안내만 표시
       if (me?.status === 'error') {
@@ -488,6 +1086,8 @@ export function createStudentView() {
       const ddUser = appendKvRow(dl, '사용자', userText, { 'data-student-user': '' });
       if (me?.status === 'ok') {
         appendInlineModeBadge(ddUser, me.mode);
+        ddUser.appendChild(document.createTextNode(' '));
+        ddUser.appendChild(createProvenanceBadgeEl(idSummary.provenance));
       }
 
       // (2) 기기
@@ -551,8 +1151,38 @@ export function createStudentView() {
     },
 
     renderDecision({ status, mode, data, error, appId } = {}) {
-      const container = createEl('div', { className: 'student-decision-view' });
+      socStore.decision = { status, mode, data, error, appId };
+      if (status === 'ok' || status === 'error') {
+        const key = `${status}|${data?.appId || appId || ''}|${data?.decision || ''}|${data?.checkedAt || ''}|${error?.code || ''}`;
+        if (key !== socStore.lastDecisionKey) {
+          socStore.lastDecisionKey = key;
+          socStore.decisionHistory.unshift({
+            status,
+            mode,
+            appId: data?.appId || appId || '업무 앱',
+            decision: status === 'ok' ? (data?.decision || 'unknown') : 'error',
+            reason: status === 'ok' ? (data?.reason || '이유 정보 없음') : extractErrorText(error, '요청 실패'),
+            checkedAt: data?.checkedAt || null,
+          });
+          if (socStore.decisionHistory.length > 20) socStore.decisionHistory.length = 20;
+        }
+      }
+      syncGlobalSocRegions();
+
+      const container = createEl('div', {
+        className: 'student-decision-view',
+        attrs: { role: 'region', 'aria-label': '업무 앱 인가 판정 및 감사 분석 뷰' },
+      });
       renderModeBadges(container, [{ mode }]);
+
+      const provenance = resolveProvenance({
+        mode,
+        id: data?.appId || appId,
+        forceLive: status === 'idle' || status === 'error',
+      });
+      container.appendChild(createEl('div', { className: 'row' }, [
+        createProvenanceBadgeEl(provenance, true),
+      ]));
 
       // 1. 요청 전 (idle)
       if (status === 'idle' || !status) {
@@ -591,7 +1221,7 @@ export function createStudentView() {
         return container;
       }
 
-      // 4. 판정 수신 (ok)
+      // 4. 판정 수신 (ok) — 2-Column Split View (Left: 판정 이력 타임라인, Right: 상세 판정 감사 및 규칙 분석)
       if (status === 'ok') {
         const info = mapDecision(data?.decision);
         const targetApp = data?.appId || appId || '지정되지 않음';
@@ -600,6 +1230,47 @@ export function createStudentView() {
         container.appendChild(createEl('div', { className: info.className }, [
           createEl('p', { text: `${targetApp} · ${info.text}` }),
           createEl('p', { className: 'muted', text: info.note }),
+        ]));
+
+        const splitWrap = createEl('div', {
+          className: 'audit-split-view',
+          attrs: { role: 'region', 'aria-label': '업무 앱 판정 타임라인 및 상세 감사 2단 분할 뷰' },
+        });
+
+        const leftCol = createEl('div', {
+          className: 'soc-split-panel soc-timeline-panel',
+          attrs: { role: 'region', 'aria-label': '업무 앱 판정 요청 타임라인' },
+        });
+        leftCol.appendChild(createEl('h3', { className: 'soc-panel-heading' }, [
+          createEl('span', { text: '판정 타임라인 추이 (Decision Timeline)' }),
+          createProvenanceBadgeEl(provenance),
+        ]));
+        const tlList = createEl('ul', { className: 'soc-timeline-list' });
+        const historyItems = socStore.decisionHistory.length > 0
+          ? socStore.decisionHistory
+          : [{ appId: targetApp, decision: info.code, reason: data?.reason || '이유 정보 없음', checkedAt: data?.checkedAt, mode }];
+        for (const item of historyItems.slice(0, 6)) {
+          const itemInfo = mapDecision(item.decision);
+          const itemProv = resolveProvenance({ mode: item.mode || mode, id: item.appId });
+          tlList.appendChild(createEl('li', {
+            className: `soc-timeline-node node-${itemInfo.code}`,
+          }, [
+            createEl('div', { className: 'event-head' }, [
+              createEl('strong', { text: `${item.appId} → ${itemInfo.text}` }),
+              createProvenanceBadgeEl(itemProv),
+            ]),
+            createEl('p', { className: 'muted', text: `사유: ${item.reason} · 시각: ${item.checkedAt || '시각 정보 없음'}` }),
+          ]));
+        }
+        leftCol.appendChild(tlList);
+
+        const rightCol = createEl('div', {
+          className: 'soc-split-panel soc-audit-panel',
+          attrs: { role: 'region', 'aria-label': '판정 상세 감사 및 규칙 매칭 내역' },
+        });
+        rightCol.appendChild(createEl('h3', { className: 'soc-panel-heading' }, [
+          createEl('span', { text: '상세 판정 감사 (Decision Audit Breakdown)' }),
+          createProvenanceBadgeEl(provenance),
         ]));
 
         const dl = createEl('dl', { className: 'kv' });
@@ -614,8 +1285,12 @@ export function createStudentView() {
             : `${mode} (정상 연결)`;
           appendKvRow(dl, '데이터 상태', modeText);
         }
+        appendKvRow(dl, '데이터 출처', provenance.fullLabel);
 
-        container.appendChild(dl);
+        rightCol.appendChild(dl);
+        splitWrap.appendChild(leftCol);
+        splitWrap.appendChild(rightCol);
+        container.appendChild(splitWrap);
         return container;
       }
 
@@ -627,8 +1302,19 @@ export function createStudentView() {
     },
 
     renderEvents({ status, mode, data, error } = {}) {
-      const container = createEl('div', { className: 'student-events-view' });
+      socStore.events = { status, mode, data, error };
+      syncGlobalSocRegions();
+
+      const container = createEl('div', {
+        className: 'student-events-view',
+        attrs: { role: 'region', 'aria-label': '보안 기록 타임라인 및 감사 로그 2단 분할 뷰' },
+      });
       renderModeBadges(container, [{ mode }]);
+
+      const evSummary = normalizeEventsSummary({ status, mode, data, error });
+      container.appendChild(createEl('div', { className: 'row' }, [
+        createProvenanceBadgeEl(evSummary.provenance, true),
+      ]));
 
       // 1. 로딩 상태
       if (status === 'loading') {
@@ -651,9 +1337,7 @@ export function createStudentView() {
       }
 
       // 3. 원본 보존 및 최신순(at 내림차순) 정렬
-      const sortedEvents = Array.isArray(data)
-        ? [...data].sort((a, b) => new Date(b?.at || 0).getTime() - new Date(a?.at || 0).getTime())
-        : [];
+      const sortedEvents = evSummary.sortedEvents;
 
       if (sortedEvents.length === 0) {
         container.appendChild(createEl('p', {
@@ -705,8 +1389,35 @@ export function createStudentView() {
 
       container.appendChild(filterBox);
 
+      // Bottom 2-Column Split View (Left: Chronological Security Event Timeline, Right: Detailed Audit & Rule Breakdown)
+      const splitView = createEl('div', {
+        className: 'audit-split-view',
+        attrs: {
+          role: 'region',
+          'aria-label': '하단 2단 분할 뷰: 좌측 시간순 이벤트 타임라인, 우측 상세 감사 및 규칙 매칭 분석',
+        },
+      });
+
+      const leftTimelineCol = createEl('div', {
+        className: 'soc-split-panel soc-timeline-panel',
+        attrs: { role: 'region', 'aria-label': '좌측: 시간순 보안 이벤트 추이 및 타임라인' },
+      });
+      leftTimelineCol.appendChild(createEl('h3', { className: 'soc-panel-heading' }, [
+        createEl('span', { text: `시간순 보안 이벤트 타임라인 (${sortedEvents.length}건)` }),
+        createProvenanceBadgeEl(evSummary.provenance),
+      ]));
+
       const listEl = createEl('ul', { className: 'records' });
-      container.appendChild(listEl);
+      leftTimelineCol.appendChild(listEl);
+
+      const rightAuditCol = createEl('div', {
+        className: 'soc-audit-host',
+        attrs: { role: 'region', 'aria-label': '우측: 상세 감사 로그 및 규칙 매칭 분석' },
+      });
+
+      splitView.appendChild(leftTimelineCol);
+      splitView.appendChild(rightAuditCol);
+      container.appendChild(splitView);
 
       function createDetailBox(ev) {
         const box = createEl('div', {
@@ -791,6 +1502,18 @@ export function createStudentView() {
           return true;
         });
 
+        const activeAuditEvent = (selectedDetailId && filtered.find((e) => e.id === selectedDetailId))
+          || filtered[0]
+          || sortedEvents[0]
+          || null;
+        rightAuditCol.replaceChildren(buildAuditBreakdownPanelDom({
+          selectedEvent: activeAuditEvent,
+          decisionSlice: socStore.decision,
+          matchedRules: evSummary.matchedRules,
+          provenance: evSummary.provenance,
+          mode,
+        }));
+
         if (filtered.length === 0) {
           listEl.appendChild(createEl('li', { className: 'records-empty' }, [
             createEl('p', { className: 'state state-empty', text: '표시할 기록이 없습니다.' }),
@@ -802,6 +1525,7 @@ export function createStudentView() {
           const summaryText = ev.summary || '요약 없음';
           const appText = ev.appId || '앱을 확인할 수 없음';
           const kindText = mapKind(ev.kind);
+          const evProv = resolveProvenance({ mode, id: ev.id });
 
           const li = createEl('li', {
             className: 'event',
@@ -811,6 +1535,7 @@ export function createStudentView() {
           li.appendChild(createEl('div', { className: 'event-head' }, [
             createEl('h3', { text: summaryText }),
             createEl('span', { className: 'tag', text: kindText }),
+            createProvenanceBadgeEl(evProv),
           ]));
 
           li.appendChild(createEl('p', {
@@ -844,14 +1569,34 @@ export function createStudentView() {
     },
 
     renderStatus({ devices, sessions, notifications, diagnostics, mode } = {}) {
-      const container = createEl('div', { className: 'student-status-view' });
+      socStore.status = { devices, sessions, notifications, diagnostics, mode };
+      syncGlobalSocRegions();
+
+      const container = createEl('div', {
+        className: 'student-status-view',
+        attrs: { role: 'region', 'aria-label': 'SOC 상태 집계 및 시스템 진단 매트릭스' },
+      });
       renderModeBadges(container, [{ mode }]);
 
+      // Top 4 SOC Metric Cards rendered via normalized state aggregation
+      const socCards = aggregateSocTopCards(socStore);
+      container.appendChild(buildSocMetricCardsDom(socCards));
+
       // 1. 등록 기기 상태 (devices)
+      const devProv = resolveProvenance({
+        mode: devices?.mode || mode,
+        ids: Array.isArray(devices?.data) ? devices.data.map((d) => d?.id) : [],
+        forceLive: devices?.status === 'error' || mode === 'disconnected',
+      });
       const secDevices = createEl('section', {
         className: 'status-section',
         attrs: { 'data-student-section': 'devices' },
-      }, [createEl('h3', { text: '등록 기기 상태' })]);
+      }, [
+        createEl('h3', { className: 'soc-panel-heading' }, [
+          createEl('span', { text: '등록 기기 상태' }),
+          createProvenanceBadgeEl(devProv),
+        ]),
+      ]);
 
       if (devices?.status === 'loading') {
         secDevices.appendChild(createEl('p', {
@@ -883,11 +1628,19 @@ export function createStudentView() {
       container.appendChild(secDevices);
 
       // 2. 현재 세션 연결 상태 (sessions)
+      const sessProv = resolveProvenance({
+        mode: sessions?.mode || mode,
+        ids: Array.isArray(sessions?.data) ? sessions.data.map((s) => s?.id) : [],
+        forceLive: sessions?.status === 'error' || mode === 'disconnected',
+      });
       const secSessions = createEl('section', {
         className: 'status-section',
         attrs: { 'data-student-section': 'sessions' },
       }, [
-        createEl('h3', { text: '현재 세션 연결 상태' }),
+        createEl('h3', { className: 'soc-panel-heading' }, [
+          createEl('span', { text: '현재 세션 연결 상태' }),
+          createProvenanceBadgeEl(sessProv),
+        ]),
         createEl('p', {
           className: 'muted',
           text: '세션은 지금 검증된 연결 하나만 표시되며 지난 세션 목록이 아닙니다.',
@@ -924,10 +1677,16 @@ export function createStudentView() {
       container.appendChild(secSessions);
 
       // 3. 상태 및 보안 알림 (notifications)
+      const notiProv = resolveProvenance({ mode, forceLive: mode !== 'demo' });
       const secNoti = createEl('section', {
         className: 'status-section',
         attrs: { 'data-student-section': 'notifications' },
-      }, [createEl('h3', { text: '상태 및 보안 알림' })]);
+      }, [
+        createEl('h3', { className: 'soc-panel-heading' }, [
+          createEl('span', { text: '상태 및 보안 알림' }),
+          createProvenanceBadgeEl(notiProv),
+        ]),
+      ]);
 
       if (!Array.isArray(notifications) || notifications.length === 0) {
         secNoti.appendChild(createEl('p', {
@@ -954,12 +1713,16 @@ export function createStudentView() {
       }
       container.appendChild(secNoti);
 
-      // 4. 시스템 진단 정보 및 도움정보 복사 (diagnostics)
+      // 4. 시스템 진단 정보 및 도움정보 복사 (diagnostics — 항상 [실측값])
+      const diagProv = resolveProvenance({ forceLive: true });
       const secDiag = createEl('section', {
         className: 'status-section',
         attrs: { 'data-student-section': 'diagnostics' },
       }, [
-        createEl('h3', { text: '시스템 진단 정보' }),
+        createEl('h3', { className: 'soc-panel-heading' }, [
+          createEl('span', { text: '시스템 진단 정보' }),
+          createProvenanceBadgeEl(diagProv),
+        ]),
         createEl('p', {
           className: 'muted',
           text: '진단 정보는 제공 화면이 조회한 안전한 점검 결과이며 학생 구현에서 직접 요청하지 않습니다.',
@@ -1058,12 +1821,18 @@ export function createStudentView() {
     },
 
     renderVulnerabilities({ status, mode, data, error } = {}) {
+      socStore.vulnerabilities = { status, mode, data, error };
+      syncGlobalSocRegions();
+
       const effectiveStatus = status || 'idle';
       const container = createEl('div', {
         className: 'student-vulnerabilities-view',
         attrs: { 'data-student-vuln-status': effectiveStatus },
       });
       renderModeBadges(container, [{ mode }]);
+      container.appendChild(createEl('div', { className: 'row' }, [
+        createProvenanceBadgeEl(resolveProvenance({ forceLive: true }), true),
+      ]));
 
       // 1. 조회 대기 (idle)
       if (effectiveStatus === 'idle') {
