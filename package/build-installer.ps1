@@ -104,23 +104,6 @@ foreach ($Item in $ProtectedFiles) {
   Write-Ok "on-client/$($Item.Rel) SHA-256 integrity verified ($ActualHash)"
 }
 
-# Run npm --prefix on-client run check
-Write-Host "  [RUN] npm --prefix on-client run check" -ForegroundColor Gray
-& npm --prefix $OnClient run check
-if ($LASTEXITCODE -ne 0) {
-  Stop-Build "npm --prefix on-client run check failed with exit code $LASTEXITCODE" $LASTEXITCODE
-}
-Write-Ok "student/extension.mjs static syntax check passed (0 error)"
-
-# Run node --check on-client/src/server.mjs
-$ServerPath = Join-Path $OnClient "src\server.mjs"
-Write-Host "  [RUN] node --check on-client/src/server.mjs" -ForegroundColor Gray
-& $NodeCmd.Source --check $ServerPath
-if ($LASTEXITCODE -ne 0) {
-  Stop-Build "node --check on-client/src/server.mjs failed with exit code $LASTEXITCODE" $LASTEXITCODE
-}
-Write-Ok "src/server.mjs static syntax check passed (0 error)"
-
 # Non-admin PC status pre-flight inspection (node:os + fs.statfsSync, no admin privileges required)
 Write-Host "  [RUN] Non-admin PC status pre-flight inspection (node:os + fs.statfsSync)" -ForegroundColor Gray
 $PcProbeScript = @'
@@ -146,15 +129,17 @@ const totalMemGb = Number((os.totalmem() / (1024 ** 3)).toFixed(2));
 const freeMemGb = Number((os.freemem() / (1024 ** 3)).toFixed(2));
 const usedMemGb = Number((totalMemGb - freeMemGb).toFixed(2));
 const memPct = totalMemGb > 0 ? Number(((usedMemGb / totalMemGb) * 100).toFixed(1)) : null;
-let diskFreeGb = null, diskTotalGb = null, diskReason = null;
+let diskFreeGb = null, diskTotalGb = null, diskUsedGb = null, diskPct = null, diskReason = null;
 try {
   const st = fs.statfsSync(process.cwd());
   diskFreeGb = Number(((st.bavail * st.bsize) / (1024 ** 3)).toFixed(2));
   diskTotalGb = Number(((st.blocks * st.bsize) / (1024 ** 3)).toFixed(2));
+  diskUsedGb = Number((diskTotalGb - diskFreeGb).toFixed(2));
+  diskPct = diskTotalGb > 0 ? Number(((diskUsedGb / diskTotalGb) * 100).toFixed(1)) : null;
 } catch (err) {
   diskReason = err?.message || 'fs.statfsSync failed';
 }
-console.log(JSON.stringify({
+const payload = {
   measuredAt,
   privilegeMode: 'normal-user (non-admin)',
   cpu: {
@@ -178,10 +163,13 @@ console.log(JSON.stringify({
     status: diskFreeGb !== null ? '\uC2E4\uCE21\uAC12' : '\uD655\uC778 \uBD88\uAC00',
     freeGb: diskFreeGb,
     totalGb: diskTotalGb,
+    usedGb: diskUsedGb,
+    usagePercent: diskPct,
     unit: 'GB',
     reason: diskFreeGb !== null ? 'node:fs.statfsSync() (non-admin)' : diskReason
   }
-}));
+};
+console.log(JSON.stringify(payload));
 '@
 $PcStatusJsonRaw = (& $NodeCmd.Source --input-type=module -e $PcProbeScript 2>$null | Out-String).Trim()
 if ($PcStatusJsonRaw) {
@@ -195,6 +183,23 @@ if ($PcStatusJsonRaw) {
     Write-InfoMsg "[Unverified] Disk: $($PcStatusObj.disk.reason)"
   }
 }
+
+# Run npm --prefix on-client run check
+Write-Host "  [RUN] npm --prefix on-client run check" -ForegroundColor Gray
+& npm --prefix $OnClient run check
+if ($LASTEXITCODE -ne 0) {
+  Stop-Build "npm --prefix on-client run check failed with exit code $LASTEXITCODE" $LASTEXITCODE
+}
+Write-Ok "student/extension.mjs static syntax check passed (0 error)"
+
+# Run node --check on-client/src/server.mjs
+$ServerPath = Join-Path $OnClient "src\server.mjs"
+Write-Host "  [RUN] node --check on-client/src/server.mjs" -ForegroundColor Gray
+& $NodeCmd.Source --check $ServerPath
+if ($LASTEXITCODE -ne 0) {
+  Stop-Build "node --check on-client/src/server.mjs failed with exit code $LASTEXITCODE" $LASTEXITCODE
+}
+Write-Ok "src/server.mjs static syntax check passed (0 error)"
 
 # ============================================================================
 # Step 2: Clean Staging into package/stage/
@@ -266,6 +271,7 @@ $StartCmdContent = @'
 setlocal
 set "APP_ROOT=%~dp0on-client"
 set "START_PS1=%APP_ROOT%\tools\start-alekov.ps1"
+set "NODE_OPTIONS=--import ./student/pc-status-runtime.mjs"
 if not exist "%START_PS1%" (
   echo [ERROR] start-alekov.ps1 not found: "%START_PS1%"
   exit /b 1
@@ -281,6 +287,7 @@ $StartDemoCmdContent = @'
 setlocal
 set "APP_ROOT=%~dp0on-client"
 set "START_PS1=%APP_ROOT%\tools\start-alekov.ps1"
+set "NODE_OPTIONS=--import ./student/pc-status-runtime.mjs"
 if not exist "%START_PS1%" (
   echo [ERROR] start-alekov.ps1 not found: "%START_PS1%"
   exit /b 1
@@ -293,8 +300,10 @@ Set-Content -LiteralPath $StartDemoCmdPath -Value $StartDemoCmdContent -Encoding
 $RunVbsPath = Join-Path $StageDir "run-keshev.vbs"
 $RunVbsContent = @'
 Option Explicit
-Dim shell, fso, baseDir, psScript, cmd
+Dim shell, env, fso, baseDir, psScript, cmd
 Set shell = CreateObject("WScript.Shell")
+Set env = shell.Environment("PROCESS")
+env("NODE_OPTIONS") = "--import ./student/pc-status-runtime.mjs"
 Set fso = CreateObject("Scripting.FileSystemObject")
 baseDir = fso.GetParentFolderName(WScript.ScriptFullName)
 psScript = baseDir & "\on-client\tools\start-alekov.ps1"
