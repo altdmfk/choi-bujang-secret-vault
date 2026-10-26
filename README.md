@@ -353,23 +353,42 @@ flowchart LR
   - Windows 전용 기능: CurrentUser DPAPI 자격 보관함, PowerShell 네이티브 레지스트리, Native 계정 연결 모듈
   - 비-Windows 환경(macOS, Linux): 기본 웹 UI 및 데모 실행 정상 지원. 외부 SDP mTLS 연결은 코드상 플랫폼 독립 구현이나 실물 미실측에 따른 「미검증 지원 범위」로 명시
 
-### 7. Final 2일차: 케셰브(Keshev) 내 PC 상태 비관리자 점검 및 추이 비교(Δ) 관제 대시보드
+### 7. Final 2~3일차: 케셰브(Keshev) 네트워크·방화벽(읽기 전용)·Windows 기록(`System`·`Application`) 점검 및 관제 대시보드 패키징
 - **현재 작동하는 기능**:
-  - **관제 대시보드형 화면 틀**: 상단 4대 상태 카드(`#soc-top-metrics`) 및 하단 2단 분할 뷰(좌측: 추이 비교 및 이벤트 타임라인, 우측: 내 PC 상태 비관리자 점검 및 상세 감사 로그)
-  - **직전 스냅샷 대비 추이 비교(Δ)**: 다시 불러오기/판정 시점마다 준수 기기(`대`), 활성 세션(`건`), 보안 사건(`건`), 위험 기록(`건`), 취약점(`건`) 증감(`+N`, `-N`, `±0`) 계산 및 표시
-  - **비관리자 일반 권한 내 PC 상태 점검**: 브라우저 표준 API(`navigator.hardwareConcurrency`, `performance.memory`, `navigator.storage.estimate()`) 및 비침습적 일반 권한 OS 런타임 브리지(`student/pc-status-runtime.mjs`, `node:os`, `fs.statfsSync`)를 통한 실시간 실측(CPU %, RAM GB, 디스크 GB). 읽지 못한 값은 예시값으로 위장하지 않고 `[확인 불가]` 사유 명시
-  - **불필요 로직 및 미요청 기능 제거**: 하드코딩된 예시값 일체 배제, 미요청된 관리자 권한 전용 하드웨어 센서(온도·SMART·커널 드라이버) 카드 및 `UNV-01~04` 임의 코드 제거, 중복 브라우저 Node 모듈 호출 코드 정리
-  - **출처 및 단위·잰 시각 체계**: `[제공 기능]` vs `[내가 바꾼 부분]`, `[실측값]` vs `[예시값]` vs `[확인 불가]` 배지 적용 및 모든 수치에 단위(`대`, `건`, `종`, `개`, `코어`, `MB`, `GB`, `%`)와 `잰 시각` 부착
-  - **빌드 자동화 파이프라인**: Pre-flight 단계에서 일반 권한 Node.js(`node:os`, `fs.statfsSync`) 내 PC 상태(CPU 사용률/코어, 메모리, 디스크) 실측값 검증, 런처 스크립트(`start-keshev.cmd` 등) 런타임 브리지 자동 주입 및 로그(`package/stage/userdata/logs/pc-status-preflight.json`) 저장
+  - **관제 대시보드형 화면 틀**: 상단 4대 상태 카드(`#soc-top-metrics`: `01~03` SDP 연동 영역 + `04` 내 PC 로컬 실측 영역) 및 하단 2단 분할 뷰(`#soc-bottom-split`: 좌측 추이 비교(Δ) 및 이벤트 타임라인, 우측 내 PC 네트워크·방화벽·Windows 기록 점검 카드 및 역할 분리·상세 감사 로그)
+  - **내 PC 네트워크·방화벽(읽기 전용)·Windows 기록(`System`·`Application`) 비관리자 실측**:
+    - **네트워크 구성 (`[실측값]`)**: 활성 인터페이스 수(`4개`), 주 어댑터(`이더넷` Realtek PCIe GbE Family Controller `192.168.3.2/24`, VMware `VMnet1`·`VMnet8`·`VMnet2`), 기본 게이트웨이(`192.168.3.1`), DNS 서버(`168.126.63.1, 168.126.63.2`), MAC 주소 조회
+    - **방화벽 설정 (`[실측값]` · 읽기 전용)**: Windows Defender 방화벽 3대 프로필(`Domain`·`Private`·`Public`) 활성 여부(`3/3 켜짐`) 및 인바운드(`Block`)·아웃바운드(`Allow`) 기본 동작을 **읽기만 하고 바꾸지 않음**
+    - **최근 24시간 Windows 기록 (`System` · `Application`, `[실측값]`)**: `System` 경고·오류 건수 및 `Application` 경고·오류 건수를 집계하며, 화면 상단 카드·하단 추이 비교·우측 점검 카드·감사 패널에 **`「이 건수는 침해나 공격 탐지 결과가 아닙니다」`** 문구를 표시
+    - **관리자 권한 필요 항목 (`「확인 불가」` 및 이유 표시)**: Windows `Security` 보안 감사 이벤트 로그(`SeSecurityPrivilege` 필요)와 방화벽 차단 패킷 로그(`pfirewall.log` / `PersistentStore` 정책 저장소)는 설정을 바꾸지 않고 **`「확인 불가」`** 배지와 사유로 표시
+    - **SDP 연결 상태와 로컬 PC 조회의 분리 (`「SDP 미연결」`)**: 외부 SDP 서버에 연결되지 않았을 때 상단 카드 01~03 및 하단 패널에 **`「SDP 미연결」`** 배지를 따로 표시하며, 내 PC 로컬 조회 결과(`[실측값]`)와 구분함
+  - **UTF-8 인코딩 및 타임아웃 방어**: `on-client/student/pc-status-runtime.mjs`에서 PowerShell `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` 지정, `4,500ms` 실행 타임아웃 방어, `4,000ms` 캐시 TTL을 적용하여 인코딩 깨짐 및 서버 응답 지연 방지
+  - **포장 형태 (기본 포장 뒤 Inno Setup 사용자 단위 설치 프로그램)**: `package/build-installer.ps1` 실행 시 `pc-status-runtime.mjs`의 `measureLiveNonAdminPcStatus()`를 단일 소스로 호출해 Pre-flight 실측 리포트(`package/stage/userdata/logs/pc-status-preflight.json`)를 저장하고, Inno Setup 6(`ISCC.exe`, `PrivilegesRequired=lowest`)으로 사용자 단위 설치 파일 **`package/dist/setup.exe`** 생성
+
+- **`[실측값]` vs `[예시값]` vs `「확인 불가」` vs `「SDP 미연결」` 구분 표**:
+
+| 구분 배지 | 대상 항목 | 이 PC에서 확인된 값 / 표시 내용 | 비고 |
+|---|---|---|---|
+| **`[실측값]`** | 내 PC 네트워크 구성 | 활성 어댑터 `4개` (`이더넷` `192.168.3.2/24`, 게이트웨이 `192.168.3.1`, DNS `168.126.63.1, 168.126.63.2`, `VMnet1·8·2`) | 일반 권한 읽기 전용 실측 |
+| **`[실측값]`** | 내 PC 방화벽 설정 (읽기 전용) | `Domain`·`Private`·`Public` 프로필 `3/3개 켜짐` (인바운드 `Block`, 아웃바운드 `Allow`) | **읽기 전용 (변경 안 함)** |
+| **`[실측값]`** | 최근 24시간 Windows 기록 (`System`·`Application`) | `System` 오류 `2건`·경고 `9건`(합계 `11건`), `Application` 오류 `0건`·경고 `6건`(합계 `6건`) | **「이 건수는 침해나 공격 탐지 결과가 아닙니다」** 명시 |
+| **`[실측값]`** | 내 PC 자원 (CPU·RAM·디스크) | CPU `16코어`, RAM 총 `15.84 GB`, 디스크 총 `465.65 GB` | `node:os` / `node:fs.statfsSync` 실측 |
+| **`「확인 불가」`** | 관리자 권한 전용 항목 | Windows `Security` 보안 감사 로그, 방화벽 `pfirewall.log` 및 `PersistentStore` 정책 저장소 | 관리자 권한 필요 — 설정 변경 없이 사유 표시 |
+| **`「SDP 미연결」`** | 외부 SDP 릴레이 서버 상태 | 기본 기동(`disconnected`) 및 데모 기동(`demo`) 모두 실제 외부 SDP 서버 미연결 상태 표시 | 로컬 PC 조회 결과(`[실측값]`)와 구분 표시 |
+| **`[예시값]`** | 데모 모드(`--demo`) SDP 가상 데이터 | 가상 업무 앱 3종(`allow`/`deny`/`challenge`), 가상 보안 사건 `1건`(`event-01`) | 실제 조회 결과가 아닌 설명용 값 (`demoEngine`) |
+
 - **다시 실행하는 방법**:
   ```powershell
-  # 문법 검사
+  # 1. 문법 검사
   npm --prefix on-client run check
 
-  # 프레임워크 무결성 검증, 내 PC 상태 실측 및 패키징 빌드
+  # 2. 프레임워크 무결성 검증, 내 PC 상태 실측, 기본 포장(package/stage) 및 Inno Setup 설치 파일(package/dist/setup.exe) 생성
   powershell -NoProfile -ExecutionPolicy Bypass -File .\package\build-installer.ps1
 
-  # 케셰브 로컬 대시보드 실행 (일반 권한 OS 실측 브리지 포함 데모 모드)
+  # 3-A. 케셰브 로컬 대시보드 기본 실행 (SDP 미연결 + 내 PC [실측값] 확인)
+  cd on-client; node --import ./student/pc-status-runtime.mjs src/server.mjs
+
+  # 3-B. 케셰브 로컬 대시보드 데모 실행 (SDP 미연결 + SDP [예시값] + 내 PC [실측값] 비교 확인)
   cd on-client; node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
   ```
 

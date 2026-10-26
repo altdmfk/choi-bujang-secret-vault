@@ -104,77 +104,17 @@ foreach ($Item in $ProtectedFiles) {
   Write-Ok "on-client/$($Item.Rel) SHA-256 integrity verified ($ActualHash)"
 }
 
-# Non-admin PC status pre-flight inspection (node:os + fs.statfsSync, no admin privileges required)
-Write-Host "  [RUN] Non-admin PC status pre-flight inspection (node:os + fs.statfsSync)" -ForegroundColor Gray
-$PcProbeScript = @'
-import os from 'node:os';
-import fs from 'node:fs';
-function sampleCpu() {
-  const cpus = os.cpus() || [];
-  let idle = 0, total = 0;
-  for (const c of cpus) {
-    for (const k of Object.keys(c.times)) total += c.times[k];
-    idle += c.times.idle;
-  }
-  return { idle, total, cores: cpus.length };
-}
-const s1 = sampleCpu();
-await new Promise((r) => setTimeout(r, 200));
-const s2 = sampleCpu();
-const measuredAt = new Date().toISOString();
-const totalDiff = s2.total - s1.total;
-const idleDiff = s2.idle - s1.idle;
-const cpuPct = totalDiff > 0 ? Number((((totalDiff - idleDiff) / totalDiff) * 100).toFixed(1)) : null;
-const totalMemGb = Number((os.totalmem() / (1024 ** 3)).toFixed(2));
-const freeMemGb = Number((os.freemem() / (1024 ** 3)).toFixed(2));
-const usedMemGb = Number((totalMemGb - freeMemGb).toFixed(2));
-const memPct = totalMemGb > 0 ? Number(((usedMemGb / totalMemGb) * 100).toFixed(1)) : null;
-let diskFreeGb = null, diskTotalGb = null, diskUsedGb = null, diskPct = null, diskReason = null;
-try {
-  const st = fs.statfsSync(process.cwd());
-  diskFreeGb = Number(((st.bavail * st.bsize) / (1024 ** 3)).toFixed(2));
-  diskTotalGb = Number(((st.blocks * st.bsize) / (1024 ** 3)).toFixed(2));
-  diskUsedGb = Number((diskTotalGb - diskFreeGb).toFixed(2));
-  diskPct = diskTotalGb > 0 ? Number(((diskUsedGb / diskTotalGb) * 100).toFixed(1)) : null;
-} catch (err) {
-  diskReason = err?.message || 'fs.statfsSync failed';
-}
-const payload = {
-  measuredAt,
-  privilegeMode: 'normal-user (non-admin)',
-  cpu: {
-    status: cpuPct !== null ? '\uC2E4\uCE21\uAC12' : '\uD655\uC778 \uBD88\uAC00',
-    usagePercent: cpuPct,
-    usageUnit: '%',
-    logicalCores: s2.cores,
-    coreUnit: '\uCF54\uC5B4',
-    reason: cpuPct !== null ? 'node:os.cpus() 200ms tick delta (non-admin)' : 'CPU tick delta unavailable'
-  },
-  memory: {
-    status: '\uC2E4\uCE21\uAC12',
-    usedGb: usedMemGb,
-    freeGb: freeMemGb,
-    totalGb: totalMemGb,
-    usagePercent: memPct,
-    unit: 'GB',
-    reason: 'node:os.totalmem()/freemem() (non-admin)'
-  },
-  disk: {
-    status: diskFreeGb !== null ? '\uC2E4\uCE21\uAC12' : '\uD655\uC778 \uBD88\uAC00',
-    freeGb: diskFreeGb,
-    totalGb: diskTotalGb,
-    usedGb: diskUsedGb,
-    usagePercent: diskPct,
-    unit: 'GB',
-    reason: diskFreeGb !== null ? 'node:fs.statfsSync() (non-admin)' : diskReason
-  }
-};
-console.log(JSON.stringify(payload));
-'@
-$PcStatusJsonRaw = (& $NodeCmd.Source --input-type=module -e $PcProbeScript 2>$null | Out-String).Trim()
+# Non-admin PC status pre-flight inspection reusing student/pc-status-runtime.mjs (single source of truth)
+Write-Host "  [RUN] Non-admin read-only PC pre-flight inspection via on-client/student/pc-status-runtime.mjs" -ForegroundColor Gray
+$PcProbeInvoke = "import { measureLiveNonAdminPcStatus } from './on-client/student/pc-status-runtime.mjs'; const res = await measureLiveNonAdminPcStatus(); process.stdout.write(JSON.stringify(res.data, null, 2));"
+$PcStatusJsonRaw = (& $NodeCmd.Source --input-type=module -e $PcProbeInvoke 2>$null | Out-String).Trim()
 if ($PcStatusJsonRaw) {
   $PcStatusObj = $PcStatusJsonRaw | ConvertFrom-Json
-  Write-Ok "[Measured] Timestamp: $($PcStatusObj.measuredAt) (non-admin normal user privilege)"
+  Write-Ok "[Measured] Timestamp: $($PcStatusObj.measuredAt) ($($PcStatusObj.privilegeMode))"
+  Write-Ok "[Measured] Network: $($PcStatusObj.network.interfaceCount) active interfaces detected"
+  Write-Ok "[Measured] Firewall (read-only): $($PcStatusObj.firewall.enabledCount)/$($PcStatusObj.firewall.totalProfiles) profiles enabled"
+  Write-Ok "[Measured] Windows Logs (24h, non-intrusion): System (Error=$($PcStatusObj.windowsEvents.system.errorCount), Warning=$($PcStatusObj.windowsEvents.system.warningCount)), Application (Error=$($PcStatusObj.windowsEvents.application.errorCount), Warning=$($PcStatusObj.windowsEvents.application.warningCount))"
+  Write-Ok "[Unverified / Admin Required] Windows Security Log & Firewall pfirewall.log marked as 'Unverified' with reason"
   Write-Ok "[Measured] CPU: usage $($PcStatusObj.cpu.usagePercent)% / logical cores $($PcStatusObj.cpu.logicalCores) cores"
   Write-Ok "[Measured] Memory: used $($PcStatusObj.memory.usedGb) GB / total $($PcStatusObj.memory.totalGb) GB (free $($PcStatusObj.memory.freeGb) GB, $($PcStatusObj.memory.usagePercent)%)"
   if ($null -ne $PcStatusObj.disk.freeGb) {
@@ -244,10 +184,10 @@ if (Test-Path -LiteralPath (Join-Path $RepoRoot "package-lock.json")) {
   Copy-Item -LiteralPath (Join-Path $RepoRoot "package-lock.json") -Destination (Join-Path $StageApp "package-lock.json") -Force
 }
 
-# Save non-admin PC status pre-flight inspection log into stage/userdata/logs/pc-status-preflight.json
+# Save non-admin PC status pre-flight inspection log into stage/userdata/logs/pc-status-preflight.json (UTF-8 without BOM)
 if ($PcStatusJsonRaw) {
   $PcLogPath = Join-Path $StageDir "userdata\logs\pc-status-preflight.json"
-  Set-Content -LiteralPath $PcLogPath -Value $PcStatusJsonRaw -Encoding UTF8
+  [System.IO.File]::WriteAllText($PcLogPath, $PcStatusJsonRaw, [System.Text.UTF8Encoding]::new($false))
   Write-Ok "Saved non-admin PC status pre-flight report: $PcLogPath"
 }
 
