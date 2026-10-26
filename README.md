@@ -357,9 +357,10 @@ flowchart LR
 - **현재 작동하는 기능**:
   - **관제 대시보드형 화면 틀**: 상단 4대 상태 카드(`#soc-top-metrics`) 및 하단 2단 분할 뷰(좌측: 추이 비교 및 이벤트 타임라인, 우측: 내 PC 상태 비관리자 점검 및 상세 감사 로그)
   - **직전 스냅샷 대비 추이 비교(Δ)**: 다시 불러오기/판정 시점마다 준수 기기(`대`), 활성 세션(`건`), 보안 사건(`건`), 위험 기록(`건`), 취약점(`건`) 증감(`+N`, `-N`, `±0`) 계산 및 표시
-  - **비관리자 일반 권한 내 PC 상태 점검**: 브라우저 표준 API(`navigator.hardwareConcurrency`, `performance.memory`, `navigator.storage.estimate()`)를 통한 비관리자 실측 및 미제공 OS 센서 항목에 대한 명확한 `[확인 불가]` 사유 안내
+  - **비관리자 일반 권한 내 PC 상태 점검**: 브라우저 표준 API(`navigator.hardwareConcurrency`, `performance.memory`, `navigator.storage.estimate()`) 및 비침습적 일반 권한 OS 런타임 브리지(`student/pc-status-runtime.mjs`, `node:os`, `fs.statfsSync`)를 통한 실시간 실측(CPU %, RAM GB, 디스크 GB). 읽지 못한 값은 예시값으로 위장하지 않고 `[확인 불가]` 사유 명시
+  - **불필요 로직 및 미요청 기능 제거**: 하드코딩된 예시값 일체 배제, 미요청된 관리자 권한 전용 하드웨어 센서(온도·SMART·커널 드라이버) 카드 및 `UNV-01~04` 임의 코드 제거, 중복 브라우저 Node 모듈 호출 코드 정리
   - **출처 및 단위·잰 시각 체계**: `[제공 기능]` vs `[내가 바꾼 부분]`, `[실측값]` vs `[예시값]` vs `[확인 불가]` 배지 적용 및 모든 수치에 단위(`대`, `건`, `종`, `개`, `코어`, `MB`, `GB`, `%`)와 `잰 시각` 부착
-  - **빌드 자동화 파이프라인**: Pre-flight 단계에서 일반 권한 Node.js(`node:os`, `fs.statfsSync`) 내 PC 상태(CPU 사용률/코어, 메모리, 디스크) 실측값 검증 및 로그(`package/stage/userdata/logs/pc-status-preflight.json`) 저장
+  - **빌드 자동화 파이프라인**: Pre-flight 단계에서 일반 권한 Node.js(`node:os`, `fs.statfsSync`) 내 PC 상태(CPU 사용률/코어, 메모리, 디스크) 실측값 검증, 런처 스크립트(`start-keshev.cmd` 등) 런타임 브리지 자동 주입 및 로그(`package/stage/userdata/logs/pc-status-preflight.json`) 저장
 - **다시 실행하는 방법**:
   ```powershell
   # 문법 검사
@@ -368,8 +369,8 @@ flowchart LR
   # 프레임워크 무결성 검증, 내 PC 상태 실측 및 패키징 빌드
   powershell -NoProfile -ExecutionPolicy Bypass -File .\package\build-installer.ps1
 
-  # 케셰브 로컬 대시보드 실행 (데모 모드)
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\on-client\tools\start-alekov.ps1 -Port 5189 -Demo
+  # 케셰브 로컬 대시보드 실행 (일반 권한 OS 실측 브리지 포함 데모 모드)
+  cd on-client; node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
   ```
 
 ---
