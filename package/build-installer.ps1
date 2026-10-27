@@ -184,6 +184,28 @@ if (Test-Path -LiteralPath (Join-Path $RepoRoot "package-lock.json")) {
   Copy-Item -LiteralPath (Join-Path $RepoRoot "package-lock.json") -Destination (Join-Path $StageApp "package-lock.json") -Force
 }
 
+# Copy minimal node_modules package.json for approved public packages to support Stage 20 OSV scanning in packaged app
+$ApprovedPackages = @(
+  "@supabase/supabase-js",
+  "jose",
+  "tslib",
+  "@supabase/auth-js",
+  "@supabase/functions-js",
+  "@supabase/postgrest-js",
+  "@supabase/realtime-js",
+  "@supabase/storage-js"
+)
+foreach ($pkg in $ApprovedPackages) {
+  $sourcePkgJson = Join-Path $RepoRoot "node_modules\$pkg\package.json"
+  if (Test-Path -LiteralPath $sourcePkgJson) {
+    $targetPkgDir = Join-Path $StageApp "node_modules\$pkg"
+    if (-not (Test-Path -LiteralPath $targetPkgDir)) {
+      New-Item -ItemType Directory -Path $targetPkgDir -Force | Out-Null
+    }
+    Copy-Item -LiteralPath $sourcePkgJson -Destination (Join-Path $targetPkgDir "package.json") -Force
+  }
+}
+
 # Save non-admin PC status pre-flight inspection log into stage/userdata/logs/pc-status-preflight.json (UTF-8 without BOM)
 if ($PcStatusJsonRaw) {
   $PcLogPath = Join-Path $StageDir "userdata\logs\pc-status-preflight.json"
@@ -197,6 +219,11 @@ $EnvExampleContent = @'
 # Keshev Security Operations Dashboard - User Environment Configuration Example
 # Default Local Loopback Port (127.0.0.1)
 ON_PORT=5189
+
+# Stage 20 OSV Supply-Chain Vulnerability Scanner
+# ON_PROJECT_DIRECTORY points to the application root directory containing package-lock.json
+ON_PROJECT_DIRECTORY=
+ON_APPROVED_PUBLIC_PACKAGES=["@supabase/supabase-js","jose","tslib","@supabase/auth-js","@supabase/functions-js","@supabase/postgrest-js","@supabase/realtime-js","@supabase/storage-js"]
 
 # Optional Native Host / SDP Host Config Absolute Paths (Do not commit secrets)
 # NATIVE_HOST_CONFIG=C:\Users\<username>\AppData\Local\Keshev\userdata\config\native-host.json
@@ -212,6 +239,8 @@ setlocal
 set "APP_ROOT=%~dp0on-client"
 set "START_PS1=%APP_ROOT%\tools\start-alekov.ps1"
 set "NODE_OPTIONS=--import ./student/pc-status-runtime.mjs"
+set "ON_PROJECT_DIRECTORY=%APP_ROOT%"
+set "ON_APPROVED_PUBLIC_PACKAGES=["@supabase/supabase-js","jose","tslib","@supabase/auth-js","@supabase/functions-js","@supabase/postgrest-js","@supabase/realtime-js","@supabase/storage-js"]"
 if not exist "%START_PS1%" (
   echo [ERROR] start-alekov.ps1 not found: "%START_PS1%"
   exit /b 1
@@ -228,6 +257,8 @@ setlocal
 set "APP_ROOT=%~dp0on-client"
 set "START_PS1=%APP_ROOT%\tools\start-alekov.ps1"
 set "NODE_OPTIONS=--import ./student/pc-status-runtime.mjs"
+set "ON_PROJECT_DIRECTORY=%APP_ROOT%"
+set "ON_APPROVED_PUBLIC_PACKAGES=["@supabase/supabase-js","jose","tslib","@supabase/auth-js","@supabase/functions-js","@supabase/postgrest-js","@supabase/realtime-js","@supabase/storage-js"]"
 if not exist "%START_PS1%" (
   echo [ERROR] start-alekov.ps1 not found: "%START_PS1%"
   exit /b 1

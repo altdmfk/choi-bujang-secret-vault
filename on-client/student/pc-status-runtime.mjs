@@ -9,6 +9,32 @@ import http from 'node:http';
 import os from 'node:os';
 import fs from 'node:fs';
 import { execFile } from 'node:child_process';
+import crypto from 'node:crypto';
+import { resolve } from 'node:path';
+
+const DEFAULT_APPROVED_PACKAGES = JSON.stringify([
+  '@supabase/supabase-js',
+  'jose',
+  'tslib',
+  '@supabase/auth-js',
+  '@supabase/functions-js',
+  '@supabase/postgrest-js',
+  '@supabase/realtime-js',
+  '@supabase/storage-js',
+]);
+
+if (!process.env.ON_PROJECT_DIRECTORY) {
+  const candidateParent = resolve(process.cwd(), '..');
+  if (fs.existsSync(resolve(process.cwd(), 'package-lock.json'))) {
+    process.env.ON_PROJECT_DIRECTORY = resolve(process.cwd());
+  } else if (fs.existsSync(resolve(candidateParent, 'package-lock.json'))) {
+    process.env.ON_PROJECT_DIRECTORY = candidateParent;
+  }
+}
+
+if (!process.env.ON_APPROVED_PUBLIC_PACKAGES) {
+  process.env.ON_APPROVED_PUBLIC_PACKAGES = DEFAULT_APPROVED_PACKAGES;
+}
 
 const PROBE_CONFIG = Object.freeze({
   ENDPOINT_PATH: '/api/pc-status',
@@ -64,16 +90,20 @@ function readCpuTickSnapshot() {
 
 let lastCpuSnapshot = readCpuTickSnapshot();
 
-const cpuSamplerTimer = setInterval(() => {
-  try {
-    lastCpuSnapshot = readCpuTickSnapshot();
-  } catch {
-    // Ignore background sampling errors
-  }
-}, PROBE_CONFIG.CPU_SAMPLER_INTERVAL_MS);
+let cpuSamplerTimer = null;
+if (!globalThis.__ALEKOV_CPU_SAMPLER_STARTED__) {
+  globalThis.__ALEKOV_CPU_SAMPLER_STARTED__ = true;
+  cpuSamplerTimer = setInterval(() => {
+    try {
+      lastCpuSnapshot = readCpuTickSnapshot();
+    } catch {
+      // Ignore background sampling errors
+    }
+  }, PROBE_CONFIG.CPU_SAMPLER_INTERVAL_MS);
 
-if (typeof cpuSamplerTimer.unref === 'function') {
-  cpuSamplerTimer.unref();
+  if (typeof cpuSamplerTimer.unref === 'function') {
+    cpuSamplerTimer.unref();
+  }
 }
 
 function readNodeNetworkInterfacesFallback() {
@@ -243,6 +273,79 @@ function Read-WinLogSummary([string]$LogName, [datetime]$SinceTime) {
   }
 }
 
+$conns = @()
+try {
+  $conns = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue)
+} catch {}
+if ($conns.Count -eq 0) {
+  try {
+    $ipProps = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
+    $conns = @($ipProps.GetActiveTcpListeners() | ForEach-Object {
+      [pscustomobject]@{
+        LocalAddress = $_.Address.ToString()
+        LocalPort = $_.Port
+        OwningProcess = 0
+      }
+    })
+  } catch {}
+}
+
+$procMap = @{}
+try {
+  Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+    $procMap[$_.Id] = [string]$_.ProcessName
+  }
+} catch {}
+
+$targetPort = if ($env:ON_PORT) { [int]$env:ON_PORT } else { 5189 }
+$ports = @($conns | ForEach-Object {
+  $la = [string]$_.LocalAddress
+  $lp = [int]$_.LocalPort
+  $pidNum = [int]$_.OwningProcess
+  $pName = if ($procMap.ContainsKey($pidNum)) { $procMap[$pidNum] } else { if ($pidNum -eq 4) { 'System' } elseif ($pidNum -eq 0) { 'System/Idle' } else { 'Unknown' } }
+  $scope = if ($la -eq '127.0.0.1' -or $la -eq '::1') { 'loopback' } else { 'exposed' }
+  [pscustomobject]@{
+    port = $lp
+    localAddress = $la
+    pid = $pidNum
+    processName = $pName
+    scope = $scope
+    isKeshevPort = ($lp -eq $targetPort)
+  }
+})
+
+$startup = @()
+try {
+  $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+  if (Test-Path -LiteralPath $runKey) {
+    $props = Get-ItemProperty -LiteralPath $runKey -ErrorAction SilentlyContinue
+    if ($null -ne $props) {
+      foreach ($p in $props.PSObject.Properties) {
+        if ($p.Name -notmatch '^PS.*') {
+          $startup += [pscustomobject]@{
+            name = [string]$p.Name
+            commandOrPath = [string]$p.Value
+            source = 'HKCU_Run'
+          }
+        }
+      }
+    }
+  }
+} catch {}
+
+try {
+  $folder = [Environment]::GetFolderPath('Startup')
+  if ($folder -and (Test-Path -LiteralPath $folder)) {
+    Get-ChildItem -LiteralPath $folder -File -ErrorAction SilentlyContinue | ForEach-Object {
+      $startup += [pscustomobject]@{
+        name = [string]$_.Name
+        commandOrPath = [string]$_.FullName
+        source = 'StartupFolder'
+      }
+    }
+  }
+} catch {}
+
 $since = (Get-Date).AddHours(-${windowHours})
 [pscustomobject]@{
   nics = $nics
@@ -250,6 +353,8 @@ $since = (Get-Date).AddHours(-${windowHours})
   fwError = $fwError
   sysSummary = (Read-WinLogSummary -LogName 'System' -SinceTime $since)
   appSummary = (Read-WinLogSummary -LogName 'Application' -SinceTime $since)
+  ports = $ports
+  startup = $startup
 } | ConvertTo-Json -Depth 5 -Compress
 `;
 }
@@ -310,6 +415,8 @@ function buildFallbackInspectionResult(fallbackInterfaces, reasonMsg, measuredAt
       adminOnlyLogs: ADMIN_ONLY_EVENT_LOGS,
       reason: `확인 불가 — ${reasonMsg}`,
     },
+    listeningPorts: [],
+    startupItems: [],
   };
 }
 
@@ -428,6 +535,8 @@ function queryWindowsReadOnlyInspection() {
                 ? `Windows 이벤트 로그(System·Application, 최근 ${PROBE_CONFIG.EVENT_WINDOW_HOURS}시간 경고·오류) 읽기 전용 조회`
                 : 'Windows 이벤트 로그를 확인하지 못했습니다.',
             },
+            listeningPorts: Array.isArray(parsed?.ports) ? parsed.ports : [],
+            startupItems: Array.isArray(parsed?.startup) ? parsed.startup : [],
           };
 
           cachedWinInspection = result;
@@ -492,46 +601,196 @@ export async function measureLiveNonAdminPcStatus() {
     diskReason = err?.message || 'fs.statfsSync 조회 실패';
   }
 
+  const payloadData = {
+    measuredAt,
+    privilegeMode: PC_STATUS_NOTICES.PRIVILEGE_MODE,
+    readOnlyGuarantee: PC_STATUS_NOTICES.READ_ONLY,
+    nonIntrusionDisclaimer: PC_STATUS_NOTICES.NON_INTRUSION,
+    sdpSeparationNotice: PC_STATUS_NOTICES.SDP_SEPARATION,
+    cpu: {
+      usagePercent: cpuPct,
+      logicalCores: after.cores > 0 ? after.cores : null,
+      reason: cpuPct !== null
+        ? 'node:os.cpus() 틱 차분 측정 (일반 권한)'
+        : 'CPU 틱 차분을 계산할 수 없습니다.',
+    },
+    memory: {
+      usedGb: usedMemGb,
+      freeGb: freeMemGb,
+      totalGb: totalMemGb,
+      usagePercent: memPct,
+      reason: 'node:os.totalmem()/freemem() 조회 (일반 권한)',
+    },
+    disk: {
+      freeGb: diskFreeGb,
+      totalGb: diskTotalGb,
+      usedGb: diskUsedGb,
+      usagePercent: diskPct,
+      reason: diskFreeGb !== null
+        ? 'node:fs.statfsSync() 볼륨 조회 (일반 권한)'
+        : diskReason,
+    },
+    network: winInspection.network,
+    firewall: winInspection.firewall,
+    windowsEvents: winInspection.windowsEvents,
+    listeningPorts: winInspection.listeningPorts || [],
+    startupItems: winInspection.startupItems || [],
+    baselineDrift: computeBaselineDrift(winInspection.listeningPorts || [], winInspection.startupItems || []),
+  };
+
+  recordSnapshot(payloadData);
+  payloadData.snapshotHistory = snapshotHistory.slice();
+
   return {
     ok: true,
-    data: {
-      measuredAt,
-      privilegeMode: PC_STATUS_NOTICES.PRIVILEGE_MODE,
-      readOnlyGuarantee: PC_STATUS_NOTICES.READ_ONLY,
-      nonIntrusionDisclaimer: PC_STATUS_NOTICES.NON_INTRUSION,
-      sdpSeparationNotice: PC_STATUS_NOTICES.SDP_SEPARATION,
-      cpu: {
-        usagePercent: cpuPct,
-        logicalCores: after.cores > 0 ? after.cores : null,
-        reason: cpuPct !== null
-          ? 'node:os.cpus() 틱 차분 측정 (일반 권한)'
-          : 'CPU 틱 차분을 계산할 수 없습니다.',
-      },
-      memory: {
-        usedGb: usedMemGb,
-        freeGb: freeMemGb,
-        totalGb: totalMemGb,
-        usagePercent: memPct,
-        reason: 'node:os.totalmem()/freemem() 조회 (일반 권한)',
-      },
-      disk: {
-        freeGb: diskFreeGb,
-        totalGb: diskTotalGb,
-        usedGb: diskUsedGb,
-        usagePercent: diskPct,
-        reason: diskFreeGb !== null
-          ? 'node:fs.statfsSync() 볼륨 조회 (일반 권한)'
-          : diskReason,
-      },
-      network: winInspection.network,
-      firewall: winInspection.firewall,
-      windowsEvents: winInspection.windowsEvents,
-    },
+    data: payloadData,
   };
 }
 
-const originalCreateServer = http.createServer;
-http.createServer = function patchedCreateServer(optionsOrListener, maybeListener) {
+// Stage 21 Server-Memory Snapshot Ring Buffer (max 25)
+const MAX_SNAPSHOT_HISTORY = 25;
+const snapshotHistory = [];
+
+function recordSnapshot(data) {
+  if (!data) return;
+  const snap = {
+    timestamp: data.measuredAt || new Date().toISOString(),
+    cpuUsagePercent: data.cpu?.usagePercent ?? null,
+    cores: data.cpu?.logicalCores ?? null,
+    memoryUsagePercent: data.memory?.usagePercent ?? null,
+    memUsedGb: data.memory?.usedGb ?? null,
+    memTotalGb: data.memory?.totalGb ?? null,
+    diskUsagePercent: data.disk?.usagePercent ?? null,
+    diskFreeGb: data.disk?.freeGb ?? null,
+    interfaceCount: data.network?.interfaceCount ?? 0,
+    firewallEnabledCount: data.firewall?.enabledCount ?? 0,
+    winSysTotal: data.windowsEvents?.system?.totalCount ?? null,
+    winAppTotal: data.windowsEvents?.application?.totalCount ?? null,
+    listeningPortsCount: Array.isArray(data.listeningPorts) ? data.listeningPorts.length : 0,
+    startupItemsCount: Array.isArray(data.startupItems) ? data.startupItems.length : 0,
+    hasBaseline: Boolean(data.baselineDrift?.hasBaseline),
+    driftDeltaCount: data.baselineDrift?.hasBaseline
+      ? ((data.baselineDrift.newExposedPorts?.length || 0) +
+         (data.baselineDrift.newLoopbackPorts?.length || 0) +
+         (data.baselineDrift.addedStartupItems?.length || 0) +
+         (data.baselineDrift.removedStartupItems?.length || 0))
+      : 0,
+    mode: 'demo',
+  };
+  snapshotHistory.push(snap);
+  if (snapshotHistory.length > MAX_SNAPSHOT_HISTORY) {
+    snapshotHistory.shift();
+  }
+}
+
+// Stage 21 Ephemeral secret for HMAC signature verification
+const AUDIT_SIGNING_SECRET = crypto.randomBytes(32).toString('hex');
+
+// Stage 20 Baseline Pinning & Drift Detection State
+let pinnedBaseline = null;
+
+function computeBaselineDrift(currentPorts = [], currentStartup = []) {
+  if (!pinnedBaseline) {
+    return {
+      hasBaseline: false,
+      pinnedAt: null,
+      newExposedPorts: [],
+      newLoopbackPorts: [],
+      addedStartupItems: [],
+      removedStartupItems: [],
+    };
+  }
+
+  const baselinePortKeys = new Set(
+    (pinnedBaseline.listeningPorts || []).map((p) => `${p.port}:${p.localAddress}`)
+  );
+  const newPorts = currentPorts.filter(
+    (p) => !baselinePortKeys.has(`${p.port}:${p.localAddress}`)
+  );
+  const newExposedPorts = newPorts.filter((p) => p.scope === 'exposed');
+  const newLoopbackPorts = newPorts.filter((p) => p.scope === 'loopback');
+
+  const baselineStartupKeys = new Set(
+    (pinnedBaseline.startupItems || []).map((s) => `${s.source}:${s.name}`)
+  );
+  const currentStartupKeys = new Set(
+    currentStartup.map((s) => `${s.source}:${s.name}`)
+  );
+  const addedStartupItems = currentStartup.filter(
+    (s) => !baselineStartupKeys.has(`${s.source}:${s.name}`)
+  );
+  const removedStartupItems = (pinnedBaseline.startupItems || []).filter(
+    (s) => !currentStartupKeys.has(`${s.source}:${s.name}`)
+  );
+
+  return {
+    hasBaseline: true,
+    pinnedAt: pinnedBaseline.pinnedAt,
+    newExposedPorts,
+    newLoopbackPorts,
+    addedStartupItems,
+    removedStartupItems,
+  };
+}
+
+// Stage 17, 18, 19 Simulation & Demo Mode Interceptor
+const isDemoMode = process.argv.includes('--demo') || process.env.ON_AI_DEMO_EXPLAIN === '1';
+
+// In-memory action records for Stage 19 SOAR state machine
+const demoActionsMap = new Map();
+
+function sendDemoJson(res, statusCode, body) {
+  if (res.destroyed || res.writableEnded) return;
+  const payload = JSON.stringify(body);
+  res.writeHead(statusCode, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+    'x-on-request-id': crypto.randomUUID(),
+  });
+  res.end(payload);
+}
+
+function canonicalJsonStringify(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(canonicalJsonStringify).join(',') + ']';
+  }
+  const keys = Object.keys(obj).sort();
+  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJsonStringify(obj[k])).join(',') + '}';
+}
+
+async function readStreamBody(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 1048576) {
+      const err = new Error('REQUEST_TOO_LARGE');
+      err.code = 'REQUEST_TOO_LARGE';
+      throw err;
+    }
+    chunks.push(chunk);
+  }
+  if (chunks.length === 0) return {};
+  const raw = Buffer.concat(chunks).toString('utf8');
+  if (!raw.trim()) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (parseErr) {
+    const err = new Error('JSON_PARSE_ERROR: ' + parseErr.message);
+    err.code = 'INVALID_JSON_BODY';
+    throw err;
+  }
+}
+
+let originalCreateServer = http.createServer;
+if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
+  globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__ = true;
+  originalCreateServer = http.createServer;
+  http.createServer = function patchedCreateServer(optionsOrListener, maybeListener) {
   const isFuncFirst = typeof optionsOrListener === 'function';
   const originalListener = isFuncFirst ? optionsOrListener : maybeListener;
 
@@ -542,6 +801,8 @@ http.createServer = function patchedCreateServer(optionsOrListener, maybeListene
   const wrappedListener = async function pcStatusInterceptor(req, res) {
     try {
       const pathname = (req?.url || '/').split('?')[0];
+
+      // 1. Live PC Status Endpoint (항상 동작)
       if (req?.method === 'GET' && pathname === PROBE_CONFIG.ENDPOINT_PATH) {
         const payload = await measureLiveNonAdminPcStatus();
         res.writeHead(200, {
@@ -552,8 +813,456 @@ http.createServer = function patchedCreateServer(optionsOrListener, maybeListene
         res.end(JSON.stringify(payload));
         return;
       }
-    } catch {
-      // Fall through to default server handler if measurement fails
+
+      // 1-1. Live Baseline Pinning Endpoint (항상 동작)
+      if (req?.method === 'POST' && pathname === '/api/pc-status/baseline') {
+        const live = await measureLiveNonAdminPcStatus();
+        pinnedBaseline = {
+          pinnedAt: new Date().toISOString(),
+          listeningPorts: live.data?.listeningPorts || [],
+          startupItems: live.data?.startupItems || [],
+        };
+        res.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+        });
+        res.end(JSON.stringify({
+          ok: true,
+          data: {
+            pinnedAt: pinnedBaseline.pinnedAt,
+            listeningPortsCount: pinnedBaseline.listeningPorts.length,
+            startupItemsCount: pinnedBaseline.startupItems.length,
+          },
+        }));
+        return;
+      }
+
+      // 1-2. Live Real-Time SSE Stream Endpoint (항상 동작)
+      if (req?.method === 'GET' && pathname === '/api/pc-status/stream') {
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+        if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+        let isClosed = false;
+        const pushStatus = async () => {
+          if (isClosed || res.destroyed || res.writableEnded) return;
+          try {
+            const status = await measureLiveNonAdminPcStatus();
+            if (isClosed || res.destroyed || res.writableEnded) return;
+            res.write(`data: ${JSON.stringify(status)}\n\n`);
+          } catch {
+            // ignore
+          }
+        };
+
+        await pushStatus();
+        const streamInterval = setInterval(pushStatus, 5000);
+
+        const cleanup = () => {
+          if (!isClosed) {
+            isClosed = true;
+            clearInterval(streamInterval);
+            try { res.end(); } catch {}
+          }
+        };
+
+        req.once('close', cleanup);
+        req.once('end', cleanup);
+        res.once('close', cleanup);
+        return;
+      }
+
+      // 1-3. Cryptographic SHA-256 Signed Audit Bundle Export (항상 동작)
+      if (req?.method === 'GET' && pathname === '/api/pc-status/audit-export') {
+        const live = await measureLiveNonAdminPcStatus();
+        const auditPayload = {
+          generatedAt: new Date().toISOString(),
+          agentVersion: (() => {
+            try {
+              const p = resolve(process.cwd(), 'package.json');
+              if (fs.existsSync(p)) {
+                const pj = JSON.parse(fs.readFileSync(p, 'utf8'));
+                if (pj.version) return pj.version;
+              }
+            } catch {}
+            return '0.2.11';
+          })(),
+          application: 'Keshev Security Operations Center',
+          badgePolicy: {
+            liveMeasured: '[실측값]',
+            readOnly: '[읽기 전용]',
+            aiAnalysisDemo: '[예시값 · 로컬 AI 분석]',
+            simulationAction: '[시뮬레이션 · 조치 상태 검증]',
+            unverified: '「확인 불가」',
+            sdpDisconnected: '「SDP 미연결」',
+            nonIntrusionNotice: '이 건수는 침해나 공격 탐지 결과가 아닙니다',
+          },
+          livePcStatus: live.data,
+          systemInfo: {
+            platform: process.platform,
+            arch: process.arch,
+            nodeVersion: process.version,
+            uptime: process.uptime(),
+          },
+          snapshotHistoryCount: snapshotHistory.length,
+        };
+
+        const canonicalString = canonicalJsonStringify(auditPayload);
+        const payloadSha256 = crypto.createHash('sha256').update(canonicalString, 'utf8').digest('hex');
+        const signature = crypto.createHmac('sha256', AUDIT_SIGNING_SECRET)
+          .update(payloadSha256, 'utf8')
+          .digest('hex');
+
+        const bundle = {
+          bundleType: 'keshev-soc-audit-bundle',
+          version: 1,
+          integrity: {
+            algorithm: 'SHA-256',
+            payloadSha256,
+            signature,
+            canonicalBytes: Buffer.byteLength(canonicalString, 'utf8'),
+          },
+          payload: auditPayload,
+        };
+
+        res.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'content-disposition': `attachment; filename="keshev-audit-bundle-${Date.now()}.json"`,
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+        });
+        res.end(JSON.stringify(bundle, null, 2));
+        return;
+      }
+
+      // 1-4. Cryptographic SHA-256 Signed Audit Bundle Verification (항상 동작)
+      if (req?.method === 'POST' && pathname === '/api/pc-status/audit-verify') {
+        const bundle = await readStreamBody(req);
+        if (!bundle || typeof bundle !== 'object' || !bundle.payload || !bundle.integrity) {
+          sendDemoJson(res, 400, {
+            ok: false,
+            error: {
+              code: 'INVALID_BUNDLE_FORMAT',
+              message: '올바른 감사 리포트 번들 형식이 아닙니다. payload와 integrity 객체가 필요합니다.',
+            },
+          });
+          return;
+        }
+
+        const canonicalString = canonicalJsonStringify(bundle.payload);
+        const computedHash = crypto.createHash('sha256').update(canonicalString, 'utf8').digest('hex');
+        const expectedHash = String(bundle.integrity?.payloadSha256 || '');
+
+        const verified = Boolean(expectedHash && computedHash.toLowerCase() === expectedHash.toLowerCase());
+
+        let signatureVerified = false;
+        if (verified && bundle.integrity?.signature) {
+          const expectedSig = crypto.createHmac('sha256', AUDIT_SIGNING_SECRET)
+            .update(computedHash, 'utf8')
+            .digest('hex');
+          signatureVerified = (expectedSig === bundle.integrity.signature);
+        }
+
+        sendDemoJson(res, 200, {
+          ok: true,
+          data: {
+            verified,
+            hashMatch: verified,
+            signatureVerified,
+            computedHash,
+            expectedHash,
+            generatedAt: bundle.payload?.generatedAt ?? null,
+            bundleType: bundle.bundleType || 'unknown',
+            canonicalBytes: Buffer.byteLength(canonicalString, 'utf8'),
+            reason: verified
+              ? '무결성 검증 통과: 감사 리포트 페이로드의 SHA-256 해시가 무결하게 일치합니다.'
+              : `위변조 탐지: 기대 해시(${expectedHash})와 재계산된 해시(${computedHash})가 불일치합니다.`,
+          },
+        });
+        return;
+      }
+
+      // 2. Demo / Simulation Mode Interceptors (17, 18, 19단계)
+      if (isDemoMode) {
+        // [Stage 17/18/19 Enriched Events]
+        if (req?.method === 'GET' && pathname === '/api/events') {
+          const demoEvents = [
+            {
+              id: 'event-01',
+              kind: 'access',
+              at: '2026-10-12T03:00:00.000Z',
+              appId: 'repository',
+              summary: '개발 저장소 접속이 제한됐습니다.',
+              evidence: [{ id: 'e-01', text: '서버 예제 판정: deny' }],
+              rules: [{ id: 'rule-01', text: '기기 상태 확인이 필요합니다.' }],
+              state: { access: 'denied', session: 'active', device: 'unknown' },
+              supportedActions: ['isolate_session', 'require_step_up'],
+            },
+          ];
+          sendDemoJson(res, 200, {
+            ok: true,
+            data: demoEvents,
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+          });
+          return;
+        }
+
+        // [Stage 17 AI Connection Check]
+        if (req?.method === 'POST' && pathname === '/api/ai/check') {
+          await readStreamBody(req);
+          sendDemoJson(res, 200, {
+            ok: true,
+            data: {
+              transportChecked: true,
+              audienceAuthorization: 'test',
+              modelCount: 2,
+              help: {
+                component: 'on-ai',
+                code: 'ON_AI_TEST_TRANSPORT_ONLY',
+                appCredentialsConfigured: false,
+                provisioning: 'pending',
+                automaticRetries: 0,
+                workbenchRequiredAtRuntime: false,
+              },
+            },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+          });
+          return;
+        }
+
+        // [Stage 18 AI Incident Explanation with Telemetry Grounding]
+        if (req?.method === 'POST' && pathname === '/api/ai/explain') {
+          const body = await readStreamBody(req);
+          if (body?.eventId !== 'event-01') {
+            sendDemoJson(res, 404, {
+              ok: false,
+              error: { code: 'EVENT_NOT_FOUND', message: '본인 기록에서 사건을 찾을 수 없습니다.' },
+              meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+            });
+            return;
+          }
+
+          let netCount = 0;
+          let fwText = '확인 불가 (일반 권한 제한)';
+          let evText = '확인 불가';
+          try {
+            const pcStatus = await measureLiveNonAdminPcStatus();
+            netCount = pcStatus.data?.network?.interfaceCount ?? 0;
+            const fwProfiles = pcStatus.data?.firewall?.profiles || [];
+            const fwEnabled = fwProfiles.filter((p) => p.enabled === true).length;
+            fwText = pcStatus.data?.firewall?.status === 'ok'
+              ? `활성 프로필 ${fwEnabled}/${pcStatus.data?.firewall?.totalProfiles || 3}개`
+              : '확인 불가 (일반 권한 제한)';
+            const sysErr = pcStatus.data?.windowsEvents?.system?.errorCount ?? 0;
+            const sysWarn = pcStatus.data?.windowsEvents?.system?.warningCount ?? 0;
+            const appErr = pcStatus.data?.windowsEvents?.application?.errorCount ?? 0;
+            const appWarn = pcStatus.data?.windowsEvents?.application?.warningCount ?? 0;
+            const totalEvents = sysErr + sysWarn + appErr + appWarn;
+            evText = `최근 24시간 이벤트 로그 ${totalEvents}건 (오류 ${sysErr + appErr}건, 경고 ${sysWarn + appWarn}건)`;
+          } catch {
+            // fallback
+          }
+
+          const summary = `[예시값 · 로컬 AI 분석] 사건 event-01 분석 결과: 개발 저장소 접속이 서버 예제 보안 정책에 의해 거부(deny)되었습니다. 로컬 PC 실측 상태 점검 결과, 활성 네트워크 어댑터 ${netCount}개, 방화벽 프로필 상태(${fwText}), ${evText}으로 관측되었습니다. 기기 상태가 아직 보안 기준에 부합하는지 확인되지 않았으므로(unknown), 세션 격리(isolate_session) 또는 단계별 인증 요구(require_step_up) 조치 수행을 권장하며 사람의 최종 확인이 필수적입니다.`;
+
+          sendDemoJson(res, 200, {
+            ok: true,
+            data: {
+              explanation: {
+                summary,
+                evidenceIds: ['e-01'],
+                proposals: [
+                  {
+                    action: 'isolate_session',
+                    evidenceIds: ['e-01'],
+                    reason: '단말 기기 보안 상태 및 방화벽 설정 확인 전까지 세션을 안전하게 격리합니다.',
+                  },
+                  {
+                    action: 'require_step_up',
+                    evidenceIds: ['e-01'],
+                    reason: '추가 본인 인증 및 단말 준수 상태 점검을 거쳐 접근을 재승인합니다.',
+                  },
+                ],
+                requiresHumanConfirmation: true,
+                executed: false,
+              },
+            },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+          });
+          return;
+        }
+
+        // [Stage 19 SOAR Action Lifecycle: prepare]
+        if (req?.method === 'POST' && pathname === '/api/actions/prepare') {
+          const body = await readStreamBody(req);
+          const eventId = body?.eventId || 'event-01';
+          const actionId = body?.actionId || 'isolate_session';
+          const requestId = crypto.randomUUID();
+          const receiptId = crypto.randomUUID();
+          const confirmationId = 'ac-on-' + crypto.randomBytes(32).toString('base64url').slice(0, 43);
+          const confirmationExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+          const target = { id: 'device:practice-pc', generation: 1 };
+          const hashPayload = `${requestId}:${receiptId}:${actionId}:${target.id}:${target.generation}`;
+          const actionHash = crypto.createHash('sha256').update(hashPayload).digest('hex');
+
+          const record = {
+            requestId,
+            receiptId,
+            eventId,
+            actionId,
+            confirmationId,
+            confirmationExpiresAt,
+            target,
+            status: 'prepared',
+            version: 1,
+            replayed: false,
+            actionHash,
+            preparedAt: new Date().toISOString(),
+            executedAt: null,
+            observation: null,
+          };
+          demoActionsMap.set(requestId, record);
+
+          sendDemoJson(res, 200, {
+            ok: true,
+            data: {
+              requestId,
+              receiptId,
+              eventId,
+              actionId,
+              status: 'prepared',
+              version: 1,
+              replayed: false,
+              confirmationId,
+              confirmationExpiresAt,
+              target,
+              actionHash,
+            },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+          });
+          return;
+        }
+
+        // [Stage 19 SOAR Action Lifecycle: execute]
+        if (req?.method === 'POST' && pathname === '/api/actions/execute') {
+          const body = await readStreamBody(req);
+          const { requestId, confirmationId } = body || {};
+          const record = demoActionsMap.get(requestId);
+          if (!record) {
+            sendDemoJson(res, 404, {
+              ok: false,
+              error: { code: 'ACTION_NOT_FOUND', message: '조치 요청을 찾을 수 없습니다.' },
+              meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+            });
+            return;
+          }
+
+          if (Date.parse(record.confirmationExpiresAt) <= Date.now() || record.confirmationId !== confirmationId) {
+            sendDemoJson(res, 409, {
+              ok: false,
+              error: { code: 'ACTION_CONFIRMATION_EXPIRED', message: '조치 확인 기한이 지났거나 확인 정보가 올바르지 않습니다.' },
+              meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+            });
+            return;
+          }
+
+          record.status = 'pending';
+          record.version = 2;
+          record.executedAt = new Date().toISOString();
+          const execHashPayload = `${record.requestId}:${record.receiptId}:${record.actionId}:${record.target.id}:${record.target.generation}:${record.executedAt}`;
+          record.actionHash = crypto.createHash('sha256').update(execHashPayload).digest('hex');
+
+          sendDemoJson(res, 200, {
+            ok: true,
+            data: {
+              requestId: record.requestId,
+              receiptId: record.receiptId,
+              eventId: record.eventId,
+              actionId: record.actionId,
+              status: 'pending',
+              version: 2,
+              replayed: false,
+              actionHash: record.actionHash,
+            },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+          });
+          return;
+        }
+
+        // [Stage 19 SOAR Action Lifecycle: result]
+        if (req?.method === 'POST' && pathname === '/api/actions/result') {
+          const body = await readStreamBody(req);
+          const { requestId } = body || {};
+          const record = demoActionsMap.get(requestId);
+          if (!record) {
+            sendDemoJson(res, 404, {
+              ok: false,
+              error: { code: 'ACTION_NOT_FOUND', message: '조치 요청을 찾을 수 없습니다.' },
+              meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+            });
+            return;
+          }
+
+          record.status = 'succeeded';
+          record.version = 3;
+          if (!record.observation) {
+            record.observation = {
+              observedAt: new Date().toISOString(),
+              effectApplied: true,
+            };
+          }
+
+          sendDemoJson(res, 200, {
+            ok: true,
+            data: {
+              requestId: record.requestId,
+              receiptId: record.receiptId,
+              eventId: record.eventId,
+              actionId: record.actionId,
+              status: 'succeeded',
+              version: 3,
+              replayed: false,
+              observation: record.observation,
+              actionHash: record.actionHash,
+            },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+          });
+          return;
+        }
+
+        // [Stage 19 Verifiable SHA-256 Receipt Inspection]
+        if (req?.method === 'GET' && pathname === '/api/actions/receipt') {
+          const urlObj = new URL(req.url, 'http://localhost');
+          const reqId = urlObj.searchParams.get('requestId');
+          if (reqId) {
+            const record = demoActionsMap.get(reqId);
+            if (!record) {
+              sendDemoJson(res, 404, { ok: false, error: { code: 'NOT_FOUND', message: '영수증을 찾을 수 없습니다.' } });
+              return;
+            }
+            sendDemoJson(res, 200, { ok: true, data: record });
+            return;
+          }
+          const allRecords = Array.from(demoActionsMap.values());
+          sendDemoJson(res, 200, { ok: true, data: allRecords });
+          return;
+        }
+      }
+    } catch (interceptorErr) {
+      if (interceptorErr?.code === 'INVALID_JSON_BODY' || interceptorErr?.code === 'REQUEST_TOO_LARGE') {
+        sendDemoJson(res, 400, {
+          ok: false,
+          error: { code: interceptorErr.code, message: interceptorErr.message },
+          meta: { checkedAt: new Date().toISOString() },
+        });
+        return;
+      }
+      // Fall through to default server handler if other measurement fails
     }
     return originalListener.apply(this, arguments);
   };
@@ -563,3 +1272,4 @@ http.createServer = function patchedCreateServer(optionsOrListener, maybeListene
   }
   return originalCreateServer.call(this, optionsOrListener, wrappedListener);
 };
+}

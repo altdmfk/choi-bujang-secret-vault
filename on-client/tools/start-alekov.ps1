@@ -106,7 +106,9 @@ $info.FileName = $node.Source
 $info.WorkingDirectory = $root
 $info.UseShellExecute = $false
 # Windows 경로에는 큰따옴표가 들어갈 수 없으므로 경로를 큰따옴표로 감싸 한 인자로 넘깁니다(공백·한글 경로 포함).
-$info.Arguments = '"' + $server + '"' + $(if ($Demo) { ' --demo' } else { '' }) + $nativeArgument + $sdpArgument
+$runtimeMjs = Join-Path $root 'student\pc-status-runtime.mjs'
+$importArg = if (Test-Path -LiteralPath $runtimeMjs) { '--import ./student/pc-status-runtime.mjs ' } else { '' }
+$info.Arguments = $importArg + '"' + $server + '"' + $(if ($Demo) { ' --demo' } else { '' }) + $nativeArgument + $sdpArgument
 $secret = '(?i)(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE_?KEY|ACCESS_?KEY|^ON_AI_|^OPENAI|^ANTHROPIC|^SUPABASE)'
 foreach ($name in @($info.EnvironmentVariables.Keys)) { if ($name -match $secret) { $info.EnvironmentVariables.Remove($name) } }
 $info.EnvironmentVariables['ON_PORT'] = [string]$Port

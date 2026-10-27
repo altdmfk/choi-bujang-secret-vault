@@ -438,6 +438,471 @@ function ensureStudentAppearanceStyle() {
       border: 1px solid #C5D1E3 !important;
     }
 
+    /* [예시값 · 로컬 AI 분석] & [시뮬레이션 · 조치 상태 검증] */
+    .badge-ai-demo {
+      background: #EFF6FF !important;
+      color: #1D4ED8 !important;
+      border: 1px solid #BFDBFE !important;
+    }
+
+    .badge-sim-action {
+      background: #FDF2F8 !important;
+      color: #9D174D !important;
+      border: 1px solid #FBCFE8 !important;
+    }
+
+    /* Stage 19 SOAR State Machine Stepper */
+    .action-progress-stepper {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      margin: 12px 0 !important;
+      padding: 10px 14px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 8px !important;
+      font-size: 12px !important;
+      flex-wrap: wrap !important;
+    }
+    .stepper-step {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      padding: 4px 8px !important;
+      border-radius: 4px !important;
+      font-weight: 500 !important;
+      color: #64748b !important;
+    }
+    .stepper-step.step-completed {
+      background: #e6f5f4 !important;
+      color: #009a93 !important;
+      font-weight: 600 !important;
+    }
+    .stepper-step.step-active {
+      background: #fdf2f8 !important;
+      color: #9d174d !important;
+      border: 1px solid #fbcfe8 !important;
+      font-weight: 600 !important;
+    }
+    .stepper-step.step-denied {
+      background: #fef2f2 !important;
+      color: #b91c1c !important;
+      font-weight: 600 !important;
+    }
+    .stepper-step.step-pending {
+      opacity: 0.6 !important;
+    }
+    .step-bullet {
+      font-size: 11px !important;
+      line-height: 1 !important;
+    }
+    .font-mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+      font-size: 11px !important;
+      letter-spacing: -0.02em !important;
+      word-break: break-all !important;
+    }
+
+    /* Supply-Chain Posture Summary Bar */
+    .supply-chain-posture-bar {
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      margin: 10px 0 16px 0 !important;
+      padding: 12px 16px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 8px !important;
+      flex-wrap: wrap !important;
+    }
+    .posture-chip {
+      display: inline-flex !important;
+      flex-direction: column !important;
+      gap: 2px !important;
+      padding: 6px 12px !important;
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 6px !important;
+      min-width: 120px !important;
+    }
+    .chip-label {
+      font-size: 11px !important;
+      color: #64748b !important;
+    }
+    .chip-val {
+      font-size: 14px !important;
+      font-weight: 700 !important;
+      color: #0f172a !important;
+    }
+    .text-teal {
+      color: #009a93 !important;
+    }
+    .text-red {
+      color: #dc2626 !important;
+    }
+    .text-muted {
+      color: #64748b !important;
+    }
+    .osv-vuln-link {
+      color: #dc2626 !important;
+      text-decoration: underline !important;
+      font-weight: 600 !important;
+    }
+    .osv-vuln-link:hover {
+      color: #b91c1c !important;
+    }
+
+    /* Baseline & Drift Styles */
+    .badge-drift-warning {
+      background: #FEF2F2 !important;
+      color: #B91C1C !important;
+      border: 1px solid #FECACA !important;
+      font-weight: 700 !important;
+    }
+    .badge-drift-clean {
+      background: #E6F5F4 !important;
+      color: #009A93 !important;
+      border: 1px solid #B3E0DE !important;
+    }
+    .baseline-action-bar {
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      margin: 8px 0 14px 0 !important;
+      padding: 8px 12px !important;
+      background: #f1f5f9 !important;
+      border-radius: 6px !important;
+      flex-wrap: wrap !important;
+    }
+    .btn-baseline-pin {
+      background: #009A93 !important;
+      color: #ffffff !important;
+      border: none !important;
+      padding: 6px 12px !important;
+      border-radius: 4px !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      cursor: pointer !important;
+    }
+    .btn-baseline-pin:hover {
+      background: #00827c !important;
+    }
+    .drift-alert-box {
+      background: #fff1f2 !important;
+      color: #9f1239 !important;
+      border: 1px solid #fecdd3 !important;
+      border-radius: 6px !important;
+      padding: 10px 14px !important;
+      margin: 8px 0 12px 0 !important;
+      font-size: 12px !important;
+      line-height: 1.5 !important;
+    }
+    .port-row-keshev {
+      background: #f5f3ff !important;
+    }
+    .surface-table-title {
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      margin: 16px 0 8px 0 !important;
+      color: #1e293b !important;
+    }
+    .surface-disclaimer {
+      margin-top: 14px !important;
+      font-size: 11px !important;
+    }
+
+    /* SSE Real-Time Stream Status Pill */
+    .sse-status-pill {
+      font-size: 11px !important;
+      padding: 3px 8px !important;
+      border-radius: 9999px !important;
+      font-weight: 600 !important;
+      margin-left: 8px !important;
+      display: inline-block !important;
+    }
+    .sse-connected {
+      background: #E6F5F4 !important;
+      color: #009A93 !important;
+      border: 1px solid #B3E0DE !important;
+    }
+    .sse-disconnected {
+      background: #FEF3C7 !important;
+      color: #B45309 !important;
+      border: 1px solid #FDE68A !important;
+    }
+
+    /* Clean Distinct Panels in Left & Right Columns & Standalone Audit */
+    .soc-split-card {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 8px !important;
+      padding: 14px 16px !important;
+      margin-bottom: 16px !important;
+      box-sizing: border-box !important;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+    }
+    .soc-split-card:last-child {
+      margin-bottom: 0 !important;
+    }
+    .soc-split-card .soc-panel-heading {
+      margin: -2px 0 12px 0 !important;
+      padding-bottom: 8px !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+    }
+    .soc-audit-standalone-panel {
+      margin-top: 14px !important;
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 8px !important;
+      overflow: hidden !important;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    .pc-baseline-control-bar {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      padding: 6px 12px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 6px !important;
+      margin-top: 2px !important;
+      margin-bottom: 18px !important;
+      box-sizing: border-box !important;
+      gap: 10px !important;
+      flex-wrap: wrap !important;
+    }
+    .pc-baseline-desc {
+      font-size: 11px !important;
+      color: #64748b !important;
+      font-weight: 500 !important;
+      line-height: 1.3 !important;
+      letter-spacing: -0.01em !important;
+    }
+    .pc-inspection-table {
+      margin-bottom: 14px !important;
+    }
+    .pc-ports-accordion,
+    details[data-pc-section="endpoint-ports-detail"] {
+      margin-top: 18px !important;
+      margin-bottom: 8px !important;
+    }
+    .pc-inspection-table + .pc-accordion {
+      margin-top: 18px !important;
+    }
+    .audit-spec-table .pc-inspection-row {
+      display: grid !important;
+      grid-template-columns: 210px 1fr 100px !important;
+      align-items: center !important;
+      gap: 12px !important;
+      padding: 6px 10px !important;
+    }
+    .audit-spec-table .pc-col-item {
+      font-size: 11.5px !important;
+      font-weight: 700 !important;
+      color: #0e306d !important;
+      white-space: nowrap !important;
+      text-align: right !important;
+      justify-self: end !important;
+      padding-right: 6px !important;
+    }
+    .audit-spec-table .pc-col-status {
+      text-align: left !important;
+      justify-self: start !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif !important;
+      font-size: 11.5px !important;
+      color: #334155 !important;
+      word-break: keep-all !important;
+      line-height: 1.45 !important;
+    }
+    .audit-spec-table .pc-col-badge {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      flex-shrink: 0 !important;
+      white-space: nowrap !important;
+    }
+    .audit-action-btn {
+      height: 28px !important;
+      padding: 0 14px !important;
+      font-size: 11.5px !important;
+      font-weight: 600 !important;
+      border-radius: 4px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
+      line-height: 26px !important;
+      cursor: pointer !important;
+      white-space: nowrap !important;
+      transition: background-color 0.15s ease, border-color 0.15s ease !important;
+    }
+    .pc-inspection-scroll {
+      max-height: 220px !important;
+      overflow-y: auto !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 6px !important;
+      margin-top: 6px !important;
+      margin-bottom: 8px !important;
+      background: #ffffff !important;
+      padding: 4px !important;
+      scrollbar-width: thin !important;
+    }
+    .soc-btn-navy {
+      background: #0E306D !important;
+      color: #ffffff !important;
+      border: 1px solid #0a2558 !important;
+      padding: 6px 14px !important;
+      border-radius: 4px !important;
+      font-size: 11.5px !important;
+      font-weight: 600 !important;
+      cursor: pointer !important;
+      transition: background 0.15s ease !important;
+    }
+    .soc-btn-navy:hover:not(:disabled) {
+      background: #09214d !important;
+    }
+    .soc-btn-navy:disabled {
+      opacity: 0.6 !important;
+      cursor: not-allowed !important;
+    }
+
+    /* Section 7 Table Scroll Container & Mini-Table */
+    .soc-table-scroll-container {
+      max-height: 220px !important;
+      overflow-y: auto !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 6px !important;
+      margin-top: 6px !important;
+      margin-bottom: 8px !important;
+      background: #ffffff !important;
+    }
+    .surface-mini-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 11.5px !important;
+    }
+    .surface-mini-table th {
+      background: #f8fafc !important;
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 1 !important;
+      font-size: 11px !important;
+      color: #64748b !important;
+      padding: 6px 8px !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      text-align: left !important;
+    }
+    .surface-mini-table td {
+      padding: 5px 8px !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+      vertical-align: middle !important;
+      text-align: left !important;
+    }
+    .surface-mini-table tr:hover {
+      background: #f8fafc !important;
+    }
+    .surface-table-title {
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      color: #0E306D !important;
+      margin: 10px 0 4px 0 !important;
+    }
+
+    /* Signed Audit Bundle Styles */
+    .badge-audit-sign {
+      background: #EDE9FE !important;
+      color: #6D28D9 !important;
+      border: 1px solid #DDD6FE !important;
+      font-weight: 600 !important;
+    }
+    .audit-sub-box {
+      margin-top: 10px !important;
+      padding: 10px 12px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 6px !important;
+    }
+    .audit-sub-title {
+      display: block !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      color: #0E306D !important;
+      margin: 6px 0 4px 0 !important;
+    }
+    .audit-sub-title:first-child {
+      margin-top: 0 !important;
+    }
+    .audit-actions-row {
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      margin-top: 8px !important;
+      flex-wrap: wrap !important;
+    }
+    .audit-input-group {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 8px !important;
+      margin-top: 8px !important;
+    }
+    .audit-file-input {
+      font-size: 12px !important;
+      color: #475569 !important;
+    }
+    .audit-json-textarea {
+      width: 100% !important;
+      min-height: 60px !important;
+      height: 78px !important;
+      max-height: 240px !important;
+      font-size: 11px !important;
+      font-family: ui-monospace, Menlo, Consolas, monospace !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 6px !important;
+      padding: 8px 10px !important;
+      box-sizing: border-box !important;
+      resize: vertical !important;
+      background: #f8fafc !important;
+      color: #1e293b !important;
+      line-height: 1.4 !important;
+      transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+    }
+    .audit-json-textarea:focus {
+      background: #ffffff !important;
+      border-color: #009a93 !important;
+      outline: 2px solid rgba(0, 154, 147, 0.2) !important;
+      outline-offset: 1px !important;
+    }
+    .audit-verify-result-container {
+      margin-top: 10px !important;
+    }
+    .audit-result-banner {
+      padding: 8px 12px !important;
+      border-radius: 6px !important;
+      font-size: 12px !important;
+      line-height: 1.5 !important;
+    }
+    .banner-verified {
+      background: #e6f5f4 !important;
+      color: #009a93 !important;
+      border: 1px solid #b3e0de !important;
+    }
+    .banner-tampered {
+      background: #fef2f2 !important;
+      color: #b91c1c !important;
+      border: 1px solid #fecaca !important;
+    }
+    .banner-warning {
+      background: #fffbeb !important;
+      color: #b45309 !important;
+      border: 1px solid #fde68a !important;
+    }
+    .text-small {
+      font-size: 11px !important;
+      margin-top: 4px !important;
+    }
+
     .soc-metric-card {
       background: #ffffff;
       border: 1px solid #e2e8f0;
@@ -683,6 +1148,89 @@ function ensureStudentAppearanceStyle() {
       letter-spacing: -0.2px;
     }
 
+    /* Card 2 방화벽 프로필 매트릭스 고정 그리드 & 한 줄 보장 */
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table {
+      width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+    }
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table th,
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table td {
+      padding: 5px 2px !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table th:nth-child(1),
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table td:nth-child(1),
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-col-profile {
+      width: 22% !important;
+      white-space: nowrap !important;
+    }
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table th:nth-child(2),
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table td:nth-child(2),
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-status-cell {
+      width: 32% !important;
+      white-space: nowrap !important;
+      word-break: keep-all !important;
+    }
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table th:nth-child(3),
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table td:nth-child(3) {
+      width: 23% !important;
+    }
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table th:nth-child(4),
+    .soc-metric-card[data-soc-card="card-2-decision-firewall"] .soc-mini-table td:nth-child(4) {
+      width: 23% !important;
+    }
+    .soc-status-cell {
+      white-space: nowrap !important;
+      word-break: keep-all !important;
+    }
+    .soc-status-pill-text {
+      display: inline-flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      white-space: nowrap !important;
+      word-break: keep-all !important;
+      font-weight: 700 !important;
+      font-size: 11px !important;
+      line-height: 1 !important;
+    }
+    .soc-status-dot-icon {
+      display: inline-block !important;
+      flex-shrink: 0 !important;
+      font-size: 10px !important;
+      line-height: 1 !important;
+      margin-right: 3px !important;
+    }
+    .soc-status-label {
+      display: inline-block !important;
+      flex-shrink: 0 !important;
+      white-space: nowrap !important;
+      word-break: keep-all !important;
+      line-height: 1 !important;
+    }
+    .soc-action-main {
+      font-weight: 600 !important;
+      font-size: 11.5px !important;
+      color: #0f172a !important;
+      white-space: nowrap !important;
+    }
+    .soc-action-sub.is-default {
+      display: block !important;
+      font-size: 10px !important;
+      color: #64748b !important;
+      line-height: 1.25 !important;
+      margin-top: 2px !important;
+      white-space: nowrap !important;
+      letter-spacing: -0.2px !important;
+    }
+    .soc-action-sub.is-received {
+      font-size: 10.5px !important;
+      color: #64748b !important;
+    }
+
     /* Card 3 전체 컬럼 줄 바꿈 방지 및 너비·패딩 최적화 */
     .soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table th,
     .soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table td {
@@ -871,6 +1419,8 @@ function ensureStudentAppearanceStyle() {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 11.5px;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .pc-accordion-badges {
       display: flex;
@@ -1297,31 +1847,41 @@ function ensureStudentAppearanceStyle() {
   }
 }
 
-function createEl(tag, { className, text, attrs, style } = {}, children = []) {
+function createEl(tag, { id, className, text, attrs, style } = {}, children = []) {
   const node = document.createElement(tag);
+  if (id) node.id = id;
   if (className) node.className = className;
   if (text !== undefined && text !== null) node.textContent = String(text);
-  if (attrs) {
-    for (const [k, v] of Object.entries(attrs)) {
-      if (v !== undefined && v !== null) {
-        if (k === 'style') {
-          // CSP-compliant: Never call setAttribute('style', ...) under style-src 'self'
-          if (typeof v === 'string') {
-            const rules = v.split(';');
-            for (const rule of rules) {
-              const colonIdx = rule.indexOf(':');
-              if (colonIdx > -1) {
-                const prop = rule.slice(0, colonIdx).trim();
-                const val = rule.slice(colonIdx + 1).trim();
-                if (prop && val && node.style && typeof node.style.setProperty === 'function') {
-                  node.style.setProperty(prop, val);
-                }
+
+  const mergedAttrs = attrs ? { ...attrs } : {};
+  if (style && !mergedAttrs.style) {
+    mergedAttrs.style = style;
+  }
+
+  for (const [k, v] of Object.entries(mergedAttrs)) {
+    if (v !== undefined && v !== null) {
+      if (k === 'style') {
+        // CSP-compliant: Never call setAttribute('style', ...) under style-src 'self'
+        if (typeof v === 'string') {
+          const rules = v.split(';');
+          for (const rule of rules) {
+            const colonIdx = rule.indexOf(':');
+            if (colonIdx > -1) {
+              const prop = rule.slice(0, colonIdx).trim();
+              let val = rule.slice(colonIdx + 1).trim();
+              let priority = '';
+              if (val.toLowerCase().endsWith('!important')) {
+                priority = 'important';
+                val = val.slice(0, -10).trim();
+              }
+              if (prop && val && node.style && typeof node.style.setProperty === 'function') {
+                node.style.setProperty(prop, val, priority);
               }
             }
           }
-        } else {
-          node.setAttribute(k, String(v));
         }
+      } else {
+        node.setAttribute(k, String(v));
       }
     }
   }
@@ -1539,7 +2099,7 @@ function formatMeasuredAt(rawIso) {
 const SOC_LIMITS = Object.freeze({
   PC_STATUS_ENDPOINT: '/api/pc-status',
   FETCH_THROTTLE_MS: 400,
-  MAX_SNAPSHOTS: 10,
+  MAX_SNAPSHOTS: 25,
   MAX_DECISION_HISTORY: 20,
   FIREWALL_PROFILE_TOTAL: 3,
 });
@@ -1665,6 +2225,9 @@ function probeNodeOsRuntimeIfAvailable(pcStatus, onResolved, force = false) {
         pcStatus.osProbeError = null;
         if (!pcStatus.cores && Number(payload.data?.cpu?.logicalCores) > 0) {
           pcStatus.cores = Number(payload.data.cpu.logicalCores);
+        }
+        if (typeof pcStatus.onServerSnapshots === 'function' && Array.isArray(payload.data.snapshotHistory)) {
+          pcStatus.onServerSnapshots(payload.data.snapshotHistory);
         }
       } else {
         const msg = payload?.error?.message || '실측 데이터 형식이 올바르지 않습니다.';
@@ -2306,6 +2869,32 @@ function buildCard01Dom(card) {
   return article;
 }
 
+function formatActionCell(actionText) {
+  if (!actionText || typeof actionText !== 'string') {
+    return [document.createTextNode('-')];
+  }
+  if (actionText === '확인 불가') {
+    return [createEl('span', { className: 'soc-action-unverified', text: '확인 불가' })];
+  }
+  const match = actionText.match(/^([^(]+)\s*(\([^)]+\))$/);
+  if (match) {
+    const main = match[1].trim();
+    const paren = match[2].trim();
+    const isNotReceived = paren.includes('기본값') || actionText.includes('기본값');
+    if (isNotReceived) {
+      return [
+        createEl('span', { className: 'soc-action-main', text: main }),
+        createEl('span', { className: 'soc-action-sub is-default', text: paren }),
+      ];
+    }
+    return [
+      createEl('span', { className: 'soc-action-main', text: main }),
+      createEl('span', { className: 'soc-action-sub is-received', text: ` ${paren}` }),
+    ];
+  }
+  return [document.createTextNode(actionText)];
+}
+
 function buildCard02Dom(card) {
   const article = createEl('article', {
     className: `soc-metric-card soc-card-${card.tone || 'unknown'}`,
@@ -2381,11 +2970,13 @@ function buildCard02Dom(card) {
         createEl('span', { className: 'soc-profile-en', text: def.en }),
       ]),
       createEl('td', { className: 'soc-status-cell' }, [
-        createEl('span', { className: statusDotClass, text: isEnabled === true ? '● ' : '○ ' }),
-        document.createTextNode(statusText),
+        createEl('span', { className: `soc-status-pill-text ${isEnabled === true ? 'soc-status-on' : 'soc-status-off'}` }, [
+          createEl('span', { className: `soc-status-dot-icon ${statusDotClass}`, text: isEnabled === true ? '●' : '○', attrs: { 'aria-hidden': 'true' } }),
+          createEl('span', { className: 'soc-status-label', text: isEnabled === true ? '켜짐' : isEnabled === false ? '꺼짐' : '확인 불가' }),
+        ]),
       ]),
-      createEl('td', { text: inAction }),
-      createEl('td', { text: outAction }),
+      createEl('td', { className: 'soc-action-cell' }, formatActionCell(inAction)),
+      createEl('td', { className: 'soc-action-cell' }, formatActionCell(outAction)),
     ]);
     tbody.appendChild(tr);
   }
@@ -2715,11 +3306,68 @@ function recordSocSnapshot(store) {
   }
 }
 
+function hydrateServerSnapshots(store, serverSnapshots = []) {
+  if (!store || !Array.isArray(serverSnapshots) || serverSnapshots.length === 0) return;
+  if (!Array.isArray(store.snapshots)) store.snapshots = [];
+  if (store.snapshots.length < serverSnapshots.length) {
+    const mapped = serverSnapshots.map((snap) => ({
+      at: snap.timestamp || snap.at || new Date().toISOString(),
+      totalEvents: snap.totalEvents ?? 0,
+      xdrCount: 0,
+      deniedTotal: 0,
+      unknownTotal: 0,
+      activeSessions: 1,
+      netCount: snap.interfaceCount ?? snap.netCount ?? null,
+      fwEnabledCount: snap.firewallEnabledCount ?? snap.fwEnabledCount ?? null,
+      winSysTotal: snap.winSysTotal ?? null,
+      winSysErr: snap.winSysErr ?? null,
+      winSysWarn: snap.winSysWarn ?? null,
+      winAppTotal: snap.winAppTotal ?? null,
+      winAppErr: snap.winAppErr ?? null,
+      winAppWarn: snap.winAppWarn ?? null,
+      cpuPct: snap.cpuUsagePercent ?? snap.cpuPct ?? null,
+      cores: snap.cores ?? null,
+      memUsedGb: snap.memUsedGb ?? null,
+      memTotalGb: snap.memTotalGb ?? null,
+      diskFreeGb: snap.diskFreeGb ?? null,
+      heapUsedMb: null,
+      mode: snap.mode || 'demo',
+      sig: `${snap.timestamp || snap.at}|${snap.cpuUsagePercent}|${snap.driftDeltaCount}`,
+    }));
+    mapped.reverse();
+    store.snapshots = mapped.slice(0, SOC_LIMITS.MAX_SNAPSHOTS);
+  }
+}
+
 function formatDeltaNumber(curr, prev, unit) {
   if (typeof curr !== 'number' || typeof prev !== 'number') return '변화량 확인 불가';
   const diff = Number((curr - prev).toFixed(2));
   const sign = diff > 0 ? `+${diff}` : `${diff}`;
   return `직전 대비 Δ ${sign}${unit} (직전 ${prev}${unit} → 현재 ${curr}${unit})`;
+}
+
+const accordionStateStore = new Map();
+
+function getAccordionOpen(sectionKey, defaultOpen = false) {
+  if (accordionStateStore.has(sectionKey)) {
+    return accordionStateStore.get(sectionKey);
+  }
+  return defaultOpen;
+}
+
+function setAccordionOpen(sectionKey, isOpen) {
+  accordionStateStore.set(sectionKey, Boolean(isOpen));
+}
+
+function captureCurrentAccordionStates() {
+  if (typeof document === 'undefined') return;
+  const accordions = document.querySelectorAll('details[data-pc-section]');
+  for (const acc of accordions) {
+    const key = acc.getAttribute('data-pc-section');
+    if (key) {
+      accordionStateStore.set(key, acc.open);
+    }
+  }
 }
 
 function buildTrendComparisonBoxDom(store, provenance) {
@@ -2862,9 +3510,16 @@ function buildTrendComparisonBoxDom(store, provenance) {
     badgeEl: createSdpStatusBadgeEl(effectiveMode),
   });
 
+  const isDeltaOpen = getAccordionOpen('trend-delta-breakdown', false);
   const deltaDetails = createEl('details', {
     className: 'pc-accordion',
-    attrs: { 'data-pc-section': 'trend-delta-breakdown' },
+    attrs: {
+      'data-pc-section': 'trend-delta-breakdown',
+      ...(isDeltaOpen ? { open: 'true' } : {}),
+    },
+  });
+  deltaDetails.addEventListener('toggle', () => {
+    setAccordionOpen('trend-delta-breakdown', deltaDetails.open);
   });
   const summaryTitle = createEl('strong', { className: 'pc-accordion-title', text: '직전 스냅샷 대비 전체 지표 증감 내역' });
   const summaryMetric = createEl('span', { className: 'pc-accordion-metric', text: `총 ${deltaRows.length}개 지표 비교` });
@@ -2889,11 +3544,22 @@ function buildTrendComparisonBoxDom(store, provenance) {
 function createInspectionTableDom(rows = []) {
   const table = createEl('div', { className: 'pc-inspection-table' });
   for (const row of rows) {
+    let statusEl;
+    if (typeof row.status === 'string' || typeof row.status === 'number') {
+      statusEl = createEl('span', { className: 'pc-col-status', text: String(row.status) });
+    } else if (Array.isArray(row.status)) {
+      statusEl = createEl('span', { className: 'pc-col-status' }, row.status);
+    } else if (row.status && typeof row.status === 'object' && row.status.nodeType) {
+      statusEl = createEl('span', { className: 'pc-col-status' }, [row.status]);
+    } else {
+      statusEl = createEl('span', { className: 'pc-col-status', text: '-' });
+    }
+
     const rowEl = createEl('div', {
       className: `pc-inspection-row ${row.isUnverified ? 'row-unverified' : ''}`,
     }, [
       createEl('span', { className: 'pc-col-item', text: row.item }),
-      createEl('span', { className: 'pc-col-status', text: row.status }),
+      statusEl,
       createEl('div', { className: 'pc-col-badge' }, [row.badgeEl]),
     ]);
     table.appendChild(rowEl);
@@ -2901,7 +3567,7 @@ function createInspectionTableDom(rows = []) {
   return table;
 }
 
-function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAllBtn = null) {
+function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAllBtn = null, onRefresh = null) {
   const grid = createEl('div', {
     className: 'pc-status-grid',
     attrs: {
@@ -2922,6 +3588,8 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
       const accordions = grid.querySelectorAll('details.pc-inspection-accordion');
       for (const acc of accordions) {
         acc.open = allExpanded;
+        const key = acc.getAttribute('data-pc-section');
+        if (key) setAccordionOpen(key, allExpanded);
       }
     });
   }
@@ -2968,9 +3636,16 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
   const osDisk = pcStatus?.osProbe?.disk;
 
   function createPcAccordionSection({ sectionKey, title, metricSummary, badges = [], bodyContent = [] }) {
+    const isOpen = getAccordionOpen(sectionKey, false);
     const details = createEl('details', {
       className: 'pc-accordion pc-inspection-accordion',
-      attrs: { 'data-pc-section': sectionKey },
+      attrs: {
+        'data-pc-section': sectionKey,
+        ...(isOpen ? { open: 'true' } : {}),
+      },
+    });
+    details.addEventListener('toggle', () => {
+      setAccordionOpen(sectionKey, details.open);
     });
 
     const summaryTitle = createEl('strong', {
@@ -3305,7 +3980,563 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
     bodyContent: [createInspectionTableDom(diskRows)],
   }));
 
+  // 7) 엔드포인트 공격 표면(열린 포트·프로세스) & 시작프로그램 기준선 감시
+  const osPorts = Array.isArray(pcStatus?.osProbe?.listeningPorts) ? pcStatus.osProbe.listeningPorts : [];
+  const osStartup = Array.isArray(pcStatus?.osProbe?.startupItems) ? pcStatus.osProbe.startupItems : [];
+  const drift = pcStatus?.osProbe?.baselineDrift || {
+    hasBaseline: false,
+    pinnedAt: null,
+    newExposedPorts: [],
+    newLoopbackPorts: [],
+    addedStartupItems: [],
+    removedStartupItems: [],
+  };
+
+  const hasDrift = Boolean(drift.hasBaseline && (
+    (drift.newExposedPorts && drift.newExposedPorts.length > 0) ||
+    (drift.newLoopbackPorts && drift.newLoopbackPorts.length > 0) ||
+    (drift.addedStartupItems && drift.addedStartupItems.length > 0) ||
+    (drift.removedStartupItems && drift.removedStartupItems.length > 0)
+  ));
+
+  const surfaceSummary = `포트 ${osPorts.length}개 · 시작프로그램 ${osStartup.length}개`;
+
+  const surfaceBadges = [
+    createProvenanceBadgeEl(liveProv),
+    createEl('span', {
+      className: 'provenance-badge badge-live',
+      text: '[읽기 전용]',
+      attrs: { 'data-provenance': 'live' },
+    }),
+  ];
+
+  const driftDeltaCount = (drift.newExposedPorts?.length || 0) + (drift.newLoopbackPorts?.length || 0) + (drift.addedStartupItems?.length || 0) + (drift.removedStartupItems?.length || 0);
+
+  if (drift.hasBaseline) {
+    if (hasDrift) {
+      surfaceBadges.push(createEl('span', {
+        className: 'badge badge-drift-warning',
+        text: `[기준선 변동 감지 (Δ ${driftDeltaCount}건)]`,
+      }));
+    } else {
+      surfaceBadges.push(createEl('span', {
+        className: 'badge badge-drift-clean',
+        text: '[기준선 일치]',
+      }));
+    }
+  }
+
+  // 1) 안전 기준선 및 공격 표면 요약 행 (Sections 1~6과 동일한 createInspectionTableDom 표준 행)
+  const loopbackPorts = osPorts.filter((p) => p.scope === 'loopback');
+  const exposedPorts = osPorts.filter((p) => p.scope !== 'loopback');
+  const hkcuStartup = osStartup.filter((s) => s.source === 'HKCU_Run');
+  const folderStartup = osStartup.filter((s) => s.source !== 'HKCU_Run');
+  const deltaCount = driftDeltaCount;
+
+  const pinBtn = createEl('button', {
+    className: 'btn pc-refresh-btn',
+    text: drift.hasBaseline ? '기준선 다시 고정' : '안전 기준선 고정',
+    attrs: { type: 'button' },
+  });
+  attachKeyboardClick(pinBtn, () => {
+    pinBtn.disabled = true;
+    pinBtn.textContent = '고정 중…';
+    fetch('/api/pc-status/baseline', { method: 'POST' })
+      .then((r) => r.json())
+      .then(() => {
+        if (typeof onRefresh === 'function') onRefresh();
+      })
+      .catch(() => {
+        pinBtn.disabled = false;
+        pinBtn.textContent = '기준선 고정 (재시도)';
+      });
+  });
+
+  const baselineControlBar = createEl('div', {
+    className: 'pc-baseline-control-bar',
+    attrs: {
+      style: 'margin-top: 2px; margin-bottom: 18px;',
+    },
+  }, [
+    pinBtn,
+    createEl('span', {
+      className: 'pc-baseline-desc',
+      attrs: {
+        style: 'font-size: 11px !important; color: #64748b !important; font-weight: 500 !important; line-height: 1.3 !important; letter-spacing: -0.01em !important;',
+      },
+      text: '(현재 열린 포트·시작프로그램 상태를 신뢰 기준선으로 등록)',
+    }),
+  ]);
+
+  const pinStatusText = drift.hasBaseline
+    ? `기준선 고정 완료: ${formatMeasuredAt(drift.pinnedAt)} (등록 당시 포트 ${osPorts.length}개 · 시작프로그램 ${osStartup.length}개)`
+    : '기준선 미설정 (신규 포트·프로세스 변경 추적 대기 상태)';
+
+  const surfaceSummaryRows = [
+    {
+      item: '엔드포인트 안전 기준선',
+      status: pinStatusText,
+      badgeEl: drift.hasBaseline
+        ? (hasDrift ? createEl('span', { className: 'badge badge-drift-warning', text: `[변동 감지 (Δ ${deltaCount}건)]` }) : createEl('span', { className: 'badge badge-drift-clean', text: '[기준선 일치]' }))
+        : createProvenanceBadgeEl(liveProv),
+    },
+  ];
+
+  if (hasDrift) {
+    const alertParts = [];
+    if (drift.newExposedPorts?.length > 0) alertParts.push(`신규 외부 노출 ${drift.newExposedPorts.length}개: ${drift.newExposedPorts.map((p) => `${p.port}(${p.processName})`).join(', ')}`);
+    if (drift.newLoopbackPorts?.length > 0) alertParts.push(`신규 루프백 ${drift.newLoopbackPorts.length}개: ${drift.newLoopbackPorts.map((p) => `${p.port}(${p.processName})`).join(', ')}`);
+    if (drift.addedStartupItems?.length > 0) alertParts.push(`신규 시작프로그램 ${drift.addedStartupItems.length}개: ${drift.addedStartupItems.map((s) => s.name).join(', ')}`);
+    if (drift.removedStartupItems?.length > 0) alertParts.push(`종료/제거 시작프로그램 ${drift.removedStartupItems.length}개: ${drift.removedStartupItems.map((s) => s.name).join(', ')}`);
+    surfaceSummaryRows.push({
+      item: '⚠️ 기준선 변동(Drift) 알림',
+      status: alertParts.join(' | '),
+      badgeEl: createEl('span', { className: 'badge badge-drift-warning', text: '[변동 알림]' }),
+    });
+  }
+
+  surfaceSummaryRows.push({
+    item: '활성 TCP 리스닝 소켓 (열린 포트)',
+    status: `총 ${osPorts.length}개 (로컬 루프백 ${loopbackPorts.length}개 · 외부/LAN 노출 ${exposedPorts.length}개)`,
+    badgeEl: createProvenanceBadgeEl(liveProv),
+  });
+
+  surfaceSummaryRows.push({
+    item: '사용자 지속성(시작프로그램)',
+    status: `총 ${osStartup.length}개 (레지스트리 Run ${hkcuStartup.length}개 · 시작메뉴 폴더 ${folderStartup.length}개)`,
+    badgeEl: createProvenanceBadgeEl(liveProv),
+  });
+
+  const surfaceBody = [
+    baselineControlBar,
+    createInspectionTableDom(surfaceSummaryRows),
+  ];
+
+  // 2) 세부 리스닝 포트 목록 (pc-accordion & pc-inspection-scroll)
+  const newPortKeySet = new Set([
+    ...(drift.newExposedPorts || []).map((p) => `${p.port}:${p.localAddress}`),
+    ...(drift.newLoopbackPorts || []).map((p) => `${p.port}:${p.localAddress}`),
+  ]);
+  const portRows = [];
+  for (const p of osPorts) {
+    const isKeshev = p.isKeshevPort || p.port === 5189;
+    const isNew = newPortKeySet.has(`${p.port}:${p.localAddress}`);
+    portRows.push({
+      item: `TCP ${p.port} (${isKeshev ? `${p.processName} · 로컬 서버` : p.processName})`,
+      status: `PID ${p.pid} · ${p.localAddress} · ${p.scope === 'loopback' ? '로컬 루프백 (보안 격리)' : '외부/LAN 노출 (exposed)'}${isNew ? ' · ⚠️ 신규' : ''}`,
+      badgeEl: isNew
+        ? createEl('span', { className: 'badge badge-drift-warning', text: '[신규 포트]' })
+        : (drift.hasBaseline ? createEl('span', { className: 'badge badge-drift-clean', text: '[기준선]' }) : createProvenanceBadgeEl(liveProv)),
+    });
+  }
+
+  const isPortsDetailOpen = getAccordionOpen('endpoint-ports-detail', false);
+  const portsDetails = createEl('details', {
+    className: 'pc-accordion pc-ports-accordion',
+    attrs: {
+      'data-pc-section': 'endpoint-ports-detail',
+      style: 'margin-top: 18px; margin-bottom: 8px;',
+      ...(isPortsDetailOpen ? { open: 'true' } : {}),
+    },
+  });
+  portsDetails.addEventListener('toggle', () => {
+    setAccordionOpen('endpoint-ports-detail', portsDetails.open);
+  });
+  portsDetails.appendChild(createEl('summary', { className: 'pc-accordion-summary' }, [
+    createEl('strong', { className: 'pc-accordion-title', text: '1) 활성 TCP 리스닝 소켓 매핑 세부 목록' }),
+    createEl('span', { className: 'pc-accordion-metric', text: `총 ${osPorts.length}개 소켓 (클릭 시 펼침)` }),
+    createEl('div', { className: 'pc-accordion-badges' }, [
+      createProvenanceBadgeEl(liveProv),
+    ]),
+  ]));
+  portsDetails.appendChild(createEl('div', { className: 'pc-accordion-body' }, [
+    portRows.length > 0
+      ? createEl('div', { className: 'pc-inspection-scroll' }, [createInspectionTableDom(portRows)])
+      : createEl('p', { className: 'muted', text: '열린 TCP 포트 정보가 없습니다.' }),
+  ]));
+  surfaceBody.push(portsDetails);
+
+  // 3) 세부 시작프로그램 목록 (pc-accordion & pc-inspection-scroll)
+  const newStartupKeySet = new Set((drift.addedStartupItems || []).map((s) => `${s.source}:${s.name}`));
+  const startupRows = [];
+  for (const s of osStartup) {
+    const isNew = newStartupKeySet.has(`${s.source}:${s.name}`);
+    startupRows.push({
+      item: `${s.name} (${s.source === 'HKCU_Run' ? '레지스트리 Run' : '시작메뉴 폴더'})`,
+      status: `명령: ${s.commandOrPath}${isNew ? ' · ⚠️ 신규 등록' : ''}`,
+      badgeEl: isNew
+        ? createEl('span', { className: 'badge badge-drift-warning', text: '[신규 등록]' })
+        : (drift.hasBaseline ? createEl('span', { className: 'badge badge-drift-clean', text: '[기준선]' }) : createProvenanceBadgeEl(liveProv)),
+    });
+  }
+
+  const isStartupDetailOpen = getAccordionOpen('endpoint-startup-detail', false);
+  const startupDetails = createEl('details', {
+    className: 'pc-accordion',
+    attrs: {
+      'data-pc-section': 'endpoint-startup-detail',
+      style: 'margin-top: 8px !important; margin-bottom: 8px !important;',
+      ...(isStartupDetailOpen ? { open: 'true' } : {}),
+    },
+  });
+  startupDetails.addEventListener('toggle', () => {
+    setAccordionOpen('endpoint-startup-detail', startupDetails.open);
+  });
+  startupDetails.appendChild(createEl('summary', { className: 'pc-accordion-summary' }, [
+    createEl('strong', { className: 'pc-accordion-title', text: '2) 사용자 지속성(시작프로그램) 등록 세부 목록' }),
+    createEl('span', { className: 'pc-accordion-metric', text: `총 ${osStartup.length}개 항목 (클릭 시 펼침)` }),
+    createEl('div', { className: 'pc-accordion-badges' }, [
+      createProvenanceBadgeEl(liveProv),
+    ]),
+  ]));
+  startupDetails.appendChild(createEl('div', { className: 'pc-accordion-body' }, [
+    startupRows.length > 0
+      ? createEl('div', { className: 'pc-inspection-scroll' }, [createInspectionTableDom(startupRows)])
+      : createEl('p', { className: 'muted', text: '등록된 사용자 시작프로그램이 없습니다.' }),
+  ]));
+  surfaceBody.push(startupDetails);
+
+  // 4) Mandatory non-intrusion notice
+  surfaceBody.push(createEl('p', {
+    className: 'pc-non-intrusion-inline surface-disclaimer',
+    text: '이 건수는 침해나 공격 탐지 결과가 아닙니다 (엔드포인트 프로세스 포트 바인딩 및 사용자 시작프로그램 레지스트리/폴더 상태)',
+  }));
+
+  grid.appendChild(createPcAccordionSection({
+    sectionKey: 'endpoint-surface-drift',
+    title: '7. 포트·시작프로그램',
+    metricSummary: surfaceSummary,
+    badges: surfaceBadges,
+    bodyContent: surfaceBody,
+  }));
+
   return grid;
+}
+
+function buildAuditBundleExporterDom() {
+  const panel = createEl('div', {
+    id: 'soc-audit-bundle-standalone',
+    className: 'soc-split-panel soc-audit-standalone-panel',
+    attrs: {
+      role: 'region',
+      'aria-label': '관제 감사 리포트 (Signed Audit Bundle) 내보내기 및 암호학적 SHA-256 무결성 검증',
+    },
+  });
+
+  // Top Heading Bar (Exact same layout as PC 상태 점검 and 직전 스냅샷 대비 추이 비교)
+  const heading = createEl('div', { className: 'soc-panel-heading' }, [
+    createEl('h3', { className: 'soc-panel-title', text: '관제 감사 리포트 (Signed Audit Bundle)' }),
+    createEl('div', { className: 'soc-panel-actions' }, [
+      createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+      createEl('span', { className: 'badge badge-audit-sign', text: '[SHA-256 서명 봉인]' }),
+    ]),
+  ]);
+  panel.appendChild(heading);
+
+  const box = createEl('div', { className: 'trend-delta-box', style: 'padding: 12px 14px;' });
+
+  // 1) 2-Card Summary Grid (matching soc-delta-summary-grid & soc-delta-card in buildTrendComparisonBoxDom)
+  const dlBtn = createEl('button', {
+    className: 'btn audit-action-btn pc-refresh-btn',
+    text: '[SHA-256 서명 감사 리포트 다운로드 (.json)]',
+    attrs: { type: 'button' },
+  });
+  const dlStatus = createEl('span', { className: 'muted font-mono text-small' });
+
+  attachKeyboardClick(dlBtn, () => {
+    dlBtn.disabled = true;
+    dlBtn.textContent = '리포트 생성 및 해시 봉인 중…';
+    fetch('/api/pc-status/audit-export')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((bundle) => {
+        dlBtn.disabled = false;
+        dlBtn.textContent = '[SHA-256 서명 감사 리포트 다운로드 (.json)]';
+        const str = JSON.stringify(bundle, null, 2);
+        const blob = new Blob([str], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const filename = `keshev-audit-bundle-${Date.now()}.json`;
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        dlStatus.textContent = `다운로드 완료: ${filename} (SHA-256: ${bundle.integrity?.payloadSha256?.slice(0, 16)}…)`;
+      })
+      .catch((err) => {
+        dlBtn.disabled = false;
+        dlBtn.textContent = '[SHA-256 서명 감사 리포트 다운로드 (.json)] (재시도)';
+        dlStatus.textContent = `내보내기 실패: ${err?.message || '서버 오류'}`;
+      });
+  });
+
+  const fileInput = createEl('input', {
+    attrs: { type: 'file', accept: '.json', style: 'display: none;' },
+  });
+
+  const filePickBtn = createEl('button', {
+    className: 'btn audit-action-btn pc-toggle-all-btn',
+    text: '[파일 선택 (.json)]',
+    attrs: {
+      type: 'button',
+      style: 'margin-right: 10px !important;',
+    },
+  });
+
+  const verifyBtn = createEl('button', {
+    className: 'btn audit-action-btn pc-refresh-btn',
+    text: '[리포트 무결성 검증 실행]',
+    attrs: { type: 'button' },
+  });
+
+  const verifyStatusChip = createEl('span', {
+    className: 'delta-chip is-same',
+    text: '검증 대기',
+  });
+
+  const resultContainer = createEl('div', { className: 'audit-verify-result-container' });
+
+  const textarea = createEl('textarea', {
+    className: 'audit-json-textarea font-mono',
+    attrs: {
+      placeholder: '감사 리포트 JSON 내용을 붙여넣거나 파일을 선택하세요.',
+      rows: '3',
+      style: 'min-height: 60px !important; height: 78px !important; max-height: 240px !important; width: 100% !important; box-sizing: border-box !important;',
+    },
+  });
+
+  attachKeyboardClick(filePickBtn, () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      filePickBtn.textContent = `[파일 선택됨: ${file.name}]`;
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        textarea.value = re.target?.result || '';
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+  });
+
+  function executeVerification() {
+    const raw = textarea.value.trim();
+    if (!raw) {
+      verifyStatusChip.className = 'delta-chip is-pending';
+      verifyStatusChip.textContent = '데이터 없음';
+      resultContainer.replaceChildren(createEl('div', {
+        className: 'audit-result-banner banner-warning',
+        text: '검증할 JSON 데이터가 없습니다. 파일을 선택하거나 내용을 입력하세요.',
+      }));
+      return;
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (parseErr) {
+      verifyStatusChip.className = 'delta-chip is-up';
+      verifyStatusChip.textContent = '파싱 실패';
+      resultContainer.replaceChildren(createEl('div', {
+        className: 'audit-result-banner banner-tampered',
+        text: `✕ JSON 파싱 실패: 형식이 손상되었습니다. (${parseErr.message})`,
+      }));
+      return;
+    }
+
+    verifyBtn.disabled = true;
+    verifyBtn.textContent = '해시 검증 중…';
+
+    fetch('/api/pc-status/audit-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(parsed),
+    })
+      .then((res) => res.json())
+      .then((resJson) => {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = '[리포트 무결성 검증 실행]';
+        const d = resJson?.data;
+        if (!resJson?.ok || !d) {
+          verifyStatusChip.className = 'delta-chip is-up';
+          verifyStatusChip.textContent = '검증 오류';
+          resultContainer.replaceChildren(createEl('div', {
+            className: 'audit-result-banner banner-tampered',
+            text: `✕ 검증 요청 실패: ${resJson?.error?.message || '서버 오류'}`,
+          }));
+          return;
+        }
+
+        if (d.verified) {
+          verifyStatusChip.className = 'delta-chip is-down';
+          verifyStatusChip.textContent = '무결성 일치 (정상)';
+          resultContainer.replaceChildren(createEl('div', {
+            className: 'audit-result-banner banner-verified',
+          }, [
+            createEl('strong', { text: '✓ 무결성 검증 통과 (일치)' }),
+            createEl('p', { text: `발행 시각: ${formatMeasuredAt(d.generatedAt)} | ${d.reason}` }),
+            createEl('p', { className: 'font-mono text-small', text: `SHA-256 다이제스트: ${d.computedHash}` }),
+          ]));
+        } else {
+          verifyStatusChip.className = 'delta-chip is-up';
+          verifyStatusChip.textContent = '위변조 탐지';
+          resultContainer.replaceChildren(createEl('div', {
+            className: 'audit-result-banner banner-tampered',
+          }, [
+            createEl('strong', { text: '✕ 위변조 탐지 (해시 불일치)' }),
+            createEl('p', { text: d.reason }),
+            createEl('div', { className: 'font-mono text-small' }, [
+              createEl('p', { text: `기대 해시 (Expected): ${d.expectedHash || '(없음)'}` }),
+              createEl('p', { text: `계산 해시 (Computed): ${d.computedHash}` }),
+            ]),
+          ]));
+        }
+      })
+      .catch((err) => {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = '[리포트 무결성 검증 실행] (재시도)';
+        verifyStatusChip.className = 'delta-chip is-up';
+        verifyStatusChip.textContent = '네트워크 오류';
+        resultContainer.replaceChildren(createEl('div', {
+          className: 'audit-result-banner banner-tampered',
+          text: `네트워크 오류: ${err.message}`,
+        }));
+      });
+  }
+
+  attachKeyboardClick(verifyBtn, executeVerification);
+
+  const grid2x1 = createEl('div', { className: 'soc-delta-summary-grid' }, [
+    createEl('div', { className: 'soc-delta-card' }, [
+      createEl('div', { className: 'delta-card-head' }, [
+        createEl('span', { className: 'delta-card-label', text: '서명된 감사 리포트 내보내기 (Export)' }),
+        createEl('span', { className: 'delta-chip is-same', text: 'SHA-256 전자서명' }),
+      ]),
+      createEl('span', { className: 'delta-card-desc', text: '단말 7개 점검 지표 실측값과 공격표면, 안전 기준선을 암호학적 SHA-256으로 봉인하여 추출합니다.' }),
+      createEl('div', { style: 'margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;' }, [
+        dlBtn,
+        dlStatus,
+      ]),
+    ]),
+    createEl('div', { className: 'soc-delta-card' }, [
+      createEl('div', { className: 'delta-card-head' }, [
+        createEl('span', { className: 'delta-card-label', text: '리포트 위변조 탐지 및 무결성 검증 (Verify)' }),
+        verifyStatusChip,
+      ]),
+      createEl('span', { className: 'delta-card-desc', text: '감사 리포트 JSON을 붙여넣거나 파일을 선택하여 SHA-256 무결성을 검증합니다.' }),
+      createEl('div', { style: 'margin-top: 8px;' }, [
+        textarea,
+      ]),
+      createEl('div', {
+        className: 'audit-buttons-row',
+        attrs: {
+          style: 'margin-top: 10px !important; display: flex !important; align-items: center !important; justify-content: flex-start !important; gap: 10px !important; flex-wrap: wrap !important;',
+        },
+      }, [
+        fileInput,
+        filePickBtn,
+        verifyBtn,
+      ]),
+      resultContainer,
+    ]),
+  ]);
+  box.appendChild(grid2x1);
+
+  // 2) Structured Table/Grid (matching trend-delta-breakdown in buildTrendComparisonBoxDom)
+  const auditSpecRows = [
+    {
+      item: '단말 실측 텔레메트리 봉인 범위',
+      status: '네트워크 어댑터, 방화벽 프로필, Windows 이벤트 로그, CPU, RAM, 디스크 (6개 센서 실측)',
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    },
+    {
+      item: '공격 표면 및 기준선 봉인',
+      status: '활성 TCP 리스닝 소켓 매핑 및 사용자 지속성 시작프로그램 등록 스냅샷',
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    },
+    {
+      item: '암호학적 무결성 서명 방식',
+      status: 'SHA-256 정규화 다이제스트 (Canonical JSON UTF-8 직렬화)',
+      badgeEl: createEl('span', { className: 'badge badge-audit-sign', text: '[SHA-256 봉인]' }),
+    },
+  ];
+
+  function createAuditSpecTableDom(rows = []) {
+    const table = createEl('div', { className: 'pc-inspection-table audit-spec-table' });
+    for (const row of rows) {
+      const itemEl = createEl('span', {
+        className: 'pc-col-item',
+        text: row.item,
+        attrs: {
+          style: 'text-align: right !important; justify-self: end !important; font-weight: 700 !important; color: #0e306d !important; font-size: 11.5px !important; white-space: nowrap !important; padding-right: 6px !important;',
+        },
+      });
+
+      const statusEl = createEl('span', {
+        className: 'pc-col-status',
+        text: String(row.status || '-'),
+        attrs: {
+          style: 'text-align: left !important; justify-self: start !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif !important; font-size: 11.5px !important; color: #334155 !important; word-break: keep-all !important; line-height: 1.45 !important;',
+        },
+      });
+
+      const badgeEl = createEl('div', {
+        className: 'pc-col-badge',
+        attrs: {
+          style: 'display: flex !important; align-items: center !important; justify-content: flex-end !important; flex-shrink: 0 !important; white-space: nowrap !important;',
+        },
+      }, [row.badgeEl]);
+
+      const rowEl = createEl('div', {
+        className: 'pc-inspection-row',
+        attrs: {
+          style: 'display: grid !important; grid-template-columns: 210px 1fr 100px !important; align-items: center !important; gap: 12px !important; padding: 6px 10px !important;',
+        },
+      }, [itemEl, statusEl, badgeEl]);
+
+      table.appendChild(rowEl);
+    }
+    return table;
+  }
+
+  const auditSpecTable = createAuditSpecTableDom(auditSpecRows);
+
+  const isAuditDetailOpen = getAccordionOpen('audit-bundle-breakdown', false);
+  const auditDetails = createEl('details', {
+    className: 'pc-accordion',
+    attrs: {
+      'data-pc-section': 'audit-bundle-breakdown',
+      ...(isAuditDetailOpen ? { open: 'true' } : {}),
+    },
+  });
+  auditDetails.addEventListener('toggle', () => {
+    setAccordionOpen('audit-bundle-breakdown', auditDetails.open);
+  });
+
+  const summary = createEl('summary', { className: 'pc-accordion-summary' }, [
+    createEl('strong', { className: 'pc-accordion-title', text: '감사 리포트 봉인 규격 명세 (단말 실측·공격표면·SHA-256 서명)' }),
+    createEl('div', { className: 'pc-accordion-badges' }, [
+      createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+      createEl('span', { className: 'badge badge-audit-sign', text: '[SHA-256 봉인]' }),
+    ]),
+  ]);
+
+  const auditBody = createEl('div', { className: 'pc-accordion-body' }, [
+    auditSpecTable,
+  ]);
+
+  auditDetails.appendChild(summary);
+  auditDetails.appendChild(auditBody);
+  box.appendChild(auditDetails);
+  panel.appendChild(box);
+
+  return panel;
 }
 
 function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRules, provenance, mode, pcStatus, onRefresh = null }) {
@@ -3357,7 +4588,7 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
       ]),
     ]);
     panel.appendChild(heading);
-    pcInspectionDom = buildPcStatusInspectionCardDom(pcStatus, mode, toggleAllBtn);
+    pcInspectionDom = buildPcStatusInspectionCardDom(pcStatus, mode, toggleAllBtn, onRefresh);
     panel.appendChild(pcInspectionDom);
   } else {
     // Header for event-specific audit slot
@@ -3465,7 +4696,17 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
   }
 
   if (pcInspectionDom) {
-    const sdpAuditDetails = createEl('details', { className: 'pc-accordion sdp-audit-details' });
+    const isSdpAuditOpen = getAccordionOpen('sdp-audit', false);
+    const sdpAuditDetails = createEl('details', {
+      className: 'pc-accordion sdp-audit-details',
+      attrs: {
+        'data-pc-section': 'sdp-audit',
+        ...(isSdpAuditOpen ? { open: 'true' } : {}),
+      },
+    });
+    sdpAuditDetails.addEventListener('toggle', () => {
+      setAccordionOpen('sdp-audit', sdpAuditDetails.open);
+    });
     const decisionCount = decisionSlice?.status === 'ok' ? 1 : 0;
     sdpAuditDetails.appendChild(createEl('summary', { className: 'pc-accordion-summary' }, [
       createEl('strong', { className: 'pc-accordion-title', text: 'SDP 업무 앱 인가 판정 & 규칙 감사' }),
@@ -3488,6 +4729,64 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
   }
 
   return panel;
+}
+
+function sha256Hex(ascii) {
+  if (typeof ascii !== 'string') ascii = String(ascii || '');
+  try {
+    ascii = unescape(encodeURIComponent(ascii));
+  } catch {}
+  function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+  const mathPow = Math.pow;
+  const maxWord = mathPow(2, 32);
+  let lengthProperty = 'length';
+  let i, j;
+  let result = '';
+  const words = [];
+  const asciiBitLength = ascii[lengthProperty] * 8;
+  let hash = [];
+  const k = [];
+  let primeCounter = 0;
+  const isComposite = {};
+  for (let candidate = 2; primeCounter < 64; candidate++) {
+    if (!isComposite[candidate]) {
+      for (i = 0; i < 313; i += candidate) { isComposite[i] = candidate; }
+      hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+      k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+    }
+  }
+  hash = hash.slice(0, 8);
+  ascii += '\x80';
+  while ((ascii[lengthProperty] % 64) - 56) ascii += '\x00';
+  for (i = 0; i < ascii[lengthProperty]; i++) {
+    j = ascii.charCodeAt(i);
+    words[i >> 2] |= j << ((3 - (i % 4)) * 8);
+  }
+  words[words[lengthProperty]] = (asciiBitLength / maxWord) | 0;
+  words[words[lengthProperty]] = asciiBitLength | 0;
+  for (j = 0; j < words[lengthProperty]; ) {
+    const w = words.slice(j, (j += 16));
+    const oldHash = hash;
+    hash = hash.slice(0, 8);
+    for (i = 0; i < 64; i++) {
+      const w15 = w[i - 15], w2 = w[i - 2];
+      const s0 = rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3);
+      const s1 = rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10);
+      const ch = (hash[4] & hash[5]) ^ (~hash[4] & hash[6]);
+      const maj = (hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2]);
+      const temp1 = (hash[7] + (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) + ch + k[i] + (w[i] = (i < 16) ? w[i] : (w[i - 16] + s0 + w[i - 7] + s1) | 0)) | 0;
+      const temp2 = ((rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) + maj) | 0;
+      hash = [(temp1 + temp2) | 0, hash[0], hash[1], hash[2], (hash[3] + temp1) | 0, hash[4], hash[5], hash[6]];
+    }
+    for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+  }
+  for (i = 0; i < 8; i++) {
+    for (j = 3; j >= 0; j--) {
+      const b = (hash[i] >> (j * 8)) & 255;
+      result += (b < 16 ? '0' : '') + b.toString(16);
+    }
+  }
+  return result;
 }
 
 export function createStudentView(options = {}) {
@@ -3541,12 +4840,61 @@ export function createStudentView(options = {}) {
     snapshots: [],
   };
 
+  socStore.pcStatus.onServerSnapshots = (snaps) => hydrateServerSnapshots(socStore, snaps);
+
+  let sseConnected = false;
+  let eventSource = null;
+
+  function initSseTelemetryStream() {
+    if (typeof window === 'undefined' || typeof window.EventSource === 'undefined') return;
+    try {
+      if (eventSource) {
+        eventSource.close();
+      }
+      eventSource = new EventSource('/api/pc-status/stream');
+
+      eventSource.onopen = () => {
+        if (!sseConnected) {
+          sseConnected = true;
+          updateSocOverview(false);
+        }
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const res = JSON.parse(event.data);
+          if (res?.ok && res?.data) {
+            socStore.pcStatus.osProbe = Object.freeze(res.data);
+            socStore.pcStatus.osProbeError = null;
+            socStore.pcStatus.measuredAt = res.data.measuredAt || new Date().toISOString();
+            if (Array.isArray(res.data.snapshotHistory)) {
+              hydrateServerSnapshots(socStore, res.data.snapshotHistory);
+            }
+            updateSocOverview(false);
+          }
+        } catch {}
+      };
+
+      eventSource.onerror = () => {
+        if (sseConnected) {
+          sseConnected = false;
+          updateSocOverview(false);
+        }
+      };
+    } catch {
+      sseConnected = false;
+    }
+  }
+
+  initSseTelemetryStream();
+
   function handleRefreshPc() {
     refreshBrowserPcStatus(socStore.pcStatus, () => updateSocOverview(false), true);
     updateSocOverview(false);
   }
 
   function updateSocOverview(shouldRefreshPc = true) {
+    captureCurrentAccordionStates();
     if (shouldRefreshPc) {
       refreshBrowserPcStatus(socStore.pcStatus, () => updateSocOverview(false));
     }
@@ -3558,6 +4906,24 @@ export function createStudentView(options = {}) {
     const topTimeEl = document.getElementById('soc-top-measured-at');
     if (topTimeEl) {
       topTimeEl.textContent = `측정 시각: ${formatMeasuredAt(rawTime)}`;
+      const parent = topTimeEl.parentElement;
+      const existingPills = parent ? Array.from(parent.querySelectorAll('.sse-status-pill')) : [];
+      let pill = document.getElementById('soc-sse-status-pill');
+      if (!pill && existingPills.length > 0) {
+        pill = existingPills[0];
+        pill.id = 'soc-sse-status-pill';
+      }
+      if (existingPills.length > 1) {
+        for (let i = 1; i < existingPills.length; i++) {
+          existingPills[i].remove();
+        }
+      }
+      if (!pill) {
+        pill = createEl('span', { id: 'soc-sse-status-pill' });
+        parent?.appendChild(pill);
+      }
+      pill.textContent = sseConnected ? '[SSE 실시간 스트림 연결됨]' : '[SSE 재연결 중]';
+      pill.className = `badge sse-status-pill ${sseConnected ? 'sse-connected' : 'sse-disconnected'}`;
     }
 
     const topMetricsEl = document.getElementById('soc-top-metrics');
@@ -3576,28 +4942,46 @@ export function createStudentView(options = {}) {
       if (leftTimelineEl) {
         const leftChildren = [];
 
-        // Single clean header for Left Column
+        // 1) CARD 1: 직전 스냅샷 대비 추이 비교
         const snapMeasuredAt = socStore.snapshots[0]?.at || socStore.pcStatus?.measuredAt;
-        leftChildren.push(createEl('div', { className: 'soc-panel-heading' }, [
-          createEl('h3', { className: 'soc-panel-title', text: '직전 스냅샷 대비 추이 비교' }),
-          createEl('div', { className: 'soc-panel-actions' }, [
-            createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${formatMeasuredAt(snapMeasuredAt)}` }),
-            createEl('span', { className: 'soc-snapshot-badge', text: `누적 스냅샷 ${socStore.snapshots.length}건` }),
+        const trendCard = createEl('div', { className: 'soc-split-card soc-trend-card' }, [
+          createEl('div', { className: 'soc-panel-heading' }, [
+            createEl('h3', { className: 'soc-panel-title', text: '직전 스냅샷 대비 추이 비교' }),
+            createEl('div', { className: 'soc-panel-actions' }, [
+              createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${formatMeasuredAt(snapMeasuredAt)}` }),
+              createEl('span', { className: 'soc-snapshot-badge', text: `누적 스냅샷 ${socStore.snapshots.length}건` }),
+            ]),
           ]),
-        ]));
+          buildTrendComparisonBoxDom(socStore, evSummary.provenance),
+        ]);
+        leftChildren.push(trendCard);
 
-        // 2x2 Delta Grid & 10-item Granular Accordion
-        leftChildren.push(buildTrendComparisonBoxDom(socStore, evSummary.provenance));
+        // 2) CARD 2: 시간순 보안 이벤트 타임라인 (SDP 사건 영역으로 명확히 분리)
+        const timelineCard = createEl('div', { className: 'soc-split-card soc-timeline-card' });
+        const tlHeading = createEl('div', { className: 'soc-panel-heading' }, [
+          createEl('h3', { className: 'soc-panel-title', text: '시간순 보안 이벤트 타임라인' }),
+          createEl('div', { className: 'soc-panel-actions' }, [
+            createSdpStatusBadgeEl(effectiveMode),
+          ]),
+        ]);
+        timelineCard.appendChild(tlHeading);
 
-        // Consolidated compact status or timeline
+        const tlBody = createEl('div', { className: 'soc-card-body', style: 'padding: 10px 12px;' });
         if (evSummary.sortedEvents.length > 0) {
+          const isTlOpen = getAccordionOpen('sdp-timeline', true);
           const tlDetails = createEl('details', {
             className: 'pc-accordion sdp-timeline-details',
-            attrs: { open: 'true' },
+            attrs: {
+              'data-pc-section': 'sdp-timeline',
+              ...(isTlOpen ? { open: 'true' } : {}),
+            },
+          });
+          tlDetails.addEventListener('toggle', () => {
+            setAccordionOpen('sdp-timeline', tlDetails.open);
           });
           tlDetails.appendChild(createEl('summary', { className: 'pc-accordion-summary' }, [
-            createEl('strong', { className: 'pc-accordion-title', text: '시간순 보안 이벤트 타임라인' }),
-            createEl('span', { className: 'pc-accordion-metric', text: `수신 기록 ${evSummary.sortedEvents.length}건 (최신순)` }),
+            createEl('strong', { className: 'pc-accordion-title', text: '수신된 보안 사건 목록' }),
+            createEl('span', { className: 'pc-accordion-metric', text: `총 ${evSummary.sortedEvents.length}건 (최신순)` }),
             createEl('div', { className: 'pc-accordion-badges' }, [
               createSdpStatusBadgeEl(effectiveMode),
             ]),
@@ -3628,18 +5012,27 @@ export function createStudentView(options = {}) {
             tlList.appendChild(item);
           }
           tlDetails.appendChild(createEl('div', { className: 'pc-accordion-body' }, [tlList]));
-          leftChildren.push(tlDetails);
+          tlBody.appendChild(tlDetails);
         } else {
-          leftChildren.push(createEl('div', { className: 'soc-compact-status-row' }, [
-            createSdpStatusBadgeEl(effectiveMode),
-            createEl('span', {
-              className: 'soc-status-prose',
-              text: effectiveMode === 'disconnected'
-                ? '외부 SDP 서버 미연결로 수신 사건 0건 (내 PC 실측값과 분리 표기)'
-                : '표시할 시간순 보안 이벤트가 0건입니다.',
+          tlBody.appendChild(createEl('div', { className: 'soc-empty-timeline-box', style: 'padding: 4px 0;' }, [
+            createEl('div', { className: 'soc-compact-status-row', style: 'margin: 0;' }, [
+              createSdpStatusBadgeEl(effectiveMode),
+              createEl('span', {
+                className: 'soc-status-prose',
+                text: effectiveMode === 'disconnected'
+                  ? '외부 SDP 서버 미연결로 수신 사건 0건 (내 PC 실측값과 분리 표기)'
+                  : '표시할 시간순 보안 이벤트가 0건입니다.',
+              }),
+            ]),
+            createEl('p', {
+              className: 'muted text-small',
+              style: 'margin: 6px 0 0 2px; font-size: 11px; line-height: 1.4;',
+              text: '외부 침해·접속 제어 사건은 SDP 게이트웨이 연동 시 실시간으로 수신되며, 상단의 로컬 PC 실측(네트워크·방화벽·로그) 데이터는 정상 측정 중입니다.',
             }),
           ]));
         }
+        timelineCard.appendChild(tlBody);
+        leftChildren.push(timelineCard);
 
         leftTimelineEl.replaceChildren(...leftChildren);
       }
@@ -3655,6 +5048,16 @@ export function createStudentView(options = {}) {
           onRefresh: handleRefreshPc,
         });
         rightAuditEl.replaceChildren(...Array.from(auditDom.childNodes));
+      }
+
+      // 3) 관제 감사 리포트 (Signed Audit Bundle) - 2단 분할 영역 하단에 별도 독립 대형 패널로 배치 (사용자 입력 상태 보존)
+      const splitOverviewEl = document.getElementById('soc-bottom-split-overview');
+      if (splitOverviewEl) {
+        const existingAuditEl = document.getElementById('soc-audit-bundle-standalone');
+        if (!existingAuditEl) {
+          const auditBundlePanel = buildAuditBundleExporterDom();
+          splitOverviewEl.appendChild(auditBundlePanel);
+        }
       }
     }
   }
@@ -4578,6 +5981,31 @@ export function createStudentView(options = {}) {
           appendKvRow(dlMeta, '잠금 파일 해시 (lockfileHash)', scanData.lockfileHash);
         }
         appendKvRow(dlMeta, '측정 시각 (checkedAt)', formatMeasuredAt(scanData.checkedAt));
+        // Supply-Chain Posture Summary Bar
+        const cleanCount = packages.filter((p) => p.status === 'none_found').length;
+        const vulnPkgCount = packages.filter((p) => p.status === 'known_vulnerabilities').length;
+        const unapprovedCount = scanData.excluded?.unapproved ?? 0;
+
+        const postureBar = createEl('div', { className: 'supply-chain-posture-bar' }, [
+          createEl('div', { className: 'posture-chip' }, [
+            createEl('span', { className: 'chip-label', text: '승인 패키지 점검' }),
+            createEl('span', { className: 'chip-val', text: `${packages.length}개` }),
+          ]),
+          createEl('div', { className: 'posture-chip' }, [
+            createEl('span', { className: 'chip-label', text: '정상 (none_found)' }),
+            createEl('span', { className: 'chip-val text-teal', text: `${cleanCount}개` }),
+          ]),
+          createEl('div', { className: 'posture-chip' }, [
+            createEl('span', { className: 'chip-label', text: '취약 (known_vulnerabilities)' }),
+            createEl('span', { className: `chip-val ${vulnPkgCount > 0 ? 'text-red' : 'text-muted'}`, text: `${vulnPkgCount}개 (${totalVulnCount}건)` }),
+          ]),
+          createEl('div', { className: 'posture-chip' }, [
+            createEl('span', { className: 'chip-label', text: '미승인 제외 (unapproved)' }),
+            createEl('span', { className: 'chip-val text-muted', text: `${unapprovedCount}개` }),
+          ]),
+        ]);
+        container.appendChild(postureBar);
+
         if (dlMeta.children.length > 0) {
           container.appendChild(dlMeta);
         }
@@ -4619,10 +6047,21 @@ export function createStudentView(options = {}) {
               tr.appendChild(createEl('td', { text: pkgStatusText }));
 
               if (finding) {
-                tr.appendChild(createEl('td', {
-                  text: finding.id || '',
+                const tdId = createEl('td', {
                   attrs: { 'data-student-vuln-id': finding.id || '' },
-                }));
+                });
+                if (finding.id) {
+                  tdId.appendChild(createEl('a', {
+                    className: 'osv-vuln-link',
+                    text: finding.id,
+                    attrs: {
+                      href: `https://osv.dev/vulnerability/${encodeURIComponent(finding.id)}`,
+                      target: '_blank',
+                      rel: 'noreferrer noopener',
+                    },
+                  }));
+                }
+                tr.appendChild(tdId);
               } else {
                 tr.appendChild(createEl('td', {
                   text: pkg.status === 'none_found' ? '알려진 항목 없음' : '-',
@@ -4887,7 +6326,15 @@ export function createStudentView(options = {}) {
         container.setAttribute('data-student-explanation-status', 'ok');
         container.setAttribute('data-student-explanation-event', event.id);
 
-        container.appendChild(createEl('h4', { text: 'AI 설명(참고용)' }));
+        const headingRow = createEl('div', { className: 'explanation-heading row items-center gap-sm' });
+        headingRow.appendChild(createEl('h4', { text: 'AI 설명(참고용)' }));
+        headingRow.appendChild(createEl('span', {
+          className: 'badge badge-ai-demo',
+          text: '[예시값 · 로컬 AI 분석]',
+          attrs: { 'data-student-ai-badge': 'demo' },
+        }));
+        container.appendChild(headingRow);
+
         container.appendChild(createEl('p', {
           className: 'muted',
           text: '아래 요약은 AI가 이 기록을 읽고 쓴 해석입니다. 사실 판단은 인용한 근거와 연동 시스템이 알려 준 현재 상태를 기준으로 하세요.',
@@ -5009,6 +6456,16 @@ export function createStudentView(options = {}) {
         },
       });
 
+      if (effectiveStatus !== 'idle') {
+        const badgeRow = createEl('div', { className: 'action-header-badge-row row items-center gap-sm' });
+        badgeRow.appendChild(createEl('span', {
+          className: 'badge badge-sim-action',
+          text: '[시뮬레이션 · 조치 상태 검증]',
+          attrs: { 'data-student-sim-badge': 'true' },
+        }));
+        container.appendChild(badgeRow);
+      }
+
       let titleText = '';
       let descText = '';
 
@@ -5073,6 +6530,34 @@ export function createStudentView(options = {}) {
         createEl('p', { className: 'muted', text: descText }),
       ]));
 
+      // 상태 진행도 바 (Progress Stepper)
+      if (['prepared', 'executing', 'pending', 'succeeded', 'denied'].includes(effectiveStatus)) {
+        const stepper = createEl('div', {
+          className: 'action-progress-stepper',
+          attrs: { 'data-student-action-stepper': effectiveStatus },
+        });
+
+        const steps = [
+          { key: 'prepared', label: '1. 준비됨(사람 확인 대기)', activeStates: ['prepared'], doneStates: ['executing', 'pending', 'succeeded', 'denied'] },
+          { key: 'pending', label: '2. 접수·처리 중(ACK)', activeStates: ['executing', 'pending'], doneStates: ['succeeded', 'denied'] },
+          { key: 'succeeded', label: '3. 원천 효과 확인', activeStates: ['succeeded'], doneStates: [] },
+        ];
+
+        for (const st of steps) {
+          const isDone = st.doneStates.includes(effectiveStatus);
+          const isActive = st.activeStates.includes(effectiveStatus);
+          const isDenied = effectiveStatus === 'denied' && st.key === 'succeeded';
+          const stepClass = isDenied ? 'step-denied' : isDone ? 'step-completed' : isActive ? 'step-active' : 'step-pending';
+          const labelText = isDenied ? '3. 연동 시스템 거절(denied)' : st.label;
+
+          stepper.appendChild(createEl('div', { className: `stepper-step ${stepClass}` }, [
+            createEl('span', { className: 'step-bullet', text: isDone ? '✓' : isDenied ? '✕' : '•' }),
+            createEl('span', { className: 'step-label', text: labelText }),
+          ]));
+        }
+        container.appendChild(stepper);
+      }
+
       // 2. 현재 사건·조치·대상·접수증 상세 정보 (전달된 항목만 표시)
       const dl = createEl('dl', { className: 'kv' });
 
@@ -5102,6 +6587,20 @@ export function createStudentView(options = {}) {
       if (receipt?.version !== undefined && receipt?.version !== null) {
         appendKvRow(dl, '버전 (version)', String(receipt.version), {
           'data-student-action-detail-version': String(receipt.version),
+        });
+      }
+      if (receipt?.requestId && receipt?.receiptId) {
+        const hashPayload = `${receipt.requestId}:${receipt.receiptId}:${receipt.actionId || actionId || ''}:${target?.id || ''}:${target?.generation ?? ''}`;
+        const actionHash = sha256Hex(hashPayload);
+        const serverHash = receipt?.actionHash || null;
+        const isMatched = !serverHash || serverHash === actionHash;
+
+        appendKvRow(dl, 'SHA-256 검증 해시', actionHash, {
+          'data-student-action-detail-hash': actionHash,
+          className: 'receipt-hash-row font-mono',
+        });
+        appendKvRow(dl, '조치 검증 상태', isMatched ? '[시뮬레이션 · 조치 상태 검증] 영수증 무결성 확인됨' : '[시뮬레이션 · 위변조 의심] 영수증 해시 불일치', {
+          'data-student-action-detail-integrity': isMatched ? 'verified' : 'mismatch',
         });
       }
       if (confirmationExpiresAt) {

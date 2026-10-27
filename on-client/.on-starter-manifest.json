@@ -55,7 +55,7 @@
     "tools/app-credentials.ps1": "8832dedf8645e13d153f7874aa439351652dacc3f19e1b4183f77fd6dc69f585",
     "tools/native-host-registry.ps1": "ece6db6dd0bdf5698c9c4276ccecbdca761f38f3d6f2cefd0d76c2739c2fd573",
     "tools/prepare-native-host.ps1": "1bc89a9ffef358a00d072ac73202b1f25630fbf59b3092a3cb62bd04ae0c0a26",
-    "tools/start-alekov.ps1": "273c0b54337155d04d97f133a960e969a6a846b4863edddb647d755067ed18b9",
+    "tools/start-alekov.ps1": "33929fe243a7bce145a0384ae9df6c47639183de65da93a523827a643fa26257",
     "vendor/NOTICE.md": "c06c09e7d859023fa585c2228e2e9b7f4c82d32a5083ffd6eeffa26fcb8aa1af",
     "vendor/clco-http.mjs": "e9c12c59c90d6b102726c3912cf26174c9b0c91160f83ed226092de6eb904667"
   }
