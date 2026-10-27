@@ -11,6 +11,9 @@
   --brand-orange: #F47725;
   --brand-orange-tint: #FEF1E8;
   --brand-orange-border: #FCD6BD;
+  --brand-red: #EA002C;
+  --brand-red-tint: #FDE8EC;
+  --brand-red-border: #F9B2BE;
   --surface-bg: #F4F6F9;
   --card-bg: #FFFFFF;
   --border-subtle: #E2E8F0;
@@ -29,9 +32,9 @@
   --allow: var(--brand-teal);
   --allow-soft: var(--brand-teal-tint);
   --allow-border: var(--brand-teal-border);
-  --deny: var(--brand-orange);
-  --deny-soft: var(--brand-orange-tint);
-  --deny-border: var(--brand-orange-border);
+  --deny: var(--brand-red, #EA002C);
+  --deny-soft: var(--brand-red-tint, #FDE8EC);
+  --deny-border: var(--brand-red-border, #F9B2BE);
   --challenge: var(--brand-orange);
   --challenge-soft: var(--brand-orange-tint);
   --challenge-border: var(--brand-orange-border);
@@ -248,6 +251,31 @@ main:focus { outline: none; }
    SOC Operations Dashboard — Data Provenance Badges, Top 4 Metric Cards & 2-Column Split View
    ========================================================================== */
 
+.soc-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 14px 0;
+}
+
+.soc-dashboard-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-main, #0F172A);
+}
+
+.soc-dashboard-header .soc-card-timestamp {
+  margin: 0 0 0 auto;
+  font-size: 12px;
+  color: var(--text-muted, #64748B);
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .soc-overview-shell {
   margin: 0 0 10px;
 }
@@ -316,7 +344,9 @@ main:focus { outline: none; }
 .mode-badge,
 .tag,
 .tag-student,
-.tag-demo {
+.tag-demo,
+.soc-snapshot-badge,
+.badge-non-intrusion {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -344,7 +374,7 @@ main:focus { outline: none; }
   border: 1px solid #B3E0DE !important;
 }
 
-/* 「SDP 미연결」 & 「확인 불가」 */
+/* 「SDP 미연결」 & 확인 불가 */
 .badge-unverified,
 .badge-sdp-disconnected,
 .mode-badge[data-mode="disconnected"],
@@ -353,17 +383,27 @@ main:focus { outline: none; }
   background: #FEF1E8 !important;
   color: #F47725 !important;
   border: 1px solid #FCD6BD !important;
+  padding: 0 6px !important;
+  margin: 0 !important;
 }
 
-/* [예시값] & [내가 바꾼 부분] & [침해 탐지 아님] */
-.badge-demo,
-.badge-provided,
+/* [내가 바꾼 부분] & 학생 태그 (보라색 지정 색: #6d28d9 / #f5f3ff / #ddd6fe) */
 .badge-custom,
 .tag-student,
+[data-role-kind="custom"] {
+  background: var(--student-soft, #f5f3ff) !important;
+  color: var(--student, #6d28d9) !important;
+  border: 1px solid #ddd6fe !important;
+}
+
+/* [예시값] & [제공 기능] & [누적 스냅샷] & [침해 탐지 아님] (네이비) */
+.badge-demo,
+.badge-provided,
 .tag-demo,
+.soc-snapshot-badge,
+.badge-non-intrusion,
 .mode-badge[data-mode="demo"],
 [data-provenance="demo"],
-[data-role-kind="custom"],
 [data-role-kind="provided"] {
   background: #E7ECF3 !important;
   color: #0E306D !important;
@@ -408,11 +448,11 @@ main:focus { outline: none; }
   margin: 4px 0 8px;
   padding: 6px 10px;
   border-radius: 4px;
-  background: #fffbeb;
-  border: 1px solid #fcd34d;
-  color: #92400e;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  color: #334155;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .soc-card-timestamp {
@@ -460,12 +500,14 @@ main:focus { outline: none; }
 }
 
 .trend-delta-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--student);
-  border-radius: var(--radius);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 10px 12px;
-  margin-bottom: 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .trend-delta-list {
@@ -686,6 +728,20 @@ main:focus { outline: none; }
   font-family: ui-monospace, Consolas, monospace;
 }
 
+.soc-col-profile {
+  white-space: nowrap !important;
+  vertical-align: middle;
+}
+
+.soc-profile-en {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted, #64748B);
+  font-weight: 500;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+
 .soc-status-on {
   color: var(--brand-teal, #009A93);
   font-weight: 700;
@@ -693,14 +749,60 @@ main:focus { outline: none; }
 }
 
 .soc-status-off {
-  color: var(--brand-orange, #F47725);
+  color: var(--brand-red, #EA002C);
   font-weight: 700;
   white-space: nowrap;
 }
 
-.soc-num-error {
-  color: var(--brand-orange, #F47725);
+.soc-dot-teal {
+  color: var(--brand-teal, #009A93);
   font-weight: 700;
+  margin-right: 4px;
+  display: inline-block;
+}
+
+.soc-dot-off {
+  color: var(--brand-red, #EA002C);
+  font-weight: 700;
+  margin-right: 4px;
+  display: inline-block;
+}
+
+.soc-num-error {
+  color: var(--brand-red, #EA002C) !important;
+  font-weight: 700;
+}
+
+/* Card 1 항목 컬럼 넓이 확보 (기본 게이트웨이 한 줄 표시) */
+.soc-metric-card[data-soc-card="card-1-identity-network"] .soc-mini-table th:first-child,
+.soc-metric-card[data-soc-card="card-1-identity-network"] .soc-mini-table td:first-child {
+  white-space: nowrap !important;
+  min-width: 98px;
+  padding-right: 6px !important;
+}
+
+.soc-metric-card[data-soc-card="card-1-identity-network"] .soc-mini-table td.soc-val-right {
+  font-size: 11.5px !important;
+  padding-left: 4px !important;
+  letter-spacing: -0.2px;
+}
+
+/* Card 3 전체 컬럼 줄 바꿈 방지 및 너비·패딩 최적화 */
+.soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table th,
+.soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table td {
+  white-space: nowrap !important;
+  padding: 5px 4px !important;
+  font-size: 11.5px !important;
+}
+
+.soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table {
+  width: 100% !important;
+  table-layout: auto !important;
+}
+
+.soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-ratio-labels,
+.soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-card-notice {
+  white-space: nowrap !important;
 }
 
 .soc-card-notice {
@@ -769,7 +871,7 @@ main:focus { outline: none; }
 }
 
 .soc-ratio-labels .ratio-err {
-  color: var(--brand-orange, #F47725);
+  color: var(--brand-red, #EA002C) !important;
 }
 
 .soc-ratio-labels .ratio-warn {
@@ -786,7 +888,7 @@ main:focus { outline: none; }
 }
 
 .soc-ratio-seg.seg-error {
-  background: var(--brand-orange, #F47725);
+  background: var(--brand-red, #EA002C) !important;
   height: 100%;
 }
 
@@ -965,7 +1067,23 @@ main:focus { outline: none; }
 }
 
 .sdp-audit-details {
-  margin-top: 10px;
+  width: 100%;
+}
+.sdp-audit-details .pc-accordion-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sdp-audit-details .soc-audit-card {
+  margin: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  background: #f8fafc;
+}
+.sdp-timeline-details,
+.soc-compact-status-row {
+  margin: 0 12px 12px 12px;
 }
 .soc-split-overview-card {
   margin-top: 8px;
@@ -977,7 +1095,7 @@ main:focus { outline: none; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   margin: 0 0 6px 0;
   padding-bottom: 6px;
@@ -988,12 +1106,23 @@ main:focus { outline: none; }
   font-size: 0.95rem;
   font-weight: 700;
   color: #0f172a;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .soc-panel-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.soc-panel-actions .soc-card-timestamp {
+  margin: 0 !important;
+  font-size: 11px;
+  color: var(--text-muted, #64748B);
+  line-height: 22px;
+  white-space: nowrap;
 }
 
 /* 2x2 Core Delta Summary Grid */
@@ -1009,17 +1138,19 @@ main:focus { outline: none; }
   }
 }
 .soc-delta-card {
-  background: #f8fafc;
+  background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .soc-delta-card:hover {
   border-color: #cbd5e1;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.06);
 }
 .delta-card-head {
   display: flex;
@@ -1037,31 +1168,36 @@ main:focus { outline: none; }
   color: #64748b;
 }
 .delta-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.25;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 22px !important;
+  line-height: 20px !important;
+  padding: 0 8px !important;
+  border-radius: 4px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
   letter-spacing: -0.2px;
 }
 .delta-chip.is-up {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: #fde8ec !important;
+  color: #EA002C !important;
+  border: 1px solid #f9b2be !important;
 }
 .delta-chip.is-down {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
 }
-.delta-chip.is-same {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+.delta-chip.is-same,
+.delta-chip.is-pending {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 .pc-toggle-all-btn,
 .pc-refresh-btn {
@@ -1142,7 +1278,7 @@ main:focus { outline: none; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 10px 14px;
   background: var(--brand-navy-tint, #E7ECF3);
@@ -1159,6 +1295,8 @@ main:focus { outline: none; }
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .soc-audit-card {
@@ -1166,7 +1304,8 @@ main:focus { outline: none; }
   border: 1px solid var(--border-subtle, #E2E8F0);
   border-radius: 6px;
   padding: 10px 12px;
-  margin: 8px 12px;
+  margin: 0 12px 8px 12px;
+  box-sizing: border-box;
 }
 
 .soc-audit-card h4 {
@@ -1177,7 +1316,12 @@ main:focus { outline: none; }
 }
 
 .pc-status-grid {
-  padding: 10px 12px;
+  padding: 10px 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .soc-timeline-list {

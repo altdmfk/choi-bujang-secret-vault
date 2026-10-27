@@ -264,6 +264,28 @@ function ensureStudentAppearanceStyle() {
     .view[hidden] {
       display: none !important;
     }
+    .soc-dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 0 0 14px 0;
+    }
+    .soc-dashboard-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .soc-dashboard-header .soc-card-timestamp {
+      margin: 0 0 0 auto;
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      text-align: right;
+      white-space: nowrap;
+    }
     .soc-overview-shell {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -308,11 +330,16 @@ function ensureStudentAppearanceStyle() {
       --brand-orange: #F47725;
       --brand-orange-tint: #FEF1E8;
       --brand-orange-border: #FCD6BD;
+      --brand-red: #EA002C;
+      --brand-red-tint: #FDE8EC;
+      --brand-red-border: #F9B2BE;
       --surface-bg: #F4F6F9;
       --card-bg: #FFFFFF;
       --border-subtle: #E2E8F0;
       --text-main: #0F172A;
       --text-muted: #64748B;
+      --student: #6d28d9;
+      --student-soft: #f5f3ff;
     }
 
     /* Standardized Badges & Tags (Zero Wrapping, Uniform 22px Height) */
@@ -326,7 +353,9 @@ function ensureStudentAppearanceStyle() {
     .mode-badge,
     .tag,
     .tag-student,
-    .tag-demo {
+    .tag-demo,
+    .soc-snapshot-badge,
+    .badge-non-intrusion {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -373,7 +402,7 @@ function ensureStudentAppearanceStyle() {
       border: 1px solid #B3E0DE !important;
     }
 
-    /* 「SDP 미연결」 & 「확인 불가」 */
+    /* 「SDP 미연결」 & 확인 불가 */
     .badge-unverified,
     .badge-sdp-disconnected,
     .mode-badge[data-mode="disconnected"],
@@ -382,17 +411,27 @@ function ensureStudentAppearanceStyle() {
       background: #FEF1E8 !important;
       color: #F47725 !important;
       border: 1px solid #FCD6BD !important;
+      padding: 0 6px !important;
+      margin: 0 !important;
     }
 
-    /* [예시값] & [내가 바꾼 부분] & [침해 탐지 아님] */
-    .badge-demo,
-    .badge-provided,
+    /* [내가 바꾼 부분] & 학생 태그 (보라색 지정 색: #6d28d9 / #f5f3ff / #ddd6fe) */
     .badge-custom,
     .tag-student,
+    [data-role-kind="custom"] {
+      background: var(--student-soft, #f5f3ff) !important;
+      color: var(--student, #6d28d9) !important;
+      border: 1px solid #ddd6fe !important;
+    }
+
+    /* [예시값] & [제공 기능] & [누적 스냅샷] & [침해 탐지 아님] (네이비) */
+    .badge-demo,
+    .badge-provided,
     .tag-demo,
+    .soc-snapshot-badge,
+    .badge-non-intrusion,
     .mode-badge[data-mode="demo"],
     [data-provenance="demo"],
-    [data-role-kind="custom"],
     [data-role-kind="provided"] {
       background: #E7ECF3 !important;
       color: #0E306D !important;
@@ -592,20 +631,85 @@ function ensureStudentAppearanceStyle() {
       font-weight: 600;
       font-family: ui-monospace, Consolas, monospace;
     }
+    .soc-col-profile {
+      white-space: nowrap !important;
+      vertical-align: middle;
+    }
+    .soc-profile-en {
+      display: block;
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+      line-height: 1.15;
+      margin-top: 2px;
+    }
     .soc-status-on {
       color: #009a93;
       font-weight: 700;
       white-space: nowrap;
     }
     .soc-status-off {
-      color: #f47725;
+      color: #EA002C;
       font-weight: 700;
       white-space: nowrap;
     }
+    .soc-dot-teal {
+      color: #009a93;
+      font-weight: 700;
+      margin-right: 4px;
+      display: inline-block;
+    }
+    .soc-dot-off {
+      color: #EA002C;
+      font-weight: 700;
+      margin-right: 4px;
+      display: inline-block;
+    }
     .soc-num-error {
-      color: #f47725;
+      color: #EA002C !important;
       font-weight: 700;
     }
+
+    /* Card 1 항목 컬럼 넓이 확보 (기본 게이트웨이 한 줄 표시) */
+    .soc-metric-card[data-soc-card="card-1-identity-network"] .soc-mini-table th:first-child,
+    .soc-metric-card[data-soc-card="card-1-identity-network"] .soc-mini-table td:first-child {
+      white-space: nowrap !important;
+      min-width: 98px;
+      padding-right: 6px !important;
+    }
+    .soc-metric-card[data-soc-card="card-1-identity-network"] .soc-mini-table td.soc-val-right {
+      font-size: 11.5px !important;
+      padding-left: 4px !important;
+      letter-spacing: -0.2px;
+    }
+
+    /* Card 3 전체 컬럼 줄 바꿈 방지 및 너비·패딩 최적화 */
+    .soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table th,
+    .soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table td {
+      white-space: nowrap !important;
+      padding: 5px 4px !important;
+      font-size: 11.5px !important;
+    }
+    .soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-mini-table {
+      width: 100% !important;
+      table-layout: auto !important;
+    }
+    .soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-ratio-labels,
+    .soc-metric-card[data-soc-card="card-3-xdr-windows-logs"] .soc-card-notice {
+      white-space: nowrap !important;
+    }
+
+    .pc-non-intrusion-inline {
+      margin: 4px 0 8px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      color: #334155;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
     .soc-card-notice {
       font-size: 11px;
       color: #64748b;
@@ -664,7 +768,7 @@ function ensureStudentAppearanceStyle() {
       font-weight: 600;
     }
     .soc-ratio-labels .ratio-err {
-      color: #f47725;
+      color: #EA002C !important;
     }
     .soc-ratio-labels .ratio-warn {
       color: #0e306d;
@@ -678,7 +782,7 @@ function ensureStudentAppearanceStyle() {
       display: flex;
     }
     .soc-ratio-seg.seg-error {
-      background: #f47725;
+      background: #EA002C !important;
       height: 100%;
     }
     .soc-ratio-seg.seg-warning {
@@ -779,10 +883,6 @@ function ensureStudentAppearanceStyle() {
       border-top: 1px solid #e2e8f0;
       background: #ffffff;
     }
-      padding: 6px 10px;
-      border-top: 1px solid #f1f5f9;
-      background: #ffffff;
-    }
 
     /* Structured Table/Grid Rows for Inspection Sub-items */
     .pc-inspection-table {
@@ -873,7 +973,7 @@ function ensureStudentAppearanceStyle() {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 8px;
       padding: 10px 14px;
       background: #e7ecf3;
@@ -889,19 +989,58 @@ function ensureStudentAppearanceStyle() {
       display: flex;
       align-items: center;
       gap: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .soc-panel-actions {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .soc-panel-actions .soc-card-timestamp {
+      margin: 0 !important;
+      font-size: 11px;
+      color: #64748b;
+      line-height: 22px;
+      white-space: nowrap;
     }
     .soc-audit-card {
       background: #f4f6f9;
       border: 1px solid #e2e8f0;
       border-radius: 6px;
       padding: 10px 12px;
-      margin: 8px 12px;
+      margin: 0 12px 8px 12px;
+      box-sizing: border-box;
+    }
+    .pc-status-grid {
+      padding: 10px 12px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .sdp-audit-details {
+      width: 100%;
+    }
+    .sdp-audit-details .pc-accordion-body {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sdp-audit-details .soc-audit-card {
+      margin: 0 !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      background: #f8fafc;
+    }
+    .sdp-timeline-details,
+    .soc-compact-status-row {
+      margin: 0 12px 12px 12px;
     }
     .soc-audit-card h4 {
       color: #0e306d;
@@ -922,18 +1061,30 @@ function ensureStudentAppearanceStyle() {
         grid-template-columns: 1fr;
       }
     }
+    .trend-delta-box {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 10px 12px;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
     .soc-delta-card {
-      background: #f8fafc;
+      background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 10px 12px;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      transition: border-color 0.15s ease;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     .soc-delta-card:hover {
       border-color: #cbd5e1;
+      box-shadow: 0 2px 5px rgba(15, 23, 42, 0.06);
     }
     .delta-card-head {
       display: flex;
@@ -951,31 +1102,36 @@ function ensureStudentAppearanceStyle() {
       color: #64748b;
     }
     .delta-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1.25;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      height: 22px !important;
+      line-height: 20px !important;
+      padding: 0 8px !important;
+      border-radius: 4px !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+      white-space: nowrap !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      margin: 0 !important;
       letter-spacing: -0.2px;
     }
     .delta-chip.is-up {
-      background: #fef2f2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
+      background: #fde8ec !important;
+      color: #EA002C !important;
+      border: 1px solid #f9b2be !important;
     }
     .delta-chip.is-down {
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1px solid #bfdbfe;
+      background: #eff6ff !important;
+      color: #1d4ed8 !important;
+      border: 1px solid #bfdbfe !important;
     }
-    .delta-chip.is-same {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
+    .delta-chip.is-same,
+    .delta-chip.is-pending {
+      background: #f1f5f9 !important;
+      color: #475569 !important;
+      border: 1px solid #cbd5e1 !important;
     }
     .pc-toggle-all-btn,
     .pc-refresh-btn {
@@ -1393,7 +1549,7 @@ const SOC_UI_TEXT = Object.freeze({
   LIVE_FULL: '[실측값] 내 PC에서 실제로 잰 값',
   DEMO_BADGE: '[예시값]',
   DEMO_FULL: '[예시값] 실제 조회 결과가 아닌 설명용 값',
-  UNVERIFIED_BADGE: '「확인 불가」',
+  UNVERIFIED_BADGE: '확인 불가',
   SDP_DISCONNECTED_BADGE: '「SDP 미연결」',
   SDP_DISCONNECTED_FULL: '「SDP 미연결」 (외부 SDP 서버 미연결 · 내 PC 조회와 구분 표시)',
   SDP_CONNECTED_BADGE: '「SDP 연결됨」',
@@ -1514,12 +1670,10 @@ function probeNodeOsRuntimeIfAvailable(pcStatus, onResolved, force = false) {
         const msg = payload?.error?.message || '실측 데이터 형식이 올바르지 않습니다.';
         pcStatus.osProbeError = msg;
       }
-      if (typeof onResolved === 'function') onResolved();
     })
     .catch((err) => {
       pcStatus.osProbe = null;
       pcStatus.osProbeError = err?.message || '로컬 런타임 브리지 센서(/api/pc-status) 연결 실패';
-      if (typeof onResolved === 'function') onResolved();
     })
     .finally(() => {
       pcStatus.osProbeLoading = false;
@@ -2076,8 +2230,6 @@ function aggregateSocTopCards(store) {
   return Object.freeze([card1, card2, card3, card4]);
 }
 
-const normalizeOverviewCards = aggregateSocTopCards;
-
 function buildCard01Dom(card) {
   const article = createEl('article', {
     className: `soc-metric-card soc-card-${card.tone || 'unknown'}`,
@@ -2093,7 +2245,7 @@ function buildCard01Dom(card) {
   const sec = card.localSection || {};
   const headerBadge = sec.netOk
     ? createProvenanceBadgeEl(sec.liveProv || resolveProvenance({ forceLive: true }))
-    : createUnverifiedBadgeEl('「확인 불가」');
+    : createUnverifiedBadgeEl('확인 불가');
 
   // (A) Uniform Header Bar (#E7ECF3 background, #0E306D bold title, right-aligned uniform badge)
   const header = createEl('header', { className: 'soc-card-header' }, [
@@ -2107,26 +2259,24 @@ function buildCard01Dom(card) {
 
   const body = createEl('div', { className: 'soc-card-body' });
 
-  // (B) Hero Metric: 4개 활성 어댑터 (with a #009A93 status dot)
-  const heroCount = sec.netOk ? (sec.netCount ?? 4) : 0;
+  // (B) Hero Metric: 활성 어댑터 수
+  const heroCount = sec.netOk ? (sec.netCount ?? 0) : 0;
   const heroRow = createEl('div', { className: 'soc-hero-metric' }, [
     createEl('span', { className: 'soc-hero-num' }, [
       createEl('span', { className: `soc-status-dot ${sec.netOk ? 'dot-teal' : 'dot-orange'}`, attrs: { 'aria-hidden': 'true' } }),
-      document.createTextNode(` ${heroCount}개`),
+      document.createTextNode(` ${sec.netOk ? `${heroCount}개` : '확인 대기'}`),
     ]),
     createEl('span', { className: 'soc-hero-unit', text: '활성 어댑터' }),
   ]);
   body.appendChild(heroRow);
 
   // (C) Structured Mini-Table (.soc-mini-table): 2-Column Key-Value Table
-  let ipv4Val = sec.primaryIpv4 || '192.168.3.2 / 24';
+  let ipv4Val = sec.primaryIpv4 || '확인 불가';
   if (ipv4Val.includes('/') && !ipv4Val.includes(' / ')) {
     ipv4Val = ipv4Val.replace('/', ' / ');
-  } else if (!ipv4Val.includes('/') && ipv4Val !== 'IPv4 없음') {
-    ipv4Val = `${ipv4Val} / 24`;
   }
-  const gwVal = sec.gw && sec.gw !== '없음(로컬)' ? sec.gw : '192.168.3.1';
-  const dnsVal = sec.dnsStr && sec.dnsStr !== 'IPv4 DNS 없음' ? sec.dnsStr : '168.126.63.1, 168.126.63.2';
+  const gwVal = sec.gw || '확인 불가';
+  const dnsVal = sec.dnsStr || '확인 불가';
 
   const table = createEl('table', { className: 'soc-mini-table', attrs: { role: 'table', 'aria-label': '네트워크 구성 측정값' } }, [
     createEl('thead', {}, [
@@ -2179,7 +2329,7 @@ function buildCard02Dom(card) {
   if (sec.fwOk) {
     headerBadges.push(createProvenanceBadgeEl(sec.liveProv || resolveProvenance({ forceLive: true })));
   } else {
-    headerBadges.push(createUnverifiedBadgeEl('「확인 불가」'));
+    headerBadges.push(createUnverifiedBadgeEl('확인 불가'));
   }
 
   // (A) Uniform Header Bar (#E7ECF3 background, #0E306D bold title, right-aligned uniform badge)
@@ -2194,13 +2344,16 @@ function buildCard02Dom(card) {
 
   const body = createEl('div', { className: 'soc-card-body' });
 
-  // (B) Hero Metric: 3 / 3 켜짐 방화벽 활성 프로필 (active 틸 그린 #009A93)
-  const enabledCount = sec.fwEnabled ?? 3;
-  const totalCount = sec.fwTotal ?? 3;
+  // (B) Hero Metric: 방화벽 활성 프로필
+  const enabledCount = sec.fwEnabled;
+  const totalCount = sec.fwTotal ?? SOC_LIMITS.FIREWALL_PROFILE_TOTAL;
+  const fwMetricText = enabledCount !== null && enabledCount !== undefined
+    ? `${enabledCount} / ${totalCount} 켜짐`
+    : '확인 대기';
   const heroRow = createEl('div', { className: 'soc-hero-metric' }, [
-    createEl('span', { className: 'soc-hero-num soc-hero-teal' }, [
-      createEl('span', { className: 'soc-status-dot dot-teal', attrs: { 'aria-hidden': 'true' } }),
-      document.createTextNode(` ${enabledCount} / ${totalCount} 켜짐`),
+    createEl('span', { className: 'soc-hero-num' }, [
+      createEl('span', { className: `soc-status-dot ${sec.fwOk ? 'dot-teal' : 'dot-orange'}`, attrs: { 'aria-hidden': 'true' } }),
+      document.createTextNode(` ${fwMetricText}`),
     ]),
     createEl('span', { className: 'soc-hero-unit', text: '방화벽 활성 프로필' }),
   ]);
@@ -2208,30 +2361,29 @@ function buildCard02Dom(card) {
 
   // (C) Structured Mini-Table: 4-Column Profile Status Matrix
   const profileDefs = [
-    { key: 'Domain', label: '도메인 (Domain)' },
-    { key: 'Private', label: '개인 (Private)' },
-    { key: 'Public', label: '공용 (Public)' },
+    { key: 'Domain', name: '도메인', en: '(Domain)' },
+    { key: 'Private', name: '개인', en: '(Private)' },
+    { key: 'Public', name: '공용', en: '(Public)' },
   ];
 
   const tbody = createEl('tbody');
   for (const def of profileDefs) {
     const prof = Array.isArray(sec.profiles) ? sec.profiles.find((p) => (p.name && p.name.includes(def.key)) || p.profileKey === def.key) : null;
-    const isEnabled = prof ? Boolean(prof.enabled) : true;
-    let inAction = '차단 (Block)';
-    if (prof?.defaultInboundAction) {
-      inAction = prof.defaultInboundAction.includes('Block') ? '차단 (Block)' : prof.defaultInboundAction;
-    }
-    let outAction = '허용 (Allow)';
-    if (prof?.defaultOutboundAction) {
-      outAction = prof.defaultOutboundAction.includes('Allow') ? '허용 (Allow)' : prof.defaultOutboundAction;
-    }
+    const isEnabled = prof ? (prof.enabled === true) : null;
+    const statusText = isEnabled === true ? '켜짐' : isEnabled === false ? '꺼짐' : '확인 불가';
+    const statusDotClass = isEnabled === true ? 'soc-dot-teal' : 'soc-dot-off';
+    const inAction = prof?.defaultInboundAction || '확인 불가';
+    const outAction = prof?.defaultOutboundAction || '확인 불가';
 
     const tr = createEl('tr', {}, [
-      createEl('td', {}, [createEl('strong', { text: def.label })]),
-      createEl('td', {
-        className: isEnabled ? 'soc-status-on' : 'soc-status-off',
-        text: isEnabled ? '● 켜짐' : '○ 꺼짐',
-      }),
+      createEl('td', { className: 'soc-col-profile' }, [
+        createEl('strong', { text: def.name }),
+        createEl('span', { className: 'soc-profile-en', text: def.en }),
+      ]),
+      createEl('td', { className: 'soc-status-cell' }, [
+        createEl('span', { className: statusDotClass, text: isEnabled === true ? '● ' : '○ ' }),
+        document.createTextNode(statusText),
+      ]),
       createEl('td', { text: inAction }),
       createEl('td', { text: outAction }),
     ]);
@@ -2270,7 +2422,7 @@ function buildCard03Dom(card) {
   const sec = card.localSection || {};
   const headerBadge = sec.winEvOk
     ? createProvenanceBadgeEl(sec.liveProv || resolveProvenance({ forceLive: true }))
-    : createUnverifiedBadgeEl('「확인 불가」');
+    : createUnverifiedBadgeEl('확인 불가');
 
   // (A) Uniform Header Bar (#E7ECF3 background, #0E306D bold title, right-aligned uniform badge)
   const header = createEl('header', { className: 'soc-card-header' }, [
@@ -2284,19 +2436,20 @@ function buildCard03Dom(card) {
 
   const body = createEl('div', { className: 'soc-card-body' });
 
-  // (B) Hero Metric: 총 18건 최근 24시간 일반 기록
-  const sysTotal = sec.sysTotal ?? 11;
-  const sysErr = sec.sysErr ?? 2;
-  const sysWarn = sec.sysWarn ?? 9;
+  // (B) Hero Metric: 최근 24시간 일반 기록
+  const sysTotal = sec.sysTotal;
+  const sysErr = sec.sysErr ?? 0;
+  const sysWarn = sec.sysWarn ?? 0;
 
-  const appTotal = sec.appTotal ?? 7;
+  const appTotal = sec.appTotal;
   const appErr = sec.appErr ?? 0;
-  const appWarn = sec.appWarn ?? 7;
+  const appWarn = sec.appWarn ?? 0;
 
-  const totalLogs = sysTotal + appTotal;
+  const hasWinData = sysTotal !== null && sysTotal !== undefined && appTotal !== null && appTotal !== undefined;
+  const totalLogs = hasWinData ? (sysTotal + appTotal) : null;
   const heroRow = createEl('div', { className: 'soc-hero-metric' }, [
     createEl('span', { className: 'soc-hero-num' }, [
-      document.createTextNode(`총 ${totalLogs}건`),
+      document.createTextNode(totalLogs !== null ? `총 ${totalLogs}건` : '수집 대기 중…'),
     ]),
     createEl('span', { className: 'soc-hero-unit', text: '최근 24시간 일반 기록' }),
   ]);
@@ -2315,7 +2468,7 @@ function buildCard03Dom(card) {
     createEl('tbody', {}, [
       createEl('tr', {}, [
         createEl('td', {}, [createEl('strong', { text: 'System' })]),
-        createEl('td', { text: `${sysTotal}건` }),
+        createEl('td', { text: sysTotal !== null && sysTotal !== undefined ? `${sysTotal}건` : '-' }),
         createEl('td', {}, [
           document.createTextNode('오류 '),
           createEl('span', { className: 'soc-num-error', text: String(sysErr) }),
@@ -2325,7 +2478,7 @@ function buildCard03Dom(card) {
       ]),
       createEl('tr', {}, [
         createEl('td', {}, [createEl('strong', { text: 'Application' })]),
-        createEl('td', { text: `${appTotal}건` }),
+        createEl('td', { text: appTotal !== null && appTotal !== undefined ? `${appTotal}건` : '-' }),
         createEl('td', {}, [
           document.createTextNode('오류 '),
           createEl('span', { className: appErr > 0 ? 'soc-num-error' : '', text: String(appErr) }),
@@ -2337,7 +2490,7 @@ function buildCard03Dom(card) {
         createEl('td', {}, [createEl('strong', { text: 'Security' })]),
         createEl('td', { text: '-' }),
         createEl('td', { text: '관리자 권한 필요' }),
-        createEl('td', {}, [createUnverifiedBadgeEl('「확인 불가」')]),
+        createEl('td', {}, [createUnverifiedBadgeEl('확인 불가')]),
       ]),
     ]),
   ]);
@@ -2347,8 +2500,8 @@ function buildCard03Dom(card) {
   const totalErr = sysErr + appErr;
   const totalWarn = sysWarn + appWarn;
   const totalErrWarn = totalErr + totalWarn;
-  const errRatio = totalErrWarn > 0 ? (totalErr / totalErrWarn) * 100 : 15;
-  const warnRatio = totalErrWarn > 0 ? 100 - errRatio : 85;
+  const errRatio = totalErrWarn > 0 ? (totalErr / totalErrWarn) * 100 : 0;
+  const warnRatio = totalErrWarn > 0 ? 100 - errRatio : 0;
 
   const ratioContainer = createEl('div', { className: 'soc-ratio-container' }, [
     createEl('div', { className: 'soc-ratio-labels' }, [
@@ -2404,39 +2557,48 @@ function buildCard04Dom(card) {
 
   const body = createEl('div', { className: 'soc-card-body' });
 
-  // (B) Hero Metric: CPU 24.7% (16 코어)
-  const cpuPct = sec.cpuPct !== null && sec.cpuPct !== undefined ? Number(sec.cpuPct) : 24.7;
-  const coresVal = sec.cores || 16;
+  // (B) Hero Metric: CPU 사용률 및 코어 수
+  const hasCpu = sec.cpuPct !== null && sec.cpuPct !== undefined;
+  const cpuPct = hasCpu ? Number(sec.cpuPct) : null;
+  const coresVal = sec.cores || null;
   const heroRow = createEl('div', { className: 'soc-hero-metric' }, [
-    createEl('span', { className: 'soc-hero-num', text: `CPU ${cpuPct}%` }),
-    createEl('span', { className: 'soc-hero-unit', text: `(${coresVal} 코어)` }),
+    createEl('span', { className: 'soc-hero-num', text: cpuPct !== null ? `CPU ${cpuPct}%` : 'CPU 측정 중…' }),
+    createEl('span', { className: 'soc-hero-unit', text: coresVal ? `(${coresVal} 코어)` : '' }),
   ]);
   body.appendChild(heroRow);
 
   // (C) Structured Mini-Table: Aligned Resource Table with Inline Gauge Bars
-  const memUsed = sec.memUsedGb !== null && sec.memUsedGb !== undefined ? Number(sec.memUsedGb) : 10.8;
-  const memTotal = sec.memTotalGb !== null && sec.memTotalGb !== undefined ? Number(sec.memTotalGb) : 15.8;
-  const memPct = memTotal > 0 ? Number(((memUsed / memTotal) * 100).toFixed(1)) : 68.3;
+  const memUsed = sec.memUsedGb !== null && sec.memUsedGb !== undefined ? Number(sec.memUsedGb) : null;
+  const memTotal = sec.memTotalGb !== null && sec.memTotalGb !== undefined ? Number(sec.memTotalGb) : null;
+  const memPct = (memUsed !== null && memTotal && memTotal > 0) ? Number(((memUsed / memTotal) * 100).toFixed(1)) : null;
 
-  const diskFree = sec.diskFreeGb !== null && sec.diskFreeGb !== undefined ? Number(sec.diskFreeGb) : 193.5;
-  const diskTotal = sec.diskTotalGb !== null && sec.diskTotalGb !== undefined ? Number(sec.diskTotalGb) : 465.7;
-  const diskUsed = diskTotal - diskFree;
-  const diskPct = diskTotal > 0 ? Number(((diskUsed / diskTotal) * 100).toFixed(1)) : 58.4;
+  const diskFree = sec.diskFreeGb !== null && sec.diskFreeGb !== undefined ? Number(sec.diskFreeGb) : null;
+  const diskTotal = sec.diskTotalGb !== null && sec.diskTotalGb !== undefined ? Number(sec.diskTotalGb) : null;
+  const diskUsed = (diskFree !== null && diskTotal !== null) ? diskTotal - diskFree : null;
+  const diskPct = (diskUsed !== null && diskTotal && diskTotal > 0) ? Number(((diskUsed / diskTotal) * 100).toFixed(1)) : null;
 
   const cpuBar = createEl('div', {
-    className: `soc-gauge-bar ${cpuPct >= 65 ? 'gauge-orange' : 'gauge-teal'}`,
+    className: `soc-gauge-bar ${cpuPct !== null && cpuPct >= 65 ? 'gauge-orange' : 'gauge-teal'}`,
   });
-  cpuBar.style.width = `${Math.min(100, Math.max(0, cpuPct))}%`;
+  cpuBar.style.width = cpuPct !== null ? `${Math.min(100, Math.max(0, cpuPct))}%` : '0%';
 
   const memBar = createEl('div', {
-    className: `soc-gauge-bar ${memPct >= 65 ? 'gauge-orange' : 'gauge-teal'}`,
+    className: `soc-gauge-bar ${memPct !== null && memPct >= 65 ? 'gauge-orange' : 'gauge-teal'}`,
   });
-  memBar.style.width = `${Math.min(100, Math.max(0, memPct))}%`;
+  memBar.style.width = memPct !== null ? `${Math.min(100, Math.max(0, memPct))}%` : '0%';
 
   const diskBar = createEl('div', {
-    className: `soc-gauge-bar ${diskPct >= 65 ? 'gauge-orange' : 'gauge-teal'}`,
+    className: `soc-gauge-bar ${diskPct !== null && diskPct >= 65 ? 'gauge-orange' : 'gauge-teal'}`,
   });
-  diskBar.style.width = `${Math.min(100, Math.max(0, diskPct))}%`;
+  diskBar.style.width = diskPct !== null ? `${Math.min(100, Math.max(0, diskPct))}%` : '0%';
+
+  const cpuValText = cpuPct !== null ? `${cpuPct}%` : '측정 대기';
+  const memValText = (memPct !== null && memUsed !== null && memTotal !== null)
+    ? `${memPct}% (${memUsed.toFixed(1)}/${memTotal.toFixed(1)} GB)`
+    : '측정 대기';
+  const diskValText = (diskPct !== null && diskFree !== null)
+    ? `${diskPct}% (여유 ${diskFree.toFixed(1)} GB)`
+    : (diskFree !== null ? `여유 ${diskFree.toFixed(1)} GB` : '측정 대기');
 
   const table = createEl('table', { className: 'soc-mini-table', attrs: { role: 'table', 'aria-label': '하드웨어 자원 사용 현황' } }, [
     createEl('thead', {}, [
@@ -2452,21 +2614,21 @@ function buildCard04Dom(card) {
         createEl('td', { className: 'soc-col-hw-gauge' }, [
           createEl('div', { className: 'soc-gauge-track' }, [cpuBar]),
         ]),
-        createEl('td', { className: 'soc-col-hw-val', text: `${cpuPct}%` }),
+        createEl('td', { className: 'soc-col-hw-val', text: cpuValText }),
       ]),
       createEl('tr', {}, [
         createEl('td', { className: 'soc-col-hw-name' }, [createEl('strong', { text: '메모리 (RAM)' })]),
         createEl('td', { className: 'soc-col-hw-gauge' }, [
           createEl('div', { className: 'soc-gauge-track' }, [memBar]),
         ]),
-        createEl('td', { className: 'soc-col-hw-val', text: `${memPct}% (${memUsed.toFixed(1)}/${memTotal.toFixed(1)} GB)` }),
+        createEl('td', { className: 'soc-col-hw-val', text: memValText }),
       ]),
       createEl('tr', {}, [
         createEl('td', { className: 'soc-col-hw-name' }, [createEl('strong', { text: '디스크 (C:)' })]),
         createEl('td', { className: 'soc-col-hw-gauge' }, [
           createEl('div', { className: 'soc-gauge-track' }, [diskBar]),
         ]),
-        createEl('td', { className: 'soc-col-hw-val', text: `${diskPct}% (여유 ${diskFree.toFixed(1)} GB)` }),
+        createEl('td', { className: 'soc-col-hw-val', text: diskValText }),
       ]),
     ]),
   ]);
@@ -2565,7 +2727,7 @@ function buildTrendComparisonBoxDom(store, provenance) {
     className: 'trend-delta-box',
     attrs: {
       role: 'region',
-      'aria-label': '직전 스냅샷 대비 보안 지표 및 내 PC 리소스 추이 비교 (Δ)',
+      'aria-label': '직전 스냅샷 대비 보안 지표 및 내 PC 리소스 추이 비교',
     },
   });
 
@@ -2575,7 +2737,7 @@ function buildTrendComparisonBoxDom(store, provenance) {
 
   function createDeltaChip(diff, unit = '') {
     if (diff === null || diff === undefined || isNaN(diff)) {
-      return createEl('span', { className: 'delta-chip is-same', text: '— 확인 대기' });
+      return createEl('span', { className: 'delta-chip is-pending', text: '확인 대기' });
     }
     if (diff > 0) {
       return createEl('span', { className: 'delta-chip is-up', text: `▲ +${diff}${unit}` });
@@ -2583,7 +2745,7 @@ function buildTrendComparisonBoxDom(store, provenance) {
     if (diff < 0) {
       return createEl('span', { className: 'delta-chip is-down', text: `▼ ${diff}${unit}` });
     }
-    return createEl('span', { className: 'delta-chip is-same', text: `— 0${unit} (변동 없음)` });
+    return createEl('span', { className: 'delta-chip is-same', text: `0${unit} (변동 없음)` });
   }
 
   const diffNet = curr.netCount !== null && prev.netCount !== null ? curr.netCount - prev.netCount : null;
@@ -2604,7 +2766,7 @@ function buildTrendComparisonBoxDom(store, provenance) {
         createEl('span', { className: 'delta-card-label', text: '방화벽 변동' }),
         createDeltaChip(diffFw, '개'),
       ]),
-      createEl('span', { className: 'delta-card-desc', text: `활성 프로필 ${curr.fwEnabledCount ?? '-'}/3개 켜짐 (직전 ${prev.fwEnabledCount ?? '-'}개)` }),
+      createEl('span', { className: 'delta-card-desc', text: `활성 프로필 ${curr.fwEnabledCount ?? '-'}/${SOC_LIMITS.FIREWALL_PROFILE_TOTAL}개 켜짐 (직전 ${prev.fwEnabledCount ?? '-'}개)` }),
     ]),
     createEl('div', { className: 'soc-delta-card' }, [
       createEl('div', { className: 'delta-card-head' }, [
@@ -2623,85 +2785,103 @@ function buildTrendComparisonBoxDom(store, provenance) {
   ]);
   box.appendChild(grid2x2);
 
-  const ul = createEl('ul', { className: 'trend-delta-list' });
+  // Structured Table Rows matching Right-side PC inspection format
+  const deltaRows = [];
   if (curr.netCount !== null && prev.netCount !== null) {
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `내 PC 활성 네트워크 어댑터: 현재 ${curr.netCount}개 — ${formatDeltaNumber(curr.netCount, prev.netCount, '개')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '내 PC 활성 네트워크 어댑터',
+      status: `현재 ${curr.netCount}개 (${formatDeltaNumber(curr.netCount, prev.netCount, '개')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
   if (curr.fwEnabledCount !== null && prev.fwEnabledCount !== null) {
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `내 PC 방화벽 활성 프로필(Domain·Private·Public, 읽기 전용): 현재 ${curr.fwEnabledCount}/${SOC_LIMITS.FIREWALL_PROFILE_TOTAL}개 켜짐 — ${formatDeltaNumber(curr.fwEnabledCount, prev.fwEnabledCount, '개')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '내 PC 방화벽 활성 프로필',
+      status: `현재 ${curr.fwEnabledCount}/${SOC_LIMITS.FIREWALL_PROFILE_TOTAL}개 켜짐 (${formatDeltaNumber(curr.fwEnabledCount, prev.fwEnabledCount, '개')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
   if (curr.winSysTotal !== null && prev.winSysTotal !== null) {
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `최근 Windows System 기록(${SOC_UI_TEXT.NON_INTRUSION_CLAIM}): 현재 ${curr.winSysTotal}건 (오류 ${curr.winSysErr ?? 0}건 · 경고 ${curr.winSysWarn ?? 0}건) — ${formatDeltaNumber(curr.winSysTotal, prev.winSysTotal, '건')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '최근 Windows System 기록',
+      status: `현재 ${curr.winSysTotal}건 · 오류 ${curr.winSysErr ?? 0}건 · 경고 ${curr.winSysWarn ?? 0}건 (${formatDeltaNumber(curr.winSysTotal, prev.winSysTotal, '건')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
   if (curr.winAppTotal !== null && prev.winAppTotal !== null) {
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `최근 Windows Application 기록(${SOC_UI_TEXT.NON_INTRUSION_CLAIM}): 현재 ${curr.winAppTotal}건 (오류 ${curr.winAppErr ?? 0}건 · 경고 ${curr.winAppWarn ?? 0}건) — ${formatDeltaNumber(curr.winAppTotal, prev.winAppTotal, '건')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '최근 Windows Application 기록',
+      status: `현재 ${curr.winAppTotal}건 · 오류 ${curr.winAppErr ?? 0}건 · 경고 ${curr.winAppWarn ?? 0}건 (${formatDeltaNumber(curr.winAppTotal, prev.winAppTotal, '건')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
   if (curr.cpuPct !== null && prev.cpuPct !== null) {
     const coreNote = curr.cores !== null ? ` (${curr.cores} 코어)` : '';
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `CPU 사용률 추이: 현재 ${curr.cpuPct}%${coreNote} — ${formatDeltaNumber(curr.cpuPct, prev.cpuPct, '%')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: 'CPU 사용률 추이',
+      status: `현재 ${curr.cpuPct}%${coreNote} (${formatDeltaNumber(curr.cpuPct, prev.cpuPct, '%')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   } else if (curr.cores !== null && prev.cores !== null) {
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `내 PC 논리 CPU 코어: 현재 ${curr.cores} 코어 — ${formatDeltaNumber(curr.cores, prev.cores, ' 코어')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '내 PC 논리 CPU 코어',
+      status: `현재 ${curr.cores} 코어 (${formatDeltaNumber(curr.cores, prev.cores, ' 코어')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
   if (curr.memUsedGb !== null && prev.memUsedGb !== null) {
     const totalNote = curr.memTotalGb !== null ? ` (전체 ${curr.memTotalGb} GB)` : '';
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `내 PC 물리 메모리(RAM) 사용량: 현재 ${curr.memUsedGb} GB${totalNote} — ${formatDeltaNumber(curr.memUsedGb, prev.memUsedGb, ' GB')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '내 PC 물리 메모리(RAM) 사용량',
+      status: `현재 ${curr.memUsedGb} GB${totalNote} (${formatDeltaNumber(curr.memUsedGb, prev.memUsedGb, ' GB')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
   if (curr.heapUsedMb !== null && prev.heapUsedMb !== null) {
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `브라우저 JS 힙 메모리 사용량: 현재 ${curr.heapUsedMb} MB — ${formatDeltaNumber(curr.heapUsedMb, prev.heapUsedMb, ' MB')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '브라우저 JS 힙 메모리 사용량',
+      status: `현재 ${curr.heapUsedMb} MB (${formatDeltaNumber(curr.heapUsedMb, prev.heapUsedMb, ' MB')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
   if (curr.diskFreeGb !== null && prev.diskFreeGb !== null) {
-    ul.appendChild(createEl('li', {
-      className: 'trend-delta-item',
-      text: `디스크 여유 공간: 현재 ${curr.diskFreeGb} GB — ${formatDeltaNumber(curr.diskFreeGb, prev.diskFreeGb, ' GB')} ${SOC_UI_TEXT.LIVE_BADGE}`,
-    }));
+    deltaRows.push({
+      item: '디스크 여유 공간 (C:)',
+      status: `현재 ${curr.diskFreeGb} GB (${formatDeltaNumber(curr.diskFreeGb, prev.diskFreeGb, ' GB')})`,
+      badgeEl: createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+    });
   }
-  const sdpNote = effectiveMode === 'demo'
-    ? `${SOC_UI_TEXT.DEMO_BADGE} 설명용 값 (${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE})`
-    : effectiveMode === 'connected'
-      ? `${SOC_UI_TEXT.LIVE_BADGE} SDP 연결됨`
-      : `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} (내 PC 조회 결과와 구분)`;
-  ul.appendChild(createEl('li', {
-    className: 'trend-delta-item',
-    text: `SDP 보안 기록 총계 (${sdpNote}): 현재 ${curr.totalEvents}건 (XDR 경보 ${curr.xdrCount}건) — ${formatDeltaNumber(curr.totalEvents, prev.totalEvents, '건')}`,
-  }));
-  ul.appendChild(createEl('li', {
-    className: 'trend-delta-item',
-    text: `SDP 거부·요청실패 누적: 현재 ${curr.deniedTotal}건 | 미확인(unknown) 상태: 현재 ${curr.unknownTotal}건 — ${formatDeltaNumber(curr.deniedTotal, prev.deniedTotal, '건')} (${provenance?.label || SOC_UI_TEXT.LIVE_BADGE})`,
-  }));
+  deltaRows.push({
+    item: 'SDP 보안 기록 총계',
+    status: `현재 ${curr.totalEvents}건 · XDR 경보 ${curr.xdrCount}건 (${formatDeltaNumber(curr.totalEvents, prev.totalEvents, '건')})`,
+    badgeEl: createSdpStatusBadgeEl(effectiveMode),
+  });
+  deltaRows.push({
+    item: 'SDP 거부 및 미확인 누적',
+    status: `거부 ${curr.deniedTotal}건 · 미확인 ${curr.unknownTotal}건 (${formatDeltaNumber(curr.deniedTotal, prev.deniedTotal, '건')})`,
+    badgeEl: createSdpStatusBadgeEl(effectiveMode),
+  });
 
-  const deltaAccordion = createEl('details', { className: 'pc-accordion' });
-  deltaAccordion.appendChild(createEl('summary', {
-    className: 'pc-accordion-summary',
-    text: '직전 스냅샷 대비 전체 지표 증감 내역 보기 (10건)',
-  }));
-  const accordionBody = createEl('div', { className: 'pc-accordion-body' });
-  accordionBody.appendChild(ul);
-  deltaAccordion.appendChild(accordionBody);
-  box.appendChild(deltaAccordion);
+  const deltaDetails = createEl('details', {
+    className: 'pc-accordion',
+    attrs: { 'data-pc-section': 'trend-delta-breakdown' },
+  });
+  const summaryTitle = createEl('strong', { className: 'pc-accordion-title', text: '직전 스냅샷 대비 전체 지표 증감 내역' });
+  const summaryMetric = createEl('span', { className: 'pc-accordion-metric', text: `총 ${deltaRows.length}개 지표 비교` });
+  const summaryBadges = createEl('div', { className: 'pc-accordion-badges' }, [
+    createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
+  ]);
+  const summary = createEl('summary', { className: 'pc-accordion-summary' }, [
+    summaryTitle,
+    summaryMetric,
+    summaryBadges,
+  ]);
+  const body = createEl('div', { className: 'pc-accordion-body' }, [
+    createInspectionTableDom(deltaRows),
+  ]);
+  deltaDetails.appendChild(summary);
+  deltaDetails.appendChild(body);
+  box.appendChild(deltaDetails);
 
   return box;
 }
@@ -2722,8 +2902,8 @@ function createInspectionTableDom(rows = []) {
 }
 
 function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAllBtn = null) {
-  const card = createEl('div', {
-    className: 'soc-audit-card',
+  const grid = createEl('div', {
+    className: 'pc-status-grid',
     attrs: {
       role: 'region',
       'aria-label': '내 PC 네트워크·방화벽·Windows 기록 및 자원 점검 (읽기 전용 · 비관리자 실측 및 확인 불가 사유)',
@@ -2739,7 +2919,7 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
     attachKeyboardClick(toggleAllBtn, () => {
       allExpanded = !allExpanded;
       toggleAllBtn.textContent = allExpanded ? '모두 접기' : '모두 펼치기';
-      const accordions = card.querySelectorAll('details.pc-accordion');
+      const accordions = grid.querySelectorAll('details.pc-inspection-accordion');
       for (const acc of accordions) {
         acc.open = allExpanded;
       }
@@ -2747,7 +2927,7 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
   }
 
   if (pcStatus?.osProbeLoading) {
-    card.appendChild(createEl('div', {
+    grid.appendChild(createEl('div', {
       className: 'pc-status-loading-indicator',
       attrs: { 'aria-live': 'polite' },
     }, [
@@ -2757,7 +2937,7 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
   }
 
   if (pcStatus?.osProbeError) {
-    card.appendChild(createEl('div', {
+    grid.appendChild(createEl('div', {
       className: 'pc-status-error-box',
       attrs: { role: 'alert' },
     }, [
@@ -2780,8 +2960,6 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
       ]),
     ]));
   }
-
-  const grid = createEl('div', { className: 'pc-status-grid' });
   const osNet = pcStatus?.osProbe?.network;
   const osFw = pcStatus?.osProbe?.firewall;
   const osWinEv = pcStatus?.osProbe?.windowsEvents;
@@ -2981,7 +3159,7 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
     createInspectionTableDom(winRows),
     createEl('p', {
       className: 'pc-non-intrusion-inline',
-      text: 'ℹ️ 이 건수는 침해나 공격 탐지 결과가 아닙니다 (Windows 운영체제와 응용프로그램의 일반 이벤트 로그)',
+      text: '이 건수는 침해나 공격 탐지 결과가 아닙니다 (Windows 운영체제와 응용프로그램의 일반 이벤트 로그)',
     }),
   ];
 
@@ -2991,7 +3169,7 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
     metricSummary: winEvSummary,
     badges: [
       winEvOk ? createProvenanceBadgeEl(liveProv) : createUnverifiedBadgeEl(),
-      createEl('span', { className: 'provenance-badge badge-custom', text: '침해 탐지 아님' }),
+      createEl('span', { className: 'provenance-badge badge-non-intrusion', text: '침해 탐지 아님' }),
     ],
     bodyContent: winEvBody,
   }));
@@ -3127,31 +3305,7 @@ function buildPcStatusInspectionCardDom(pcStatus, sdpMode = 'unknown', toggleAll
     bodyContent: [createInspectionTableDom(diskRows)],
   }));
 
-  card.appendChild(grid);
-  return card;
-}
-
-function buildRoleSeparationCardDom() {
-  const card = createEl('div', { className: 'soc-audit-card' });
-  card.appendChild(createEl('div', { className: 'event-head' }, [
-    createEl('h4', { text: `${SOC_UI_TEXT.LIVE_BADGE} · ${SOC_UI_TEXT.DEMO_BADGE} · ${SOC_UI_TEXT.UNVERIFIED_BADGE} · ${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE} 구분 안내` }),
-    createProvenanceBadgeEl(resolveProvenance({ forceLive: true })),
-    createProvenanceBadgeEl(resolveProvenance({ mode: 'demo' })),
-    createUnverifiedBadgeEl(),
-    createSdpStatusBadgeEl('disconnected'),
-  ]));
-  const items = [
-    `${SOC_UI_TEXT.LIVE_BADGE} (내 PC에서 실제로 잰 값): 네트워크 구성(인터페이스·IPv4·게이트웨이·DNS), 방화벽 설정(Domain·Private·Public 읽기 전용 상태), 최근 Windows 기록(System·Application 경고·오류 건수 — 침해·공격 탐지 아님), CPU·RAM·디스크 측정값`,
-    `${SOC_UI_TEXT.DEMO_BADGE} (실제 조회 결과가 아닌 설명용 값): 데모 모드(--demo) 실행 시 제공 엔진(demoEngine)이 공급하는 가상 사용자(practice-user)·가상 기기(practice-pc)·가상 업무 앱 3종·가상 사건 1건(event-01)`,
-    `${SOC_UI_TEXT.SDP_DISCONNECTED_BADGE}: 외부 SDP 서버에 연결되지 않은 상태를 나타내며, 내 PC 로컬 조회 결과(${SOC_UI_TEXT.LIVE_BADGE})와 구분해 표시합니다.`,
-    `${SOC_UI_TEXT.UNVERIFIED_BADGE}: 방화벽과 보안 설정은 읽기만 하고 바꾸지 않습니다. 관리자 권한이 필요한 항목(Windows Security 감사 로그, 방화벽 pfirewall.log 및 PersistentStore 정책 저장소)은 설정을 바꾸지 않고 이유와 함께 표시합니다.`,
-  ];
-  const ul = createEl('ul', { className: 'soc-rule-list' });
-  for (const text of items) {
-    ul.appendChild(createEl('li', { className: 'soc-rule-item', text }));
-  }
-  card.appendChild(ul);
-  return card;
+  return grid;
 }
 
 function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRules, provenance, mode, pcStatus, onRefresh = null }) {
@@ -3164,6 +3318,7 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
   });
 
   const osTimeText = formatMeasuredAt(pcStatus?.osProbe?.measuredAt || pcStatus?.measuredAt);
+  let pcInspectionDom = null;
 
   if (pcStatus) {
     const toggleAllBtn = createEl('button', {
@@ -3194,7 +3349,7 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
 
     // Single header for Right Column in global overview
     const heading = createEl('div', { className: 'soc-panel-heading' }, [
-      createEl('h3', { className: 'soc-panel-title', text: '내 PC 상태 점검 (1~6) 및 판정 감사' }),
+      createEl('h3', { className: 'soc-panel-title', text: 'PC 상태 점검' }),
       createEl('div', { className: 'soc-panel-actions' }, [
         createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${osTimeText}` }),
         toggleAllBtn,
@@ -3202,7 +3357,8 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
       ]),
     ]);
     panel.appendChild(heading);
-    panel.appendChild(buildPcStatusInspectionCardDom(pcStatus, mode, toggleAllBtn));
+    pcInspectionDom = buildPcStatusInspectionCardDom(pcStatus, mode, toggleAllBtn);
+    panel.appendChild(pcInspectionDom);
   } else {
     // Header for event-specific audit slot
     const heading = createEl('div', { className: 'soc-panel-heading' }, [
@@ -3308,7 +3464,7 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
     }));
   }
 
-  if (pcStatus) {
+  if (pcInspectionDom) {
     const sdpAuditDetails = createEl('details', { className: 'pc-accordion sdp-audit-details' });
     const decisionCount = decisionSlice?.status === 'ok' ? 1 : 0;
     sdpAuditDetails.appendChild(createEl('summary', { className: 'pc-accordion-summary' }, [
@@ -3324,7 +3480,7 @@ function buildAuditBreakdownPanelDom({ selectedEvent, decisionSlice, matchedRule
       ruleAggCard,
     ]);
     sdpAuditDetails.appendChild(auditBody);
-    panel.appendChild(sdpAuditDetails);
+    pcInspectionDom.appendChild(sdpAuditDetails);
   } else {
     panel.appendChild(decCard);
     panel.appendChild(evCard);
@@ -3339,8 +3495,7 @@ export function createStudentView(options = {}) {
 
   function setupTabNavigation() {
     if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
-    const tabs = Array.from(document.querySelectorAll('#tab-list [role="tab"], #nav [role="tab"]'));
-    const knownViews = ['dashboard', 'protection', 'apps', 'records', 'action'];
+    const tabs = Array.from(document.querySelectorAll('#nav [role="tab"], #tab-list [role="tab"]'));
 
     function switchView(targetView) {
       for (const tab of tabs) {
@@ -3355,14 +3510,6 @@ export function createStudentView(options = {}) {
         if (panel) {
           panel.hidden = !isSelected;
           panel.classList.toggle('is-active', isSelected);
-        }
-      }
-      for (const v of knownViews) {
-        const panel = document.getElementById(`view-${v}`);
-        if (panel) {
-          const isCur = (v === targetView);
-          panel.hidden = !isCur;
-          panel.classList.toggle('is-active', isCur);
         }
       }
     }
@@ -3430,10 +3577,12 @@ export function createStudentView(options = {}) {
         const leftChildren = [];
 
         // Single clean header for Left Column
+        const snapMeasuredAt = socStore.snapshots[0]?.at || socStore.pcStatus?.measuredAt;
         leftChildren.push(createEl('div', { className: 'soc-panel-heading' }, [
-          createEl('h3', { className: 'soc-panel-title', text: '직전 스냅샷 대비 추이 비교 (Δ)' }),
+          createEl('h3', { className: 'soc-panel-title', text: '직전 스냅샷 대비 추이 비교' }),
           createEl('div', { className: 'soc-panel-actions' }, [
-            createEl('span', { className: 'soc-card-timestamp', text: `누적 스냅샷 ${socStore.snapshots.length}건` }),
+            createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${formatMeasuredAt(snapMeasuredAt)}` }),
+            createEl('span', { className: 'soc-snapshot-badge', text: `누적 스냅샷 ${socStore.snapshots.length}건` }),
           ]),
         ]));
 
