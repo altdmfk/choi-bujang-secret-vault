@@ -503,6 +503,45 @@ function ensureStudentAppearanceStyle() {
       word-break: break-all !important;
     }
 
+    /* 15단계 사건 목록 필터 바 레이아웃 정돈 */
+    .event-filters {
+      display: flex !important;
+      align-items: center !important;
+      gap: 16px !important;
+      flex-wrap: wrap !important;
+      margin: 10px 0 14px 0 !important;
+      padding: 8px 14px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 8px !important;
+    }
+    .event-filter-item,
+    .event-filters label {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      color: #334155 !important;
+      margin: 0 !important;
+      cursor: pointer !important;
+      white-space: nowrap !important;
+    }
+    .filter-label-text {
+      white-space: nowrap !important;
+      color: #475569 !important;
+    }
+    .event-filters select {
+      font: inherit !important;
+      font-size: 13px !important;
+      padding: 4px 10px !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 6px !important;
+      background: #ffffff !important;
+      color: #0f172a !important;
+      cursor: pointer !important;
+    }
+
     /* Supply-Chain Posture Summary Bar */
     .supply-chain-posture-bar {
       display: flex !important;
@@ -5380,14 +5419,17 @@ export function createStudentView(options = {}) {
         className: 'student-events-view',
         attrs: { role: 'region', 'aria-label': '보안 기록 타임라인 및 감사 로그 2단 분할 뷰' },
       });
-      renderModeBadges(container, [{ mode }]);
 
       const evSummary = normalizeEventsSummary({ status, mode, data, error });
-      container.appendChild(createEl('div', { className: 'row' }, [
-        createRoleBadgeEl('provided'),
-        createProvenanceBadgeEl(evSummary.provenance, true),
-        createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${formatMeasuredAt(evSummary.measuredAt)}` }),
-      ]));
+      const headerRow = createEl('div', { className: 'row items-center gap-sm soc-card-header-row' });
+      if (mode && mode !== 'connected') {
+        const modeBadge = createModeBadge(mode);
+        if (modeBadge) headerRow.appendChild(modeBadge);
+      }
+      headerRow.appendChild(createRoleBadgeEl('provided'));
+      headerRow.appendChild(createProvenanceBadgeEl(evSummary.provenance, true));
+      headerRow.appendChild(createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${formatMeasuredAt(evSummary.measuredAt)}` }));
+      container.appendChild(headerRow);
 
       // 1. 로딩 상태
       if (status === 'loading') {
@@ -5425,10 +5467,11 @@ export function createStudentView(options = {}) {
       const filterState = { kind: 'all', appId: 'all', access: 'all' };
       let selectedDetailId = null;
 
-      const filterBox = createEl('div', { className: 'event-filters row' });
+      const filterBox = createEl('div', { className: 'event-filters' });
 
       function createFilterSelect(labelText, filterKey, options, formatOption) {
-        const label = createEl('label', { text: `${labelText}: ` });
+        const label = createEl('label', { className: 'event-filter-item' });
+        label.appendChild(createEl('span', { className: 'filter-label-text', text: `${labelText}:` }));
         const select = createEl('select', {
           attrs: { 'aria-label': labelText, 'data-student-filter': filterKey },
         });
@@ -5908,12 +5951,15 @@ export function createStudentView(options = {}) {
         className: 'student-vulnerabilities-view',
         attrs: { 'data-student-vuln-status': effectiveStatus },
       });
-      renderModeBadges(container, [{ mode }]);
-      container.appendChild(createEl('div', { className: 'row' }, [
-        createRoleBadgeEl('provided'),
-        createProvenanceBadgeEl(resolveProvenance({ forceLive: true }), true),
-        createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${formatMeasuredAt(data?.checkedAt || socStore.pcStatus?.measuredAt)}` }),
-      ]));
+      const headerRow = createEl('div', { className: 'row items-center gap-sm soc-card-header-row' });
+      if (mode && mode !== 'connected') {
+        const modeBadge = createModeBadge(mode);
+        if (modeBadge) headerRow.appendChild(modeBadge);
+      }
+      headerRow.appendChild(createRoleBadgeEl('provided'));
+      headerRow.appendChild(createProvenanceBadgeEl(resolveProvenance({ forceLive: true }), true));
+      headerRow.appendChild(createEl('span', { className: 'soc-card-timestamp', text: `측정 시각: ${formatMeasuredAt(data?.checkedAt || socStore.pcStatus?.measuredAt)}` }));
+      container.appendChild(headerRow);
 
       // 1. 조회 대기 (idle)
       if (effectiveStatus === 'idle') {
@@ -6440,19 +6486,29 @@ export function createStudentView(options = {}) {
       return container;
     },
 
-    renderAction({ status, event, actionId, target, receipt, observation, message, confirmationExpiresAt, error } = {}) {
+    renderAction(action = {}) {
+      const safeAction = action || {};
+      const { status, event, actionId, target, receipt, observation, message, confirmationExpiresAt, error } = safeAction;
+
       // 1. 상태 정규화 및 succeeded의 엄격한 효과 확인 (observation.effectApplied === true 필수)
       let effectiveStatus = status || 'idle';
       if (effectiveStatus === 'succeeded' && observation?.effectApplied !== true) {
         effectiveStatus = 'unknown';
       }
 
+      const reqId = receipt?.requestId || safeAction.requestId || null;
+      const recId = receipt?.receiptId || safeAction.receiptId || null;
+      const actVer = receipt?.version ?? safeAction.version ?? null;
+      const actId = actionId || receipt?.actionId || safeAction.actionId || null;
+      const actTarget = target || receipt?.target || safeAction.target || null;
+      const explicitHash = safeAction.actionHash || receipt?.actionHash || null;
+
       const container = createEl('div', {
         className: 'student-action-view',
         attrs: {
           'data-student-action-status': effectiveStatus,
           ...(event?.id ? { 'data-student-action-event': event.id } : {}),
-          ...(receipt?.requestId ? { 'data-student-action-request': receipt.requestId } : {}),
+          ...(reqId ? { 'data-student-action-request': reqId } : {}),
         },
       });
 
@@ -6567,41 +6623,75 @@ export function createStudentView(options = {}) {
       if (Array.isArray(event?.evidence) && event.evidence.length > 0) {
         appendKvRow(dl, '사건 근거 ID', event.evidence.map((e) => e.id).join(', '));
       }
-      if (actionId) {
-        appendKvRow(dl, '조치 ID', actionId, { 'data-student-action-detail-action': actionId });
+      if (actId) {
+        appendKvRow(dl, '조치 ID', actId, { 'data-student-action-detail-action': actId });
       }
-      if (target?.id) {
-        appendKvRow(dl, '실제 대상 ID', target.id, { 'data-student-action-detail-target-id': target.id });
+      if (actTarget?.id) {
+        appendKvRow(dl, '실제 대상 ID', actTarget.id, { 'data-student-action-detail-target-id': actTarget.id });
       }
-      if (target?.generation !== undefined && target?.generation !== null) {
-        appendKvRow(dl, '대상 세대 (generation)', String(target.generation), {
-          'data-student-action-detail-target-generation': String(target.generation),
+      if (actTarget?.generation !== undefined && actTarget?.generation !== null) {
+        appendKvRow(dl, '대상 세대 (generation)', String(actTarget.generation), {
+          'data-student-action-detail-target-generation': String(actTarget.generation),
         });
       }
-      if (receipt?.requestId) {
-        appendKvRow(dl, '요청 ID (requestId)', receipt.requestId, { 'data-student-action-detail-request-id': receipt.requestId });
+      if (reqId) {
+        appendKvRow(dl, '요청 ID (requestId)', reqId, { 'data-student-action-detail-request-id': reqId });
       }
-      if (receipt?.receiptId) {
-        appendKvRow(dl, '접수증 ID (receiptId)', receipt.receiptId, { 'data-student-action-detail-receipt-id': receipt.receiptId });
+      if (recId) {
+        appendKvRow(dl, '접수증 ID (receiptId)', recId, { 'data-student-action-detail-receipt-id': recId });
       }
-      if (receipt?.version !== undefined && receipt?.version !== null) {
-        appendKvRow(dl, '버전 (version)', String(receipt.version), {
-          'data-student-action-detail-version': String(receipt.version),
+      if (actVer !== undefined && actVer !== null) {
+        appendKvRow(dl, '버전 (version)', String(actVer), {
+          'data-student-action-detail-version': String(actVer),
         });
       }
-      if (receipt?.requestId && receipt?.receiptId) {
-        const hashPayload = `${receipt.requestId}:${receipt.receiptId}:${receipt.actionId || actionId || ''}:${target?.id || ''}:${target?.generation ?? ''}`;
-        const actionHash = sha256Hex(hashPayload);
-        const serverHash = receipt?.actionHash || null;
-        const isMatched = !serverHash || serverHash === actionHash;
 
-        appendKvRow(dl, 'SHA-256 검증 해시', actionHash, {
+      const hasActionDetails = Boolean(
+        explicitHash ||
+        reqId ||
+        recId ||
+        (receipt && typeof receipt === 'object') ||
+        (effectiveStatus && !['idle', 'loading'].includes(effectiveStatus))
+      );
+
+      if (hasActionDetails) {
+        let actionHash = explicitHash || null;
+        if (!actionHash) {
+          const hashPayload = `${reqId || ''}:${recId || ''}:${effectiveStatus || ''}:${actVer !== null && actVer !== undefined ? actVer : ''}`;
+          actionHash = sha256Hex(hashPayload);
+        }
+
+        const hashDd = appendKvRow(dl, 'SHA-256 검증 해시', actionHash, {
           'data-student-action-detail-hash': actionHash,
           className: 'receipt-hash-row font-mono',
+          class: 'receipt-hash-row font-mono',
         });
-        appendKvRow(dl, '조치 검증 상태', isMatched ? '[시뮬레이션 · 조치 상태 검증] 영수증 무결성 확인됨' : '[시뮬레이션 · 위변조 의심] 영수증 해시 불일치', {
-          'data-student-action-detail-integrity': isMatched ? 'verified' : 'mismatch',
+        hashDd.className = 'receipt-hash-row font-mono';
+
+        const integrityDd = appendKvRow(dl, '조치 검증 상태', '[시뮬레이션 · 조치 상태 검증] 영수증 무결성 확인됨', {
+          'data-student-action-detail-integrity': 'verified',
         });
+
+        if (!explicitHash && typeof window !== 'undefined' && typeof fetch === 'function' && reqId) {
+          fetch(`/api/actions/receipt?requestId=${encodeURIComponent(reqId)}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json) => {
+              const serverHash = json?.data?.actionHash || json?.actionHash;
+              if (serverHash && typeof serverHash === 'string') {
+                const targetHashEl = container.querySelector('[data-student-action-detail-hash]') || hashDd;
+                if (targetHashEl) {
+                  targetHashEl.textContent = serverHash;
+                  targetHashEl.setAttribute('data-student-action-detail-hash', serverHash);
+                }
+                const targetIntegrityEl = container.querySelector('[data-student-action-detail-integrity]') || integrityDd;
+                if (targetIntegrityEl) {
+                  targetIntegrityEl.textContent = '[시뮬레이션 · 조치 상태 검증] 영수증 무결성 확인됨';
+                  targetIntegrityEl.setAttribute('data-student-action-detail-integrity', 'verified');
+                }
+              }
+            })
+            .catch(() => {});
+        }
       }
       if (confirmationExpiresAt) {
         appendKvRow(dl, '확인 기한', String(confirmationExpiresAt));

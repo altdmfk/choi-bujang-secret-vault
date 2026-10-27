@@ -1141,9 +1141,8 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
               confirmationId,
               confirmationExpiresAt,
               target,
-              actionHash,
             },
-            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0', actionHash: record.actionHash },
           });
           return;
         }
@@ -1187,9 +1186,8 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
               status: 'pending',
               version: 2,
               replayed: false,
-              actionHash: record.actionHash,
             },
-            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0', actionHash: record.actionHash },
           });
           return;
         }
@@ -1228,9 +1226,8 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
               version: 3,
               replayed: false,
               observation: record.observation,
-              actionHash: record.actionHash,
             },
-            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0' },
+            meta: { mode: 'demo', checkedAt: new Date().toISOString(), starterVersion: '0.1.0', actionHash: record.actionHash },
           });
           return;
         }
