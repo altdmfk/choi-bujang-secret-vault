@@ -836,6 +836,39 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
     try {
       const pathname = (req?.url || '/').split('?')[0];
 
+      // 0. Student Appearance & Dashboard CSS Bundle (CSP style-src 'self' 준수)
+      if (req?.method === 'GET' && pathname === '/student/appearance.css') {
+        let appearanceCssContent = ':root{--accent:#0e306d;--accent-soft:#e2e6ed;--bg:#f8fafc;--surface:#ffffff}\n';
+        try {
+          const appJsonPath = resolve(process.cwd(), 'student/appearance.json');
+          if (fs.existsSync(appJsonPath)) {
+            const aj = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
+            if (aj?.palette?.accent) {
+              const acc = aj.palette.accent;
+              const bg = aj.palette.background || '#f8fafc';
+              const surf = aj.palette.surface || '#ffffff';
+              appearanceCssContent = `:root{--accent:${acc};--accent-soft:#e2e6ed;--bg:${bg};--surface:${surf}}\n`;
+            }
+          }
+        } catch {}
+
+        let dashboardCss = '';
+        try {
+          const dashPath = resolve(process.cwd(), 'student/dashboard.css');
+          if (fs.existsSync(dashPath)) {
+            dashboardCss = fs.readFileSync(dashPath, 'utf8');
+          }
+        } catch {}
+
+        res.writeHead(200, {
+          'content-type': 'text/css; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+        });
+        res.end(appearanceCssContent + '\n' + dashboardCss);
+        return;
+      }
+
       // 1. Live PC Status Endpoint (항상 동작)
       if (req?.method === 'GET' && pathname === PROBE_CONFIG.ENDPOINT_PATH) {
         const payload = await measureLiveNonAdminPcStatus();

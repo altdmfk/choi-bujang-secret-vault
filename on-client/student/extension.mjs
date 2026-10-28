@@ -231,6 +231,17 @@ function attachKeyboardClick(element, handler) {
 
 function ensureStudentAppearanceStyle() {
   if (typeof document === 'undefined' || typeof document.createElement !== 'function') return;
+
+  // 1. CSP(style-src 'self')를 완벽히 준수하는 정식 외부 스타일시트 링크 확인
+  if (!document.querySelector('link[href*="appearance.css"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/student/appearance.css';
+    try {
+      (document.head || document.documentElement).appendChild(link);
+    } catch {}
+  }
+
   if (document.getElementById('student-appearance-style')) return;
 
   const styleEl = document.createElement('style');
@@ -4828,8 +4839,120 @@ function sha256Hex(ascii) {
   return result;
 }
 
+function ensureStudentDashboardDom() {
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function') return;
+  if (document.getElementById('view-dashboard')) return;
+
+  const nav = document.getElementById('nav');
+  if (nav && !document.getElementById('tab-dashboard')) {
+    const tabDashboard = document.createElement('button');
+    tabDashboard.type = 'button';
+    tabDashboard.id = 'tab-dashboard';
+    tabDashboard.className = 'tab is-active';
+    tabDashboard.setAttribute('role', 'tab');
+    tabDashboard.setAttribute('data-testid', 'nav-dashboard');
+    tabDashboard.setAttribute('data-view', 'dashboard');
+    tabDashboard.setAttribute('aria-selected', 'true');
+    tabDashboard.setAttribute('aria-controls', 'view-dashboard');
+    tabDashboard.tabIndex = 0;
+    tabDashboard.textContent = '종합 관제 대시보드';
+    nav.insertBefore(tabDashboard, nav.firstChild);
+
+    for (const otherTab of nav.querySelectorAll('[role="tab"]')) {
+      if (otherTab !== tabDashboard) {
+        otherTab.classList.remove('is-active');
+        otherTab.setAttribute('aria-selected', 'false');
+        otherTab.tabIndex = -1;
+      }
+    }
+  }
+
+  const main = document.getElementById('main');
+  if (main) {
+    for (const otherView of main.querySelectorAll('.view')) {
+      otherView.hidden = true;
+      otherView.classList.remove('is-active');
+    }
+
+    const viewDashboard = document.createElement('section');
+    viewDashboard.id = 'view-dashboard';
+    viewDashboard.className = 'view is-active';
+    viewDashboard.setAttribute('role', 'tabpanel');
+    viewDashboard.setAttribute('aria-labelledby', 'tab-dashboard');
+
+    const header = document.createElement('header');
+    header.className = 'soc-dashboard-header';
+    const h1 = document.createElement('h1');
+    h1.textContent = '종합 관제 대시보드';
+    const timeSpan = document.createElement('span');
+    timeSpan.id = 'soc-top-measured-at';
+    timeSpan.className = 'soc-card-timestamp';
+    timeSpan.textContent = '측정 시각: 대기 중…';
+    header.appendChild(h1);
+    header.appendChild(timeSpan);
+    viewDashboard.appendChild(header);
+
+    const overviewShell = document.createElement('section');
+    overviewShell.id = 'soc-executive-overview';
+    overviewShell.className = 'soc-overview-shell';
+    overviewShell.setAttribute('role', 'region');
+    overviewShell.setAttribute('aria-label', 'SOC 통합 보안 관제 지표 및 데이터 출처 요약');
+    overviewShell.setAttribute('aria-live', 'polite');
+
+    const topMetrics = document.createElement('div');
+    topMetrics.id = 'soc-top-metrics';
+    topMetrics.className = 'soc-metric-grid';
+    topMetrics.setAttribute('role', 'region');
+    topMetrics.setAttribute('aria-label', '상단 4대 관제 대시보드 핵심 지표 카드');
+    topMetrics.setAttribute('aria-live', 'polite');
+    overviewShell.appendChild(topMetrics);
+
+    const bottomSplitOverview = document.createElement('section');
+    bottomSplitOverview.id = 'soc-bottom-split-overview';
+    bottomSplitOverview.className = 'soc-split-overview-card';
+    bottomSplitOverview.setAttribute('role', 'region');
+    bottomSplitOverview.setAttribute('aria-label', '추이 비교 및 PC 상태 점검 2단 분할 뷰');
+    bottomSplitOverview.setAttribute('aria-live', 'polite');
+
+    const bottomSplitInner = document.createElement('div');
+    bottomSplitInner.id = 'soc-bottom-split';
+    bottomSplitInner.className = 'audit-split-view';
+    bottomSplitInner.setAttribute('role', 'region');
+    bottomSplitInner.setAttribute('aria-label', '시간순 이벤트 추이 비교 및 내 PC 상태·규칙 감사 2단 분할 영역');
+    bottomSplitInner.setAttribute('aria-live', 'polite');
+
+    const leftCol = document.createElement('div');
+    leftCol.id = 'soc-split-left-timeline';
+    leftCol.className = 'soc-split-panel soc-timeline-panel';
+    leftCol.setAttribute('role', 'region');
+    leftCol.setAttribute('aria-label', '좌측: 직전 조회 대비 추이 비교 및 시간순 보안 기록');
+    leftCol.setAttribute('aria-live', 'polite');
+
+    const rightCol = document.createElement('div');
+    rightCol.id = 'soc-split-right-audit';
+    rightCol.className = 'soc-split-panel soc-audit-panel';
+    rightCol.setAttribute('role', 'region');
+    rightCol.setAttribute('aria-label', '우측: 내 PC 네트워크·방화벽·Windows 기록 점검 및 판정 감사');
+    rightCol.setAttribute('aria-live', 'polite');
+
+    bottomSplitInner.appendChild(leftCol);
+    bottomSplitInner.appendChild(rightCol);
+    bottomSplitOverview.appendChild(bottomSplitInner);
+    overviewShell.appendChild(bottomSplitOverview);
+    viewDashboard.appendChild(overviewShell);
+
+    const viewProtection = document.getElementById('view-protection');
+    if (viewProtection) {
+      main.insertBefore(viewDashboard, viewProtection);
+    } else {
+      main.appendChild(viewDashboard);
+    }
+  }
+}
+
 export function createStudentView(options = {}) {
   ensureStudentAppearanceStyle();
+  ensureStudentDashboardDom();
 
   function setupTabNavigation() {
     if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
@@ -4858,6 +4981,20 @@ export function createStudentView(options = {}) {
       tab.addEventListener('click', () => {
         const targetView = tab.dataset.view || (tab.id ? tab.id.replace(/^tab-/, '') : '');
         switchView(targetView);
+      });
+      tab.addEventListener('keydown', (event) => {
+        const allTabs = Array.from(document.querySelectorAll('#nav [role="tab"], #tab-list [role="tab"]'));
+        const index = allTabs.indexOf(tab);
+        let next = null;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = allTabs[(index + 1) % allTabs.length];
+        else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = allTabs[(index - 1 + allTabs.length) % allTabs.length];
+        else if (event.key === 'Home') next = allTabs[0];
+        else if (event.key === 'End') next = allTabs[allTabs.length - 1];
+        if (!next) return;
+        event.preventDefault();
+        const nextView = next.dataset.view || (next.id ? next.id.replace(/^tab-/, '') : '');
+        switchView(nextView);
+        next.focus();
       });
     }
   }
@@ -5102,6 +5239,9 @@ export function createStudentView(options = {}) {
   }
 
   const syncGlobalSocRegions = updateSocOverview;
+  try {
+    updateSocOverview(false);
+  } catch {}
 
   return {
     renderIdentity({ me, devices, sessions } = {}) {

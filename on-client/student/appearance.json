@@ -1,98 +1,10 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "name": "케셰브 관제 대시보드형 테마 (Keshev SOC Dashboard Theme)",
-  "version": "1.0.0",
-  "description": "설치형 앱 및 웹에서 공통 화면 파일 수정 없이 반영되는 학생 전용 관제 대시보드 테마 및 레이아웃 설정",
-  "theme": {
-    "mode": "dark-soc",
-    "primaryColor": "#0f172a",
-    "secondaryColor": "#1e293b",
-    "accentColor": "#38bdf8",
-    "focusColor": "#38bdf8",
-    "borderColor": "#334155"
+  "schema": "alekov.student-appearance.v1",
+  "appName": "케셰브 보안 관제 센터",
+  "palette": {
+    "accent": "#0e306d",
+    "background": "#f8fafc",
+    "surface": "#ffffff"
   },
-  "layout": {
-    "framework": "control-dashboard",
-    "description": "맨 위 4대 상태 카드(SDP와 내 PC 실측 도메인별 분산 배치), 중간 내 PC 상세 실측 점검, 아래 직전 대비 추이 및 시간순 기록 2단 뷰",
-    "topCardsDistribution": [
-      {
-        "slot": 1,
-        "id": "identity-compliance-network",
-        "title": "신원·기기 & 내 PC 네트워크",
-        "sdpDomain": "신원(me) · 등록 기기(devices) · 활성 세션(sessions)",
-        "localDomain": "내 PC 네트워크 구성 (활성 인터페이스 개수 · 대표 IPv4 · 게이트웨이 · DNS)"
-      },
-      {
-        "slot": 2,
-        "id": "access-decisions-firewall",
-        "title": "업무 앱 인가 & 내 PC 방화벽",
-        "sdpDomain": "업무 앱 인가 판정 통계 (allow / deny / challenge / error)",
-        "localDomain": "내 PC 방화벽 설정 (Domain·Private·Public 3/3 켜짐 · 인/아웃바운드 동작 · 읽기 전용)"
-      },
-      {
-        "slot": 3,
-        "id": "xdr-events-windows-logs",
-        "title": "XDR 보안 기록 & 최근 Windows 기록",
-        "sdpDomain": "XDR 보안 경보 및 접속 기록 (SDP 사건 건수 · 매칭 규칙)",
-        "localDomain": "최근 24시간 Windows 기록 (System·Application 경고·오류 건수 · Security 확인 불가)",
-        "nonIntrusionClaim": "이 건수는 침해·공격 탐지 결과가 아닙니다"
-      },
-      {
-        "slot": 4,
-        "id": "diagnostics-hardware-resources",
-        "title": "진단·취약점 & 내 PC 하드웨어 자원",
-        "sdpDomain": "시스템 진단 점검(diagnostics) · 패키지 취약점(OSV) 요약",
-        "localDomain": "내 PC 하드웨어 자원 (CPU 코어/사용률 · 물리 메모리 사용량 · 디스크 여유 공간)"
-      }
-    ],
-    "coreFeaturesPriority": [
-      {
-        "rank": 1,
-        "name": "SOC 관제 4대 핵심 지표 카드 (SDP 상태 + 내 PC 실측 도메인 분산)",
-        "selector": "#soc-top-metrics, .soc-metric-grid"
-      },
-      {
-        "rank": 2,
-        "name": "내 PC 보안·네트워크·자원 실측 점검 카드 (다시 조회 버튼 & 대기 표시 & 실패 안내)",
-        "selector": "[data-student-pc-status='non-admin']"
-      },
-      {
-        "rank": 3,
-        "name": "직전 스냅샷 대비 추이 비교 및 시간순 보안 이벤트 기록 / 상세 감사 분석",
-        "selector": ".audit-split-view, .trend-delta-box"
-      }
-    ]
-  },
-  "provenanceBadges": {
-    "live": {
-      "text": "[실측값]",
-      "description": "내 PC 또는 실제 서버에서 직접 측정한 값 (측정 시각 표시)",
-      "badgeClass": "badge-live",
-      "style": "background:#064e3b;color:#a7f3d0;border:1px solid #059669;"
-    },
-    "demo": {
-      "text": "[예시]",
-      "description": "실제 조회 결과가 아닌 학습·설명용 가상 합성 데이터",
-      "badgeClass": "badge-demo",
-      "style": "background:#4c1d95;color:#ddd6fe;border:1px solid #7c3aed;"
-    },
-    "sdpDisconnected": {
-      "text": "[SDP 미연결]",
-      "description": "외부 SDP 원본 서버와 연결되지 않은 상태 (로컬 실측과 명확히 구분)",
-      "badgeClass": "badge-disconnected",
-      "style": "background:#7f1d1d;color:#fecaca;border:1px solid #dc2626;"
-    },
-    "unverified": {
-      "text": "[확인 불가]",
-      "description": "관리자 권한 필요 또는 측정 불가 사유로 확인되지 않은 항목",
-      "badgeClass": "badge-unverified",
-      "style": "background:#374151;color:#f3f4f6;border:1px solid #9ca3af;"
-    }
-  },
-  "accessibility": {
-    "keyboardNavigation": true,
-    "focusVisibleRing": "2px solid #38bdf8",
-    "focusVisibleOffset": "2px",
-    "ariaLiveRegions": true
-  }
+  "dashboardPreset": "student-first"
 }
