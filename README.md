@@ -370,7 +370,7 @@ flowchart LR
     - **관리자 권한 필요 항목 (`「확인 불가」` 및 이유 표시)**: Windows `Security` 보안 감사 이벤트 로그(`SeSecurityPrivilege` 필요)와 방화벽 차단 패킷 로그(`pfirewall.log` / `PersistentStore` 정책 저장소)는 설정을 바꾸지 않고 **`「확인 불가」`** 배지와 사유로 표시
     - **SDP 연결 상태와 로컬 PC 조회의 분리 (`「SDP 미연결」`)**: 외부 SDP 서버에 연결되지 않았을 때 상단 카드 01~03 및 하단 패널에 **`「SDP 미연결」`** 배지를 따로 표시하며, 내 PC 로컬 조회 결과(`[실측값]`)와 구분함
   - **UTF-8 인코딩 및 타임아웃 방어**: `on-client/student/pc-status-runtime.mjs`에서 PowerShell `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` 지정, `4,500ms` 실행 타임아웃 방어, `4,000ms` 캐시 TTL을 적용하여 인코딩 깨짐 및 서버 응답 지연 방지
-  - **포장 형태 (기본 포장 뒤 Inno Setup 사용자 단위 설치 프로그램)**: `package/build-installer.ps1` 실행 시 `pc-status-runtime.mjs`의 `measureLiveNonAdminPcStatus()`를 단일 소스로 호출해 Pre-flight 실측 리포트(`package/stage/userdata/logs/pc-status-preflight.json`)를 저장하고, Inno Setup 6(`ISCC.exe`, `PrivilegesRequired=lowest`)으로 사용자 단위 설치 파일 **`package/dist/setup.exe`** 생성
+  - **포장 형태 (포장 없이 프로젝트 폴더에서 실행)**: 포장 없이 프로젝트 폴더에서 앱을 직접 실행합니다. 설치 프로그램 제작 명령은 이번 과정에서 실행하지 않습니다. 과정 종료 후 참고 자료로 활용합니다. 실행 스크립트 또는 노드 직접 실행 명령어로 관제 대시보드를 구동합니다.
 
 - **`[실측값]` vs `[예시값]` vs `「확인 불가」` vs `「SDP 미연결」` 구분 표**:
 
@@ -380,23 +380,39 @@ flowchart LR
 | **`[실측값]`** | 내 PC 방화벽 설정 (읽기 전용) | `Domain`·`Private`·`Public` 프로필 `3/3개 켜짐` (인바운드 `Block`, 아웃바운드 `Allow`) | **읽기 전용 (변경 안 함)** |
 | **`[실측값]`** | 최근 24시간 Windows 기록 (`System`·`Application`) | `System` 오류 `2건`·경고 `9건`(합계 `11건`), `Application` 오류 `0건`·경고 `6건`(합계 `6건`) | **「이 건수는 침해나 공격 탐지 결과가 아닙니다」** 명시 |
 | **`[실측값]`** | 내 PC 자원 (CPU·RAM·디스크) | CPU `16코어`, RAM 총 `15.84 GB`, 디스크 총 `465.65 GB` | `node:os` / `node:fs.statfsSync` 실측 |
+| **`[예시값]`** | 데모 모드(`--demo`) SDP 가상 데이터 | 가상 업무 앱 3종(`allow`/`deny`/`challenge`), 가상 보안 사건 `1건`(`event-01`) | 실제 조회 결과가 아닌 설명용 값 (`demoEngine`) |
+| **`[예시값]`** | 로컬 AI 사건 설명 및 조치 라이프사이클 | 단말 실측 요약 기반 사건 원인 설명, SOAR 조치(`ac-on-...`) 라이프사이클 및 영수증 | 가상 사건 기반 설명용 생성 데이터 |
 | **`「확인 불가」`** | 관리자 권한 전용 항목 | Windows `Security` 보안 감사 로그, 방화벽 `pfirewall.log` 및 `PersistentStore` 정책 저장소 | 관리자 권한 필요 — 설정 변경 없이 사유 표시 |
 | **`「SDP 미연결」`** | 외부 SDP 릴레이 서버 상태 | 기본 기동(`disconnected`) 및 데모 기동(`demo`) 모두 실제 외부 SDP 서버 미연결 상태 표시 | 로컬 PC 조회 결과(`[실측값]`)와 구분 표시 |
-| **`[예시값]`** | 데모 모드(`--demo`) SDP 가상 데이터 | 가상 업무 앱 3종(`allow`/`deny`/`challenge`), 가상 보안 사건 `1건`(`event-01`) | 실제 조회 결과가 아닌 설명용 값 (`demoEngine`) |
 
-- **다시 실행하는 방법**:
+- **다시 실행하는 방법 (포장 없이 프로젝트 폴더에서 실행)**:
+
   ```powershell
-  # 1. 문법 검사
-  npm --prefix on-client run check
+  # 1. 작업 폴더(on-client) 확인 및 문법 검사
+  # on-client 폴더 안에서 실행합니다.
+  npm run check
+  # 프로젝트 루트에서 검사할 때는 아래 명령을 실행합니다.
+  # npm --prefix on-client run check
 
-  # 2. 프레임워크 무결성 검증, 내 PC 상태 실측, 기본 포장(package/stage) 및 Inno Setup 설치 파일(package/dist/setup.exe) 생성
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\package\build-installer.ps1
+  # 2-A. 로컬 관제 대시보드 기본 실행 (단말 실측값 확인)
+  # 표준 실행
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+  # 직접 실행
+  node --import ./student/pc-status-runtime.mjs src/server.mjs
 
-  # 3-A. 케셰브 로컬 대시보드 기본 실행 (SDP 미연결 + 내 PC [실측값] 확인)
-  cd on-client; node --import ./student/pc-status-runtime.mjs src/server.mjs
+  # 2-B. 로컬 관제 대시보드 데모 실행 (가상 데이터 및 실측값 비교)
+  # 표준 실행
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
+  # 직접 실행
+  node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
 
-  # 3-B. 케셰브 로컬 대시보드 데모 실행 (SDP 미연결 + SDP [예시값] + 내 PC [실측값] 비교 확인)
-  cd on-client; node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
+  # 3. 브라우저 확인
+  # 브라우저로 http://127.0.0.1:5189/ 에 접속합니다.
+  # - 상단 관제 카드 4종: 실측값 및 읽기 전용 배지 표시를 확인합니다.
+  # - 하단 분할 영역: 좌측 변동률 추이와 이벤트 목록, 우측 단말 점검 및 감사 패널 렌더링을 확인합니다.
+
+  # 4. 참고 사항 (과정 뒤 확인용 - 지금은 실행하지 않음)
+  # powershell -NoProfile -ExecutionPolicy Bypass -File .\package\build-installer.ps1
   ```
 
 ---

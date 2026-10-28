@@ -114,27 +114,38 @@ flowchart LR
 
 ### 4.1 작업 디렉토리 진입
 ```powershell
-cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
+# 프로젝트 루트에서 앱 폴더로 이동합니다.
+cd on-client
 ```
 
 ### 4.2 실행 명령어
 
-- **표준 실행 (PowerShell 래퍼)**:
+- **표준 실행 (PowerShell 래퍼 - 권장)**:
   ```powershell
   powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
   ```
-- **대체 실행 (npm 스크립트)**:
+  * 백엔드 센서 모듈을 자동으로 불러옵니다. 상단 관제 카드 4종에 단말 실측 데이터를 표기합니다.
+
+- **직접 실행 (Node.js)**:
   ```powershell
-  npm start
+  node --import ./student/pc-status-runtime.mjs src/server.mjs
   ```
+  * 주의: `npm start` 명령어나 옵션 없는 `node src/server.mjs` 명령어로 실행하면 안 됩니다. 로컬 센서 엔드포인트가 동작하지 않습니다. 상단 관제 카드에 센서 응답 없음 오류가 발생합니다. 반드시 `--import` 옵션을 포함하여 실행해야 합니다.
+
+- **가상 데이터 확인 실행 (데모 모드)**:
+  ```powershell
+  # 표준 실행 (PowerShell)
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
+
+  # 직접 실행 (Node.js)
+  node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
+  ```
+
 - **포트 충돌 해결 실행**:
   ```powershell
   powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Port 5190
   ```
-- **가상 데이터 확인 실행**:
-  ```powershell
-  npm run demo
-  ```
+
 - **확장 모듈 문법 검사**:
   ```powershell
   npm run check
@@ -168,7 +179,7 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 - `on-client/tools/start-alekov.ps1`: 실행 전 환경 검증 및 부팅 래퍼
 
 ### 5.2 학생 구현 영역 (`on-client/student/extension.mjs`)
-학생은 `createStudentView` 내부의 8대 화면 표시(View) 함수를 구현하였습니다:
+학생은 `createStudentView` 내부의 8대 화면 표시(View) 함수를 구현했습니다.
 - `renderIdentity`: 사용자 신원, 기기 상태, 세션 정보 DOM 렌더링
 - `renderDecision`: 인가 판정 배지 및 거절 사유 렌더링
 - `renderEvents`: 보안 이벤트 목록, 증거, 룰 식별자 렌더링
@@ -177,6 +188,41 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 - `renderExplanation`: AI 사건 해석 리포트 및 주의사항 렌더링
 - `renderAction`: 전달받은 조치 상태(`idle`, `prepared`, `pending`, `succeeded` 등) 및 영수증 렌더링 (실행기가 아닌 상태 뷰어)
 - `renderVulnerabilities`: 패키지 취약점 스캔 결과 상태 렌더링
+
+### 5.3 종합 관제 대시보드 화면 및 상단 핵심 카드 4종
+학생은 종합 관제 대시보드 탭과 상단 4대 카드 및 하단 2단 레이아웃을 구현했습니다.
+- `Card 01`: 활성 네트워크 어댑터 실측 데이터 표기 (IPv4 주소, 서브넷 마스크, 기본 게이트웨이, DNS 서버)
+- `Card 02`: 윈도우 방화벽 3대 프로필(Domain, Private, Public) 활성 상태 및 인바운드 차단, 아웃바운드 허용 기본 동작 표기 (읽기 전용)
+- `Card 03`: 최근 24시간 윈도우 이벤트 로그(System, Application) 경고 및 오류 건수 집계 및 비침해 고지 배너 표기
+- `Card 04`: 단말 하드웨어 자원(CPU 코어 및 사용률, 메모리 가용량, 디스크 가용량) 모니터링
+- 하단 2단 분할 영역: 좌측 직전 스냅샷 대비 변동률과 이벤트 목록 표기, 우측 단말 점검 및 무결성 감사 패널 표기
+
+### 5.4 로컬 단말 실측 및 감사 엔드포인트
+런타임 인터셉터(`on-client/student/pc-status-runtime.mjs`)는 프레임워크 파일을 수정하지 않고 다음 엔드포인트를 제공합니다.
+- `GET /api/pc-status`: 단말 네트워크, 방화벽, 이벤트 로그, 하드웨어 실측 데이터 반환
+- `POST /api/pc-status/baseline`: 단말 기준선 스냅샷 저장 및 변동률 추적
+- `GET /api/pc-status/stream`: 실시간 단말 상태 SSE 스트림 전송
+- `GET /api/pc-status/audit-export`: SHA-256 전자서명이 포함된 감사 보고서 JSON 출력
+- `POST /api/pc-status/audit-verify`: 감사 보고서 해시 무결성 검증
+
+### 5.5 보안 조치 라이프사이클 및 영수증 검증 엔드포인트
+보안 조치 모의 라이프사이클을 지원하기 위해 다음 엔드포인트를 제공합니다.
+- `POST /api/actions/prepare`: 유효 시간 5분의 확인 식별자 발급 및 파라미터 화이트리스트 검증
+- `POST /api/actions/execute`: 실행 대기 상태 전이 및 SHA-256 고정 해시 생성
+- `POST /api/actions/result`: 성공 상태 완료 및 관측 결과 반영
+- `GET /api/actions/receipt`: SHA-256 기반 영수증 내역 및 해시 검증 데이터 조회
+
+### 5.6 실행 파라미터 및 런타임 환경 변수
+- 파워셸 실행 래퍼(`tools/start-alekov.ps1`):
+  - `-Port <int>`: HTTP 바인딩 포트 지정 (기본값: 5189)
+  - `-Demo`: 가상 데모 데이터 모드 구동
+  - `-Background`: 백그라운드 프로세스로 구동하고 프로세스 ID를 출력한 뒤 터미널 복귀
+  - `-WaitSeconds <int>`: 서버 부팅 대기 제한 시간 지정 (기본값: 20초)
+  - `-NativeHostConfig <path>`: 로컬 포털 승인 설정 파일 주입
+  - `-SdpHostConfig <path>`: 외부 SDP 릴레이 호스트 mTLS 통신 설정 파일 주입
+- 런타임 환경 변수(`student/pc-status-runtime.mjs`):
+  - `ON_PROJECT_DIRECTORY`: 프로젝트 루트 경로 수동 지정
+  - `ON_APPROVED_PUBLIC_PACKAGES`: 공개 취약점 조회 승인 라이브러리 8종 목록 지정
 
 ---
 
@@ -188,20 +234,23 @@ cd C:\Users\user\Desktop\task\choi-bujang-secret-vault\on-client
 |---|---|---|
 | `Node.js 가 없습니다` | 런타임 미설치 또는 환경변수 PATH 누락 | Node.js 24.19.0 설치 후 새 터미널에서 재실행 |
 | `지금 Node.js 는 vXX 입니다` | 비호환 Node.js 버전 실행 | Node.js 24.19.0으로 전환 후 재실행 |
-| `포트 5189 를 다른 프로그램이 쓰고 있습니다` | 포트 5189 점유 충돌 | `.\tools\start-alekov.ps1 -Port 5190` 명령으로 포트 변경 실행 |
+| `포트 5189 를 다른 프로그램이 쓰고 있습니다` | 포트 5189 점유 충돌 또는 이전 프로세스 잔류 | `Stop-Process -Name node -Force`로 기존 프로세스를 정리하거나 `.\tools\start-alekov.ps1 -Port 5190` 실행 |
 | `앱 폴더가 아닙니다` | 잘못된 디렉토리에서 스크립트 실행 | `cd on-client` 이동 후 재실행 |
 | `…초 안에 뜨지 않았습니다` | 프로세스 부팅 타임아웃 | 백그라운드 프로세스 정리 후 재실행 |
+| `스크립트 실행 권한 제한` | 파워셸 실행 정책 차단 (`PSSecurityException`) | `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1` 명령으로 실행 |
 
 ### 6.2 애플리케이션 상태 코드 및 화면 문구
 
 | 화면 상태 문구 | 관련 상태 코드 | 원인 분석 | 복구 절차 |
 |---|---|---|---|
+| **센서 응답 없음** | `404 Not Found` (`/api/pc-status`) | `--import` 옵션 없이 서버 구동 | 서버 종료 후 `start-alekov.ps1` 또는 `node --import ./student/pc-status-runtime.mjs src/server.mjs`로 재실행 |
 | **연결 없음** | `disconnected`, `NOT_MOUNTED` | 호스트 설정 미주입 기본 실행 | 정상 상태. 별도 호스트 연동 시 `-SdpHostConfig` 지정 |
-| **예제** | `demo` | 데모 모드 활성화 | `npm run demo` 실행 결과. 실제 검증 시 표준 명령으로 재구동 |
+| **예제** | `demo` | 데모 모드 활성화 | `tools/start-alekov.ps1 -Demo` 실행 결과. 실제 검증 시 표준 명령으로 재구동 |
 | **AI 앱 승인 대기** | `awaiting_approval` (`/api/ai/connect/*`) | AI 연결 승인 대기 중 | 화면에 표시된 **UUID 앞뒤 4글자 하이픈 연결 확인 번호(`xxxx-xxxx`, 9글자)** 확인 후 포털에서 승인 완료하고, 화면의 **`[승인했으며 연결 확인]`** (`ai-connect-finish`) 버튼을 클릭하여 완료 |
 | **계정 연결 승인 대기** | `awaiting_approval` (`/api/native-login/*`) | Native 로컬 계정 연결 승인 대기 중 | 화면에 표시된 **6자리 숫자 승인 번호(`123456`)** 확인 후 포털에서 승인 완료하고, 화면의 **`[승인 번호로 로그인 완료]`** (또는 redeem) 버튼을 클릭하여 완료 |
 | **권한 준비 중** | `ON_AI_PROVISIONING_PENDING` | AI 계정 권한 미발급 | 운영자 권한 반영 대기 |
-| **확인 불가** | `UNVERIFIED`, `CONTRACT_MISMATCH` | 응답 계약 검증 실패 | 화면 새로고침 및 도움정보 점검 |
+| **확인 불가 (방화벽/보안 로그)** | `UNVERIFIED` | 일반 권한 읽기 전용 실행 환경 | 정상 동작. 관리자 권한 요구 로그 및 외부 서버 미연결 상태 안내이므로 별도 조치 불필요 |
+| **확인 불가 (계약 오류)** | `UNVERIFIED`, `CONTRACT_MISMATCH` | 응답 계약 검증 실패 | 화면 새로고침 및 도움정보 점검 |
 | **조회 실패** | `SERVER_UNAVAILABLE`, `TIMEOUT` | 네트워크 통신 장애 | 로컬 서버 구동 여부 확인 후 재시도 |
 | **프로젝트 미설정** | `PROJECT_NOT_CONFIGURED` (`not_configured`) | 프로젝트 절대경로 설정 누락 | 담당자에게 프로젝트 경로를 확인한 뒤 설정을 주입하고 수동 재조회 |
 | **승인된 패키지 없음** | `NO_APPROVED_PACKAGES` (`not_checked`) | 공개 조회 승인 목록에 일치하는 패키지 부재 | 정상 분기 (`packages: []`). 담당자에게 공개 조회 승인 목록을 확인한 뒤 수동 재조회 |
