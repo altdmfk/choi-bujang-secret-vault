@@ -561,90 +561,104 @@ function queryWindowsReadOnlyInspection() {
   return inflightWinPromise;
 }
 
+let inflightMeasureStatusPromise = null;
+
 export async function measureLiveNonAdminPcStatus() {
-  const before = lastCpuSnapshot || readCpuTickSnapshot();
-  const [winInspection] = await Promise.all([
-    queryWindowsReadOnlyInspection(),
-    new Promise((resolve) => setTimeout(resolve, PROBE_CONFIG.CPU_TICK_DELTA_WAIT_MS)),
-  ]);
-  const after = readCpuTickSnapshot();
-  lastCpuSnapshot = after;
-
-  const measuredAt = new Date().toISOString();
-  const totalDiff = after.total - before.total;
-  const idleDiff = after.idle - before.idle;
-  const cpuPct = totalDiff > 0
-    ? Number((((totalDiff - idleDiff) / totalDiff) * 100).toFixed(1))
-    : null;
-
-  const totalMemGb = Number((os.totalmem() / (1024 ** 3)).toFixed(2));
-  const freeMemGb = Number((os.freemem() / (1024 ** 3)).toFixed(2));
-  const usedMemGb = Number((totalMemGb - freeMemGb).toFixed(2));
-  const memPct = totalMemGb > 0
-    ? Number(((usedMemGb / totalMemGb) * 100).toFixed(1))
-    : null;
-
-  let diskFreeGb = null;
-  let diskTotalGb = null;
-  let diskUsedGb = null;
-  let diskPct = null;
-  let diskReason = null;
-  try {
-    const stat = fs.statfsSync(process.cwd());
-    diskFreeGb = Number(((Number(stat.bavail) * Number(stat.bsize)) / (1024 ** 3)).toFixed(2));
-    diskTotalGb = Number(((Number(stat.blocks) * Number(stat.bsize)) / (1024 ** 3)).toFixed(2));
-    diskUsedGb = Number((diskTotalGb - diskFreeGb).toFixed(2));
-    diskPct = diskTotalGb > 0
-      ? Number(((diskUsedGb / diskTotalGb) * 100).toFixed(1))
-      : null;
-  } catch (err) {
-    diskReason = err?.message || 'fs.statfsSync 조회 실패';
+  if (inflightMeasureStatusPromise) {
+    return inflightMeasureStatusPromise;
   }
 
-  const payloadData = {
-    measuredAt,
-    privilegeMode: PC_STATUS_NOTICES.PRIVILEGE_MODE,
-    readOnlyGuarantee: PC_STATUS_NOTICES.READ_ONLY,
-    nonIntrusionDisclaimer: PC_STATUS_NOTICES.NON_INTRUSION,
-    sdpSeparationNotice: PC_STATUS_NOTICES.SDP_SEPARATION,
-    cpu: {
-      usagePercent: cpuPct,
-      logicalCores: after.cores > 0 ? after.cores : null,
-      reason: cpuPct !== null
-        ? 'node:os.cpus() 틱 차분 측정 (일반 권한)'
-        : 'CPU 틱 차분을 계산할 수 없습니다.',
-    },
-    memory: {
-      usedGb: usedMemGb,
-      freeGb: freeMemGb,
-      totalGb: totalMemGb,
-      usagePercent: memPct,
-      reason: 'node:os.totalmem()/freemem() 조회 (일반 권한)',
-    },
-    disk: {
-      freeGb: diskFreeGb,
-      totalGb: diskTotalGb,
-      usedGb: diskUsedGb,
-      usagePercent: diskPct,
-      reason: diskFreeGb !== null
-        ? 'node:fs.statfsSync() 볼륨 조회 (일반 권한)'
-        : diskReason,
-    },
-    network: winInspection.network,
-    firewall: winInspection.firewall,
-    windowsEvents: winInspection.windowsEvents,
-    listeningPorts: winInspection.listeningPorts || [],
-    startupItems: winInspection.startupItems || [],
-    baselineDrift: computeBaselineDrift(winInspection.listeningPorts || [], winInspection.startupItems || []),
-  };
+  inflightMeasureStatusPromise = (async () => {
+    try {
+      const before = lastCpuSnapshot || readCpuTickSnapshot();
+      const [winInspection] = await Promise.all([
+        queryWindowsReadOnlyInspection(),
+        new Promise((resolve) => setTimeout(resolve, PROBE_CONFIG.CPU_TICK_DELTA_WAIT_MS)),
+      ]);
+      const after = readCpuTickSnapshot();
+      lastCpuSnapshot = after;
 
-  recordSnapshot(payloadData);
-  payloadData.snapshotHistory = snapshotHistory.slice();
+      const measuredAt = new Date().toISOString();
+      const totalDiff = after.total - before.total;
+      const idleDiff = after.idle - before.idle;
+      const cpuPct = totalDiff > 0
+        ? Number((((totalDiff - idleDiff) / totalDiff) * 100).toFixed(1))
+        : null;
 
-  return {
-    ok: true,
-    data: payloadData,
-  };
+      const totalMemGb = Number((os.totalmem() / (1024 ** 3)).toFixed(2));
+      const freeMemGb = Number((os.freemem() / (1024 ** 3)).toFixed(2));
+      const usedMemGb = Number((totalMemGb - freeMemGb).toFixed(2));
+      const memPct = totalMemGb > 0
+        ? Number(((usedMemGb / totalMemGb) * 100).toFixed(1))
+        : null;
+
+      let diskFreeGb = null;
+      let diskTotalGb = null;
+      let diskUsedGb = null;
+      let diskPct = null;
+      let diskReason = null;
+      try {
+        const stat = fs.statfsSync(process.cwd());
+        diskFreeGb = Number(((Number(stat.bavail) * Number(stat.bsize)) / (1024 ** 3)).toFixed(2));
+        diskTotalGb = Number(((Number(stat.blocks) * Number(stat.bsize)) / (1024 ** 3)).toFixed(2));
+        diskUsedGb = Number((diskTotalGb - diskFreeGb).toFixed(2));
+        diskPct = diskTotalGb > 0
+          ? Number(((diskUsedGb / diskTotalGb) * 100).toFixed(1))
+          : null;
+      } catch (err) {
+        diskReason = err?.message || 'fs.statfsSync 조회 실패';
+      }
+
+      const payloadData = {
+        measuredAt,
+        privilegeMode: PC_STATUS_NOTICES.PRIVILEGE_MODE,
+        readOnlyGuarantee: PC_STATUS_NOTICES.READ_ONLY,
+        nonIntrusionDisclaimer: PC_STATUS_NOTICES.NON_INTRUSION,
+        sdpSeparationNotice: PC_STATUS_NOTICES.SDP_SEPARATION,
+        cpu: {
+          usagePercent: cpuPct,
+          logicalCores: after.cores > 0 ? after.cores : null,
+          reason: cpuPct !== null
+            ? 'node:os.cpus() 틱 차분 측정 (일반 권한)'
+            : 'CPU 틱 차분을 계산할 수 없습니다.',
+        },
+        memory: {
+          usedGb: usedMemGb,
+          freeGb: freeMemGb,
+          totalGb: totalMemGb,
+          usagePercent: memPct,
+          reason: 'node:os.totalmem()/freemem() 조회 (일반 권한)',
+        },
+        disk: {
+          freeGb: diskFreeGb,
+          totalGb: diskTotalGb,
+          usedGb: diskUsedGb,
+          usagePercent: diskPct,
+          reason: diskFreeGb !== null
+            ? 'node:fs.statfsSync() 볼륨 조회 (일반 권한)'
+            : diskReason,
+        },
+        network: winInspection.network,
+        firewall: winInspection.firewall,
+        windowsEvents: winInspection.windowsEvents,
+        listeningPorts: winInspection.listeningPorts || [],
+        startupItems: winInspection.startupItems || [],
+        baselineDrift: computeBaselineDrift(winInspection.listeningPorts || [], winInspection.startupItems || []),
+      };
+
+      recordSnapshot(payloadData);
+      payloadData.snapshotHistory = snapshotHistory.slice();
+
+      return {
+        ok: true,
+        data: payloadData,
+      };
+    } finally {
+      inflightMeasureStatusPromise = null;
+    }
+  })();
+
+  return inflightMeasureStatusPromise;
 }
 
 // Stage 21 Server-Memory Snapshot Ring Buffer (max 25)
@@ -683,8 +697,11 @@ function recordSnapshot(data) {
   }
 }
 
-// Stage 21 Ephemeral secret for HMAC signature verification
-const AUDIT_SIGNING_SECRET = crypto.randomBytes(32).toString('hex');
+// Stage 21 Ephemeral/deterministic secret for HMAC signature verification across restarts
+const AUDIT_SIGNING_SECRET = process.env.ON_AUDIT_SIGNING_SECRET ||
+  crypto.createHash('sha256')
+    .update(`keshev-audit-v1:${os.hostname()}:${os.homedir()}:${process.arch}`)
+    .digest('hex');
 
 // Stage 20 Baseline Pinning & Drift Detection State
 let pinnedBaseline = null;
@@ -736,8 +753,21 @@ function computeBaselineDrift(currentPorts = [], currentStartup = []) {
 // Stage 17, 18, 19 Simulation & Demo Mode Interceptor
 const isDemoMode = process.argv.includes('--demo') || process.env.ON_AI_DEMO_EXPLAIN === '1';
 
-// In-memory action records for Stage 19 SOAR state machine
+// In-memory action records for Stage 19 SOAR state machine (LRU bounded)
+const MAX_DEMO_ACTIONS = 50;
 const demoActionsMap = new Map();
+
+function saveDemoAction(key, record) {
+  if (demoActionsMap.has(key)) {
+    demoActionsMap.delete(key);
+  } else if (demoActionsMap.size >= MAX_DEMO_ACTIONS) {
+    const oldestKey = demoActionsMap.keys().next().value;
+    if (oldestKey !== undefined) {
+      demoActionsMap.delete(oldestKey);
+    }
+  }
+  demoActionsMap.set(key, record);
+}
 
 function sendDemoJson(res, statusCode, body) {
   if (res.destroyed || res.writableEnded) return;
@@ -752,14 +782,18 @@ function sendDemoJson(res, statusCode, body) {
 }
 
 function canonicalJsonStringify(obj) {
+  if (typeof obj === 'string') {
+    return JSON.stringify(obj.normalize('NFC'));
+  }
   if (obj === null || typeof obj !== 'object') {
     return JSON.stringify(obj);
   }
   if (Array.isArray(obj)) {
     return '[' + obj.map(canonicalJsonStringify).join(',') + ']';
   }
-  const keys = Object.keys(obj).sort();
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJsonStringify(obj[k])).join(',') + '}';
+  const entries = Object.entries(obj).map(([k, v]) => [k.normalize('NFC'), v]);
+  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return '{' + entries.map(([k, v]) => JSON.stringify(k) + ':' + canonicalJsonStringify(v)).join(',') + '}';
 }
 
 async function readStreamBody(req) {
@@ -849,6 +883,22 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
         if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
         let isClosed = false;
+        let streamInterval = null;
+        const cleanup = () => {
+          if (!isClosed) {
+            isClosed = true;
+            if (streamInterval !== null) {
+              clearInterval(streamInterval);
+              streamInterval = null;
+            }
+            try { res.end(); } catch {}
+          }
+        };
+
+        req.once('close', cleanup);
+        req.once('end', cleanup);
+        res.once('close', cleanup);
+
         const pushStatus = async () => {
           if (isClosed || res.destroyed || res.writableEnded) return;
           try {
@@ -861,19 +911,13 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
         };
 
         await pushStatus();
-        const streamInterval = setInterval(pushStatus, 5000);
 
-        const cleanup = () => {
-          if (!isClosed) {
-            isClosed = true;
-            clearInterval(streamInterval);
-            try { res.end(); } catch {}
+        if (!isClosed && !res.destroyed && !res.writableEnded) {
+          streamInterval = setInterval(pushStatus, 5000);
+          if (typeof streamInterval.unref === 'function') {
+            streamInterval.unref();
           }
-        };
-
-        req.once('close', cleanup);
-        req.once('end', cleanup);
-        res.once('close', cleanup);
+        }
         return;
       }
 
@@ -1126,7 +1170,7 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
             executedAt: null,
             observation: null,
           };
-          demoActionsMap.set(requestId, record);
+          saveDemoAction(requestId, record);
 
           sendDemoJson(res, 200, {
             ok: true,
@@ -1175,6 +1219,7 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
           record.executedAt = new Date().toISOString();
           const execHashPayload = `${record.requestId}:${record.receiptId}:${record.actionId}:${record.target.id}:${record.target.generation}:${record.executedAt}`;
           record.actionHash = crypto.createHash('sha256').update(execHashPayload).digest('hex');
+          saveDemoAction(record.requestId, record);
 
           sendDemoJson(res, 200, {
             ok: true,
@@ -1214,6 +1259,7 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
               effectApplied: true,
             };
           }
+          saveDemoAction(record.requestId, record);
 
           sendDemoJson(res, 200, {
             ok: true,
@@ -1245,7 +1291,7 @@ if (!globalThis.__ALEKOV_HTTP_INTERCEPTOR_PATCHED__) {
             sendDemoJson(res, 200, { ok: true, data: record });
             return;
           }
-          const allRecords = Array.from(demoActionsMap.values());
+          const allRecords = Array.from(demoActionsMap.values()).slice(-20);
           sendDemoJson(res, 200, { ok: true, data: allRecords });
           return;
         }

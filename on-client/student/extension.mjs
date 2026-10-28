@@ -6673,9 +6673,11 @@ export function createStudentView(options = {}) {
         });
 
         if (!explicitHash && typeof window !== 'undefined' && typeof fetch === 'function' && reqId) {
+          container.setAttribute('data-student-action-request', reqId);
           fetch(`/api/actions/receipt?requestId=${encodeURIComponent(reqId)}`)
             .then((res) => (res.ok ? res.json() : null))
             .then((json) => {
+              if (!container.isConnected || container.getAttribute('data-student-action-request') !== reqId) return;
               const serverHash = json?.data?.actionHash || json?.actionHash;
               if (serverHash && typeof serverHash === 'string') {
                 const targetHashEl = container.querySelector('[data-student-action-detail-hash]') || hashDd;

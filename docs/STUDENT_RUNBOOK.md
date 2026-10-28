@@ -122,24 +122,23 @@ cd on-client
 
 - **표준 실행 (PowerShell 래퍼 - 권장)**:
   ```powershell
+  # 기본 단독 기동 (단말 실측값 확인)
   powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+
+  # 데모 모드 기동 (가상 데이터 및 실측값 종합 관제 대시보드)
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
   ```
-  * 백엔드 센서 모듈을 자동으로 불러옵니다. 상단 관제 카드 4종에 단말 실측 데이터를 표기합니다.
+  * `tools/start-alekov.ps1`은 Node.js 22~24 버전 검증 및 포트 점유 검사 후 백엔드 런타임 인터셉터(`student/pc-status-runtime.mjs`)를 자동으로 연결하여 상단 관제 카드 4종 및 실시간 감사 엔드포인트를 제공합니다.
 
 - **직접 실행 (Node.js)**:
   ```powershell
+  # 기본 단독 기동 (단말 실측값 확인)
   node --import ./student/pc-status-runtime.mjs src/server.mjs
-  ```
-  * 주의: `npm start` 명령어나 옵션 없는 `node src/server.mjs` 명령어로 실행하면 안 됩니다. 로컬 센서 엔드포인트가 동작하지 않습니다. 상단 관제 카드에 센서 응답 없음 오류가 발생합니다. 반드시 `--import` 옵션을 포함하여 실행해야 합니다.
 
-- **가상 데이터 확인 실행 (데모 모드)**:
-  ```powershell
-  # 표준 실행 (PowerShell)
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
-
-  # 직접 실행 (Node.js)
+  # 데모 모드 기동 (가상 데이터 및 실측값 종합 관제 대시보드)
   node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
   ```
+  * *주의: 옵션 없는 순수 베이스라인 명령어(`npm start` 또는 `node src/server.mjs`)로 기동 시 `pc-status-runtime.mjs`가 로드되지 않으므로, 종합 관제 대시보드 실측 엔드포인트(`/api/pc-status/*`) 및 모의 조치 엔진(`/api/actions/*`)이 비활성화됩니다. 종합 관제 대시보드를 사용할 때는 반드시 `tools/start-alekov.ps1` 또는 `--import ./student/pc-status-runtime.mjs` 옵션을 포함하여 실행해야 합니다.*
 
 - **포트 충돌 해결 실행**:
   ```powershell
@@ -149,6 +148,7 @@ cd on-client
 - **확장 모듈 문법 검사**:
   ```powershell
   npm run check
+  # 또는 루트 디렉토리에서: npm --prefix on-client run check
   ```
 
 ### 4.3 접속 및 시작 확인
@@ -190,27 +190,29 @@ cd on-client
 - `renderVulnerabilities`: 패키지 취약점 스캔 결과 상태 렌더링
 
 ### 5.3 종합 관제 대시보드 화면 및 상단 핵심 카드 4종
-학생은 종합 관제 대시보드 탭과 상단 4대 카드 및 하단 2단 레이아웃을 구현했습니다.
-- `Card 01`: 활성 네트워크 어댑터 실측 데이터 표기 (IPv4 주소, 서브넷 마스크, 기본 게이트웨이, DNS 서버)
-- `Card 02`: 윈도우 방화벽 3대 프로필(Domain, Private, Public) 활성 상태 및 인바운드 차단, 아웃바운드 허용 기본 동작 표기 (읽기 전용)
-- `Card 03`: 최근 24시간 윈도우 이벤트 로그(System, Application) 경고 및 오류 건수 집계 및 비침해 고지 배너 표기
-- `Card 04`: 단말 하드웨어 자원(CPU 코어 및 사용률, 메모리 가용량, 디스크 가용량) 모니터링
-- 하단 2단 분할 영역: 좌측 직전 스냅샷 대비 변동률과 이벤트 목록 표기, 우측 단말 점검 및 무결성 감사 패널 표기
+학생은 종합 관제 대시보드 탭(`#tab-dashboard`)과 상단 4대 카드 및 하단 2단 레이아웃을 구현했습니다.
+- `Card 01 (네트워크 어댑터)`: 활성 네트워크 어댑터 실측 데이터 표기 (IPv4 주소, 서브넷 마스크, 기본 게이트웨이, DNS 서버)
+- `Card 02 (방화벽 설정)`: 윈도우 방화벽 3대 프로필(Domain, Private, Public) 활성 상태 및 인바운드 차단, 아웃바운드 허용 기본 동작 표기 (`[읽기 전용]`, 설정 변경 안 함)
+- `Card 03 (윈도우 일반 기록)`: 최근 24시간 윈도우 이벤트 로그(System, Application) 경고 및 오류 건수 집계 및 비침해 고지 배너(`「이 건수는 침해나 공격 탐지 결과가 아닙니다」`) 표기
+- `Card 04 (하드웨어 자원)`: 단말 하드웨어 자원(CPU 코어 및 사용률, 메모리 가용량, 디스크 가용량) 모니터링 (`[실측값]`)
+- 하단 2단 분할 영역 (`#soc-bottom-split`):
+  - 좌측: 25개 스냅샷 링 버퍼 기반 직전 스냅샷 대비 변동률(Δ) 추이 및 실시간 보안 사건/로그 목록
+  - 우측: 단말 점검 카드(TCP 청취 포트 `loopback` vs `exposed`, `HKCU Run`·`Startup` 시작프로그램 점검), 안전 기준선 고정(`[안전 기준선 고정]` / `[기준선 다시 고정]`), 결정론적 SHA-256 HMAC 서명 감사 리포트 내보내기/검증 패널
 
 ### 5.4 로컬 단말 실측 및 감사 엔드포인트
 런타임 인터셉터(`on-client/student/pc-status-runtime.mjs`)는 프레임워크 파일을 수정하지 않고 다음 엔드포인트를 제공합니다.
-- `GET /api/pc-status`: 단말 네트워크, 방화벽, 이벤트 로그, 하드웨어 실측 데이터 반환
-- `POST /api/pc-status/baseline`: 단말 기준선 스냅샷 저장 및 변동률 추적
-- `GET /api/pc-status/stream`: 실시간 단말 상태 SSE 스트림 전송
-- `GET /api/pc-status/audit-export`: SHA-256 전자서명이 포함된 감사 보고서 JSON 출력
-- `POST /api/pc-status/audit-verify`: 감사 보고서 해시 무결성 검증
+- `GET /api/pc-status`: 단말 네트워크, 방화벽(읽기 전용), 이벤트 로그(System/Application), 하드웨어 자원, TCP 청취 포트(`loopback` vs `exposed`), 시작프로그램(`HKCU Run`·`Startup`), 25건 스냅샷 링 버퍼(`snapshotHistory`), 기준선 변동(`baselineDrift`) 실측 데이터 반환 (동시 요청 프로미스 중복 제거)
+- `POST /api/pc-status/baseline`: 단말 안전 기준선 스냅샷 고정 및 공격 표면 변동 추적
+- `GET /api/pc-status/stream`: 실시간 단말 상태 SSE 스트림 전송 (선결합 해제 및 언레프 인터벌 누수 방어)
+- `GET /api/pc-status/audit-export`: 머신/환경 스코프 결정론적 비밀키 기반 SHA-256 HMAC 전자서명이 포함된 감사 리포트 JSON 출력
+- `POST /api/pc-status/audit-verify`: 감사 리포트 SHA-256 페이로드 해시 및 HMAC 전자서명 무결성 검증 (서버 재기동 후에도 일치 보장)
 
 ### 5.5 보안 조치 라이프사이클 및 영수증 검증 엔드포인트
-보안 조치 모의 라이프사이클을 지원하기 위해 다음 엔드포인트를 제공합니다.
-- `POST /api/actions/prepare`: 유효 시간 5분의 확인 식별자 발급 및 파라미터 화이트리스트 검증
-- `POST /api/actions/execute`: 실행 대기 상태 전이 및 SHA-256 고정 해시 생성
-- `POST /api/actions/result`: 성공 상태 완료 및 관측 결과 반영
-- `GET /api/actions/receipt`: SHA-256 기반 영수증 내역 및 해시 검증 데이터 조회
+보안 조치 모의 라이프사이클을 지원하기 위해 다음 엔드포인트를 제공합니다 (50건 LRU 인메모리 관리: `MAX_DEMO_ACTIONS = 50`).
+- `POST /api/actions/prepare`: 유효 시간 5분의 확인 식별자(`ac-on-...`) 발급 및 파라미터 화이트리스트 검증 (`prepared`)
+- `POST /api/actions/execute`: 실행 대기 상태 전이 및 고유 SHA-256 영수증 해시 생성 (`pending`)
+- `POST /api/actions/result`: 성공 상태 완료 및 관측 결과 반영 (`succeeded`)
+- `GET /api/actions/receipt`: `requestId` 단건 영수증 조회 또는 전체 조회 시 최신 20건 제한 반환 (`.slice(-20)`)
 
 ### 5.6 실행 파라미터 및 런타임 환경 변수
 - 파워셸 실행 래퍼(`tools/start-alekov.ps1`):
@@ -221,8 +223,10 @@ cd on-client
   - `-NativeHostConfig <path>`: 로컬 포털 승인 설정 파일 주입
   - `-SdpHostConfig <path>`: 외부 SDP 릴레이 호스트 mTLS 통신 설정 파일 주입
 - 런타임 환경 변수(`student/pc-status-runtime.mjs`):
-  - `ON_PROJECT_DIRECTORY`: 프로젝트 루트 경로 수동 지정
-  - `ON_APPROVED_PUBLIC_PACKAGES`: 공개 취약점 조회 승인 라이브러리 8종 목록 지정
+  - `ON_PROJECT_DIRECTORY`: 프로젝트 루트 경로 수동 지정 (미지정 시 상위 디렉터리 package-lock.json 자동 탐색)
+  - `ON_APPROVED_PUBLIC_PACKAGES`: 공개 취약점 조회 승인 라이브러리 8종 목록 지정 (기본 승인 패키지 8종 내장)
+  - `ON_AUDIT_SIGNING_SECRET`: 감사 리포트 HMAC 전자서명 키 수동 재정의 (기본값: 머신/사용자 스코프 결정론적 SHA-256 파생값)
+  - `ON_AI_DEMO_EXPLAIN`: `1` 지정 시 `--demo` 플래그와 동일하게 데모 모드 인가 배지 및 AI 설명/조치 라이프사이클 인터셉터 활성화
 
 ---
 
@@ -405,14 +409,18 @@ cd on-client
    - 터미널에서 `Ctrl + C`를 입력하여 서버를 정상 종료합니다.
    - 다시 기동 명령을 실행하여 프로세스가 충돌 없이 바인딩되고 이전과 동일하게 브라우저 응답이 복원되는지 확인합니다.
 
-### 8.3 누적 기능 재현 결과 표 (13~21단계)
+### 8.3 누적 기능 재현 결과 표 (13~21단계 및 Final SOC)
 
 결과 분류 기준:
-- `재현됨`: 현재 제출본에서 직접 실행하여 정상 화면 렌더링 및 응답을 확인한 항목
+- `재현됨`: 해당 검증 환경에서 직접 실행하여 정상 화면 렌더링 및 응답을 확인한 항목
 - `연결 없음`: 기본 단독 기동 시 외부 호스트 설정 미주입으로 안전 대기 상태를 확인한 항목
 - `확인 불가`: 계약 불일치 또는 데이터 무결성 오류로 렌더링이 중단된 항목
 - `미확인`: 환경적 제약이나 권한 미비로 실행하지 못했거나 화면 표시를 관찰하지 못한 항목
 - `재현 안 됨`: 로직 오류나 런타임 결함으로 동작이 실패한 항목
+
+#### 8.3.1 22단계 고정 재현 커밋(`3e9beee`) 기준 독립 재현 결과 (v0.2.11 RC)
+
+*고정 커밋 `3e9beee5bec0348cfd93f32b6e4a281956adab1b`을 새 격리 폴더에 체크아웃한 순수 베이스라인 환경에서의 재현 기록입니다.*
 
 | 단계 | 확인한 기능 | 결과 | 확인 시각 | 비고 (근거, 예제 구분, 실제 사용 설정 및 관찰 결과) |
 |---|---|---|---|---|
@@ -425,6 +433,19 @@ cd on-client
 | **19단계** | 보안 조치 상태 뷰 (`renderAction`) | `연결 없음` | 2026-10-23 13:44 | 기본 기동 시 `idle` 상태 표시. 실제 원격 보안 조치 집행기는 플랫폼 미연결(`ACTION_UNSUPPORTED`) 상태 유지. 실행기가 아닌 상태 뷰어로 동작 확인됨 |
 | **20단계** | 패키지 의존성 취약점 점검 (`renderVulnerabilities`) | `재현됨` | 2026-10-23 13:44 | 기동 직후 초기 `idle`(대기) 상태 확인.<br/>화면에서 **`[설치 패키지 조회]` (`vulnerabilities-load`)** 버튼 클릭 후 관찰:<br/>1) 기본 기동 시 `ON_PROJECT_DIRECTORY` 미설정으로 `프로젝트 미설정` (`PROJECT_NOT_CONFIGURED`) 확인.<br/>2) `ON_PROJECT_DIRECTORY` 주입(또는 `--env-file`) 및 `ON_APPROVED_PUBLIC_PACKAGES=[]` 설정 기동 시 로컬 lockfile 파싱 및 `승인된 패키지 없음` (`NO_APPROVED_PACKAGES`, `packages: []`) 정상 상태 렌더링 확인 |
 | **21단계** | 런북 규격 실행 및 재실행 | `재현됨` | 2026-10-23 13:44 | 확장 단일 파일 문법 검사(`npm run check`, `node --check student/extension.mjs`) 통과. 표준 기동 스크립트 실행 후 `http://127.0.0.1:5189/` 정상 응답, `Ctrl + C` 종료 후 재기동 성공 확인 |
+
+#### 8.3.2 최종 관제 대시보드(Final SOC) 확장 런타임 실측 결과 (현재 작업본 HEAD)
+
+*현재 최신 제출본(HEAD)에서 `student/pc-status-runtime.mjs` 런타임 인터셉터를 바인딩(`tools/start-alekov.ps1 -Demo` 또는 `--import`)하여 측정한 결과입니다.*
+
+| 단계 | 확인한 기능 | 결과 | 확인 시각 | 비고 (근거, 예제 구분, 실제 사용 설정 및 관찰 결과) |
+|---|---|---|---|---|
+| **17단계** | AI 게이트웨이 점검 상태 (`renderAiConnection`) | `재현됨` (데모) | 2026-10-28 12:00 | `tools/start-alekov.ps1 -Demo` 구동 시 `pc-status-runtime.mjs` 인터셉터를 통한 모델 수(2개)·점검 시각 정상 렌더링 확인 (유료 모델 실호출은 UNV-02 유지) |
+| **18단계** | 보안 사건 AI 설명 렌더링 (`renderExplanation`) | `재현됨` (데모) | 2026-10-28 12:00 | `tools/start-alekov.ps1 -Demo` 구동 시 단말 실측 요약(어댑터·방화벽·로그)을 결합한 동적 로컬 AI 사고 분석 보고서(**`[예시값 · 로컬 AI 분석]`**) 렌더링 정상 재현됨 |
+| **19단계** | 보안 조치 상태 뷰 (`renderAction`) | `재현됨` (시뮬레이션) | 2026-10-28 12:00 | 50건 LRU 인메모리 관리 기반 SOAR 조치 라이프사이클(`prepared`→`pending`→`succeeded`) 및 고유 SHA-256 영수증 무결성 검증(**`[시뮬레이션 · 조치 상태 검증]`**) 정상 재현됨 |
+| **20단계** | 패키지 의존성 취약점 점검 (`renderVulnerabilities`) | `재현됨` | 2026-10-28 12:00 | `ON_PROJECT_DIRECTORY` 및 `ON_APPROVED_PUBLIC_PACKAGES` 주입 시 로컬 lockfile 파싱 및 승인 8종 대상 실시간 Google OSV 라이브 질의 정상 렌더링 확인 |
+| **21단계** | 런북 규격 실행 및 재실행 | `재현됨` | 2026-10-28 12:00 | 확장 단일 파일 문법 검사(`npm --prefix on-client run check`) 및 런타임 인터셉터 검사(`node --check on-client/student/pc-status-runtime.mjs`) 통과. 기동 및 재기동 정상 확인 |
+| **Final SOC** | 종합 관제 대시보드 및 실시간 감사 엔드포인트 | `재현됨` | 2026-10-28 12:00 | 상단 4대 관제 카드(네트워크 `[실측값]`, 방화벽 `[읽기 전용]`, Windows System/Application 로그 `[실측값]`, 하드웨어 자원 `[실측값]`), 25건 스냅샷 링 버퍼(`snapshotHistory`), 실시간 SSE 스트림(`/api/pc-status/stream`), TCP 청취 포트/시작프로그램 감사, 안전 기준선 고정(`[안전 기준선 고정]`→`[기준선 다시 고정]`), 결정론적 SHA-256 HMAC 감사 리포트 내보내기/3단계 무결성 검증(`/api/pc-status/audit-export`, `/api/pc-status/audit-verify`) 정상 재현됨 |
 
 ### 8.4 데이터 보존 및 백업·복원 계획
 
