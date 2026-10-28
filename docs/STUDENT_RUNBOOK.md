@@ -120,25 +120,29 @@ cd on-client
 
 ### 4.2 실행 명령어
 
-- **표준 실행 (PowerShell 래퍼 - 권장)**:
+- **표준 실행 (PowerShell 래퍼 + 인터셉터 연동 - 권장)**:
   ```powershell
   # 기본 단독 기동 (단말 실측값 확인)
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
 
   # 데모 모드 기동 (가상 데이터 및 실측값 종합 관제 대시보드)
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
   ```
-  * `tools/start-alekov.ps1`은 Node.js 22~24 버전 검증 및 포트 점유 검사 후 백엔드 런타임 인터셉터(`student/pc-status-runtime.mjs`)를 자동으로 연결하여 상단 관제 카드 4종 및 실시간 감사 엔드포인트를 제공합니다.
+  * `tools/start-alekov.ps1`은 alekov-starter 0.2.21 공식 원본 무결성을 유지하며, 사전 설정된 `$env:NODE_OPTIONS`를 통해 비침습적으로 백엔드 런타임 인터셉터(`student/pc-status-runtime.mjs`)를 연결하여 상단 관제 카드 4종 및 실시간 감사 엔드포인트를 제공합니다.
 
-- **직접 실행 (Node.js)**:
+- **직접 실행 (npm / Node.js)**:
   ```powershell
   # 기본 단독 기동 (단말 실측값 확인)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; npm start
+  # 또는
   node --import ./student/pc-status-runtime.mjs src/server.mjs
 
   # 데모 모드 기동 (가상 데이터 및 실측값 종합 관제 대시보드)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; npm run demo
+  # 또는
   node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
   ```
-  * *주의: 옵션 없는 순수 베이스라인 명령어(`npm start` 또는 `node src/server.mjs`)로 기동 시 `pc-status-runtime.mjs`가 로드되지 않으므로, 종합 관제 대시보드 실측 엔드포인트(`/api/pc-status/*`) 및 모의 조치 엔진(`/api/actions/*`)이 비활성화됩니다. 종합 관제 대시보드를 사용할 때는 반드시 `tools/start-alekov.ps1` 또는 `--import ./student/pc-status-runtime.mjs` 옵션을 포함하여 실행해야 합니다.*
+  * *주의: 옵션 없는 순수 베이스라인 명령어(`npm start` 또는 `node src/server.mjs`)로 기동 시 `pc-status-runtime.mjs`가 로드되지 않으므로, 종합 관제 대시보드 실측 엔드포인트(`/api/pc-status/*`) 및 모의 조치 엔진(`/api/actions/*`)이 비활성화됩니다. 종합 관제 대시보드를 사용할 때는 반드시 `$env:NODE_OPTIONS` 또는 `--import ./student/pc-status-runtime.mjs` 옵션을 포함하여 실행해야 합니다.*
 
 - **포트 충돌 해결 실행**:
   ```powershell
@@ -297,7 +301,7 @@ cd on-client
 - **대상 브랜치**: `main`
 - **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
 - **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD)
-- **현재 버전 상태**: `v0.2.11` (검증 중인 버전, Release Candidate)
+- **현재 버전 상태**: `v0.2.21` (검증 중인 버전, Release Candidate)
   > [!IMPORTANT]
   > 22단계 통과는 원문 검토 기준의 수료 판정이며, 실제 운영 인증이나 v1.0 자동 인증이 아닙니다. 19단계 실제 원격 조치 집행기 연동과 21·22단계 공식 접수 서명 연결이 완료되기 전까지는 정식 `v1.0`으로 표기하지 않고 검증 중인 버전으로 유지합니다.
 
@@ -526,7 +530,7 @@ cd on-client
 
 #### 8.6.1 버전 체계의 역할 분담 및 확인 가능한 코드 범위
 문서와 소스코드에 존재하는 두 버전 표기는 실제 코드상 다음과 같이 역할이 명확히 구분됩니다:
-- **패키지 및 릴리스 버전 (`0.2.11`)**:
+- **패키지 및 릴리스 버전 (`0.2.21`)**:
   - 정의: 학생 과제 스타터 패키지 번들 및 개발 확장 모듈(`on-client/package.json`)의 최신 릴리스 버전입니다.
   - 적용: 과제 누적 단계 진척도 및 학생 확장 구현(`student/extension.mjs`)의 기준 버전으로 사용됩니다.
 - **서버 프로토콜 및 베이스라인 메타 버전 (`0.1.0`)**:
@@ -551,7 +555,7 @@ cd on-client
   - 외부 SDP mTLS 릴레이 연결은 플랫폼 독립 코드로 구현되어 있으나, 실제 비-Windows 실물 머신에서의 mTLS 핸드셰이크 실측 시험을 수행하지 않은 **「미검증 지원 범위」** 로 명시합니다. Native 계정 연결 및 DPAPI 자격 보관함은 Windows 전용이므로 비-Windows에서는 지원되지 않습니다.
 
 #### 8.6.3 정식 v1.0 미발행 사유 및 미확인(UNV) 스펙
-- **현재 표기 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
+- **현재 표기 버전**: `v0.2.21` (검증 중인 버전, Release Candidate)
 - **정식 v1.0 미발행 사유**:
   - 18단계 AI 설명 보고서 표시 미확인 (데모 모드에서도 권한 준비 중으로 미표시)
   - 19단계 실제 원격 조치 집행기 연결 부재 (`ACTION_UNSUPPORTED`, `supportedActions: []` 상태 유지)

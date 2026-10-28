@@ -190,3 +190,25 @@
 
 ### 8.3 패키징 빌드 검증
 - `package/build-installer.ps1`: 소스 해시 검증, 스테이징, 의존성 메타데이터 복사와 인스톨러 컴파일을 모두 통과했다.
+
+---
+
+## 9. alekov-starter 0.2.21 업데이트 및 프레임워크 무결성 원복 (비침습 아키텍처 전환)
+
+### 9.1 프레임워크 보호 파일 4종 공식 원본 복원
+- `public/index.html`, `public/style.css`, `tools/start-alekov.ps1`, `.on-starter-manifest.json` 4개 파일을 0.2.21 공식 스타터 원본으로 복원하고 해시 일치(75개 파일 중 73개 공식 일치)를 검증했다.
+
+### 9.2 대시보드 동적 마운트 및 접근성 연동 (extension.mjs)
+- `index.html`을 수정하지 않고, `createStudentView` 진입 시 `ensureStudentDashboardDom()`을 통해 좌측 사이드바 `#nav`에 `tab-dashboard` 탭 버튼 및 본문 `#view-dashboard`, 4대 카드 그리드(`#soc-top-metrics`), 하단 2단 분할 뷰(`audit-split-view`)를 동적으로 주입하도록 구현했다.
+- 상·하·좌·우 방향키 및 Home/End 키보드 탭 순환 이동 핸들러를 추가하고, 초기 1회 동기 렌더링 호출을 보강했다.
+
+### 9.3 CSP(style-src 'self') 대응 및 대시보드 CSS 인터셉트 서빙 (pc-status-runtime.mjs)
+- 브라우저 보안 헤더(CSP: `style-src 'self'`)에 의해 인라인 `<style>` 태그 삽입이 전면 차단되는 문제를 해결했다.
+- 과거 7282e0b 당시 검증된 1,517줄의 관제 스타일을 `student/dashboard.css`로 분리 보존하고, `pc-status-runtime.mjs` 인터셉터가 정식 외부 스타일시트 경로인 `GET /student/appearance.css`를 가로채 `:root` 색상 변수와 함께 39KB 관제 스타일을 번들로 서빙하도록 구성했다.
+
+### 9.4 student/appearance.json 규격 동기화
+- 이전 버전의 비표준 메타데이터로 4,096바이트 상한을 초과하던 문제를 해결했다.
+- 0.2.21 공식 규격(`alekov.student-appearance.v1`)에 맞추어 `schema`, `appName`, `palette`, `dashboardPreset`만 정규화(230바이트)하여 서버 검증(`state: "applied"`)을 통과시켰다.
+
+### 9.5 비침습 실행 파이프라인 정립
+- `start-alekov.ps1`을 수정하지 않고, Node.js 표준 환경변수 `$env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"`를 통해 인터셉터 브리지를 주입하는 표준 실행 절차를 확립했다.

@@ -281,7 +281,7 @@ flowchart LR
 - **대상 브랜치**: `main`
 - **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
 - **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD)
-- **릴리스 버전**: `v0.2.11` (검증 중인 버전, Release Candidate)
+- **릴리스 버전**: `v0.2.21` (검증 중인 버전, Release Candidate)
   - 18단계 AI 설명 보고서 표시 미확인, 19단계 실제 원격 조치 집행기 미연결(`ACTION_UNSUPPORTED`), 21·22단계 공식 접수 서명 미연결 상태이므로 정식 `v1.0` 대신 검증 중인 버전으로 표기합니다.
 - **고정 재현 커밋(`3e9beee`)과의 파일별 차분 및 코드 일치 검증**:
   - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `on-client/tools/**`): **변경 없음 (`0 diff`)**
@@ -345,7 +345,7 @@ flowchart LR
 
 ### 6. 버전 체계 및 OS 지원 범위 분리
 - **버전 역할 분담**:
-  - 패키지 및 릴리스 버전 (`0.2.11`): `on-client/package.json` 기준 학생 과제 진행 릴리스 버전
+  - 패키지 및 릴리스 버전 (`0.2.21`): `on-client/package.json` 기준 학생 과제 진행 릴리스 버전
   - 서버 프로토콜 및 베이스라인 메타 버전 (`0.1.0`): `on-client/src/server.mjs`의 `GET /api/diagnostics` 응답 및 진단 메타데이터 사양 버전
 - **런타임 및 실행 방법별 버전 지원 범위**:
   - **PowerShell 실행 도구 (`tools/start-alekov.ps1`)**: Node.js 22~24 버전만 허용(21 이하 및 25 이상 사전 차단, Windows PowerShell 전용)
@@ -399,15 +399,19 @@ flowchart LR
   # 프로젝트 루트에서 검사할 때는 아래 명령을 실행합니다.
   # npm --prefix on-client run check
 
-  # 2-A. 로컬 관제 대시보드 기본 실행 (단말 실측값 확인)
-  # 표준 실행
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+  # 2-A. 로컬 관제 대시보드 기본 실행 (단말 실측 브리지 연동)
+  # 환경변수 주입 실행 (권장)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; npm start
+  # 표준 실행 래퍼 사용 시 ($env:NODE_OPTIONS 사전 설정 필요)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
   # 직접 실행
   node --import ./student/pc-status-runtime.mjs src/server.mjs
 
-  # 2-B. 로컬 관제 대시보드 데모 실행 (가상 데이터 및 실측값 비교)
-  # 표준 실행
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
+  # 2-B. 로컬 관제 대시보드 데모 실행 (가상 데이터 및 실측값 관제)
+  # npm 데모 실행 (권장)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; npm run demo
+  # 표준 실행 래퍼 사용 시 ($env:NODE_OPTIONS 사전 설정 필요)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
   # 직접 실행
   node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
 
