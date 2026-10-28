@@ -279,15 +279,15 @@ flowchart LR
 ### 1. 기준 형상 정보 및 변경 대조
 - **저장소 URL**: `https://github.com/altdmfk/choi-bujang-secret-vault.git`
 - **대상 브랜치**: `main`
-- **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
-- **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD)
+- **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b` (13~22단계 기본 과제 수료 기준선)
+- **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD, 22단계 기준선 위에 Final 1~4일차 종합 관제 대시보드 및 alekov-starter 0.2.21 공식 프레임워크 업데이트가 완전 통합된 형상)
 - **릴리스 버전**: `v0.2.21` (검증 중인 버전, Release Candidate)
   - 18단계 AI 설명 보고서 표시 미확인, 19단계 실제 원격 조치 집행기 미연결(`ACTION_UNSUPPORTED`), 21·22단계 공식 접수 서명 미연결 상태이므로 정식 `v1.0` 대신 검증 중인 버전으로 표기합니다.
-- **고정 재현 커밋(`3e9beee`)과의 파일별 차분 및 코드 일치 검증**:
-  - 실행 코드(`on-client/src/**`, `student/**`, `public/**`, `on-client/tools/**`): **변경 없음 (`0 diff`)**
-  - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package.json`): **변경 없음 (`0 diff`, `on-client`는 외부 의존성이 없어 루트 `package-lock.json` 사용)**
-  - 핵심 파일 8종 Git Blob 및 저장소 원문 `fileSha256`(LF 기준) 해시 대조: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md) 8.1.1 표 수록 (두 커밋의 산출 해시 일치 확인)
-  - 파일별 차분 대상: `docs/STUDENT_RUNBOOK.md`, `README.md`, `.env.example`, `on-client/.env.example` (문서 및 환경 템플릿 보완 전용)
+- **고정 기준선(`3e9beee`)과 현재 제출본(HEAD) 간 형상 대조**:
+  - 기본 과제 영역(`on-client/src/**`): 22단계 수료 로직 보존 및 0.2.21 공식 프레임워크 4대 파일(`tools/start-alekov.ps1`, `public/index.html`, `public/style.css`, `.on-starter-manifest.json`) 원본 무결성 유지
+  - Final 확장 영역(`on-client/student/**`): 상단 4대 관제 지표, 단말 읽기전용 실측 런타임 인터셉터(`pc-status-runtime.mjs`), 2단 분할 감사 패널, 브라우저 CSP 규격 맞춤 분리 스타일시트(`student/appearance.css`) 구현 추가
+  - 의존성 및 락파일(`package.json`, `package-lock.json`, `on-client/package.json`): 루트 `package-lock.json` 무결성 유지
+  - 파일별 차분 상세: [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md) 8.1절 참조
 - **변경된 파일 관련 재확인 결과**:
   - 확장 모듈 단일 파일 문법 검사(`npm --prefix on-client run check` - `student/extension.mjs` 대상 `node --check`), 환경 템플릿 기반 기본 HTTP 기동(`npm start`) 및 `/api/diagnostics` 응답, 취약점 `idle` 대기 및 버튼 클릭 분기(`PROJECT_NOT_CONFIGURED` / `NO_APPROVED_PACKAGES`), 데모 모드(`npm run demo`) 사건 1건 및 인가 배지 3종 렌더링, 데이터 복원 테스트(`npm run test:restore` 9건 통과), 실행 방법별(PowerShell 도구 vs 직접 실행) 지원 범위 구분 명시
 - **변경된 파일 관련 미확인 사항 (UNV 유지)**:

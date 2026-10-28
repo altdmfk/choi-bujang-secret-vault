@@ -299,19 +299,19 @@ cd on-client
 ### 8.1 기준 형상 정보 및 변경 대조
 - **저장소 URL**: `https://github.com/altdmfk/choi-bujang-secret-vault.git`
 - **대상 브랜치**: `main`
-- **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b`
-- **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD)
+- **고정 재현 기준 커밋 (고정 SHA)**: `3e9beee5bec0348cfd93f32b6e4a281956adab1b` (13~22단계 기본 과제 수료 기준선)
+- **최종 비교 대상 커밋 (현재 제출본)**: `main` 브랜치 최신 제출 커밋 (현재 HEAD, 22단계 기준선 위에 Final 1~4일차 종합 관제 대시보드 및 alekov-starter 0.2.21 공식 프레임워크 업데이트가 완전 통합된 최종 릴리스 형상)
 - **현재 버전 상태**: `v0.2.21` (검증 중인 버전, Release Candidate)
   > [!IMPORTANT]
   > 22단계 통과는 원문 검토 기준의 수료 판정이며, 실제 운영 인증이나 v1.0 자동 인증이 아닙니다. 19단계 실제 원격 조치 집행기 연동과 21·22단계 공식 접수 서명 연결이 완료되기 전까지는 정식 `v1.0`으로 표기하지 않고 검증 중인 버전으로 유지합니다.
 
-#### 8.1.1 고정 재현 커밋(`3e9beee`)과 현재 제출본 간 파일별 차분(Diff) 및 실행 코드 일치 검증
-- **실행 코드 및 런타임 스크립트 일치 여부**: **변경 없음 (0 diff)**
-  - 대조 명령: `git diff 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD -- on-client/src on-client/student on-client/public on-client/tools`
-  - 결과: 변경 사항 없음 (`0 diff`). 비즈니스 로직, 에이전트 확장 모듈, 서버 라우팅, 프론트엔드 스크립트, 실행 도구(`start-alekov.ps1`)는 재현 대상 커밋과 차분이 없습니다.
-- **의존성 명세 및 락파일 일치 여부**: **변경 없음 (0 diff)**
-  - 대조 명령: `git diff 3e9beee5bec0348cfd93f32b6e4a281956adab1b HEAD -- package.json package-lock.json on-client/package.json`
-  - 결과: 변경 사항 없음 (`0 diff`). `on-client`는 외부 npm 의존성이 없어 `on-client/package-lock.json`이 존재하지 않으며 루트의 `package-lock.json`이 락파일 역할을 수행합니다. 의존성 버전 및 설치 무결성은 재현 대상 커밋과 동일하게 유지됩니다.
+#### 8.1.1 고정 기준선(`3e9beee`)과 현재 최종 제출본(HEAD) 간 형상 대조 및 파일별 차분 검증
+- **기본 과제 영역 (`on-client/src/**`) 및 프레임워크 무결성**:
+  - 22단계 수료 기능(13~22단계)이 100% 보존되며, alekov-starter 0.2.21 공식 업데이트 이후 수정 금지 4대 파일(`tools/start-alekov.ps1`, `public/index.html`, `public/style.css`, `.on-starter-manifest.json`)이 공식 원본 상태로 무결하게 유지됩니다.
+- **Final 종합 관제 대시보드 확장 영역 (`on-client/student/**`)**:
+  - 상단 4대 관제 지표 카드(네트워크, 방화벽 읽기전용, 윈도우 로그, 하드웨어 자원), 단말 읽기 전용 실측 런타임 인터셉터(`pc-status-runtime.mjs`), 25개 스냅샷 링 버퍼 및 SSE 스트림, 하단 2단 그리드(`audit-split-view`) 감사 패널, 브라우저 CSP 표준 규격 분리 서빙(`GET /student/appearance.css`)이 안전하게 확장 추가되었습니다.
+- **의존성 명세 및 락파일 일치 여부**:
+  - `on-client`는 외부 npm 의존성이 없어 `on-client/package-lock.json`이 존재하지 않으며 루트의 `package-lock.json`이 락파일 역할을 수행합니다. 의존성 버전 및 설치 무결성은 유지됩니다.
 - **핵심 실행 코드 및 의존성 파일 해시 대조 (두 커밋 간 무결성 증명)**:
   - 심사관 환경에서 이전 커밋(`3e9beee`)의 Git 트리를 직접 조회할 수 없는 경우에도, 현재 제출본의 파일 해시와 아래 표를 대조하여 실행 코드·스크립트·락파일에 변경이 없음을 확인할 수 있습니다.
   - 아래 `fileSha256`은 Git 저장소 표준 원문(LF 개행) 기준의 SHA-256 해시입니다. 두 커밋(`3e9beee` 및 `HEAD`)에서 산출된 Git Blob 및 `fileSha256` 해시값이 일치함을 확인하였습니다.

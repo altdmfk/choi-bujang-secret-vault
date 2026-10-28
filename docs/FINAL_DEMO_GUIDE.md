@@ -4,7 +4,7 @@
 
 * **화면 틀**: 관제 대시보드형을 적용했습니다. 상단에 4대 관제 지표 카드를 배치했습니다. 하단에 스냅샷 변동률 추이와 실시간 감사 패널을 배치했습니다.
 * **실행 형태**: 포장 없이 프로젝트 폴더에서 직접 실행합니다. 패키징 빌드 명령은 실행하지 않습니다. 설치 프로그램은 과정 종료 후 참고 자료로 활용합니다.
-* **기준 커밋**: `c84f6428cf0d66f54169a221200fa9fb27142ffd` (관제 대시보드 완성본) 및 최신 제출본(HEAD)
+* **기준 커밋**: `c84f6428cf0d66f54169a221200fa9fb27142ffd` (Final 4일차 1차 구현본) 및 최신 제출본(HEAD, alekov-starter 0.2.21 공식 무결성 및 CSP 비침습 아키텍처 완성본)
 
 ---
 
@@ -77,9 +77,9 @@
 
 ## 5. 실제 확인 근거
 
-* **커밋 번호**: `c84f6428cf0d66f54169a221200fa9fb27142ffd` (관제 대시보드 완성본) 및 최신 안정화 커밋(HEAD)
-* **실행 기록**: `tools/start-alekov.ps1 -Demo` 기동 콘솔 출력, `GET /api/pc-status` 200 OK 응답 수신
-* **화면 요소**: 종합 관제 대시보드 탭(`#tab-dashboard`), 상단 카드 그리드(`#soc-top-metrics`), 하단 분할 영역(`#soc-bottom-split`)
+* **커밋 번호**: `c84f6428cf0d66f54169a221200fa9fb27142ffd` (Final 4일차 1차 구현 기준선) 및 최신 안정화 커밋(HEAD, alekov-starter 0.2.21 공식 원본 4종 무결성 및 CSP 독립 서빙 검증 완료)
+* **실행 기록**: `$env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; tools/start-alekov.ps1 -Demo` 기동 콘솔 출력, `GET /api/pc-status` 200 OK 응답 수신, `GET /student/appearance.css` 200 OK 수신
+* **화면 요소**: 종합 관제 대시보드 탭(`#tab-dashboard`), 상단 카드 그리드(`#soc-top-metrics`), 하단 분할 영역(`#soc-bottom-split`), 2단 그리드 레이아웃(`audit-split-view`)
 
 ---
 
@@ -105,19 +105,19 @@
 
 - **로컬 관제 대시보드 데모 실행 (가상 데이터 및 실측값 비교)**:
   ```powershell
-  # 표준 실행 (PowerShell 래퍼)
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
+  # 1. 표준 실행 (PowerShell 세션에서 환경 변수 결합 후 래퍼 구동)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo
 
-  # 직접 실행 (Node.js)
+  # 2. 직접 실행 (Node.js 직접 구동)
   node --import ./student/pc-status-runtime.mjs src/server.mjs --demo
   ```
 
 - **로컬 관제 대시보드 기본 실행 (단말 실측값 단독 확인)**:
   ```powershell
-  # 표준 실행 (PowerShell 래퍼)
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+  # 1. 표준 실행 (PowerShell 세션에서 환경 변수 결합 후 래퍼 구동)
+  $env:NODE_OPTIONS = "--import ./student/pc-status-runtime.mjs"; powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
 
-  # 직접 실행 (Node.js)
+  # 2. 직접 실행 (Node.js 직접 구동)
   node --import ./student/pc-status-runtime.mjs src/server.mjs
   ```
 
